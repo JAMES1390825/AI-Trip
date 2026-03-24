@@ -1,0 +1,73 @@
+groups:
+  - name: trip-api-slo
+    interval: 30s
+    rules:
+      - alert: TripApiHigh5xxRate
+        expr: |
+          (
+            sum(rate(http_server_requests_seconds_count{job="trip-api",status=~"5.."}[5m])) /
+            clamp_min(sum(rate(http_server_requests_seconds_count{job="trip-api"}[5m])), 0.001)
+          ) > 0.05
+        for: 10m
+        labels:
+          severity: critical
+          service: trip-api
+        annotations:
+          summary: "trip-api 5xx ratio is high"
+          description: "5xx ratio is above 5% for 10m."
+
+      - alert: TripPlanGenerationFailureRateHigh
+        expr: |
+          (
+            sum(rate(trip_plan_generated_total{job="trip-api",status="failure"}[10m])) /
+            clamp_min(sum(rate(trip_plan_generated_total{job="trip-api"}[10m])), 0.001)
+          ) > 0.10
+        for: 10m
+        labels:
+          severity: critical
+          service: trip-api
+        annotations:
+          summary: "Plan generation failure rate is high"
+          description: "trip_plan_generated failure ratio is above 10% for 10m."
+
+      - alert: TripPlanGenerationP95LatencyHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(trip_plan_generate_latency_seconds_bucket{job="trip-api"}[10m])) by (le)
+          ) > 8
+        for: 10m
+        labels:
+          severity: warning
+          service: trip-api
+        annotations:
+          summary: "Plan generation P95 latency is high"
+          description: "trip_plan_generate_latency_seconds p95 is above 8 seconds for 10m."
+
+      - alert: TripPlanCacheHitRateLow
+        expr: |
+          (
+            sum(rate(trip_plan_cache_total{job="trip-api",result="hit"}[30m])) /
+            clamp_min(sum(rate(trip_plan_cache_total{job="trip-api"}[30m])), 0.001)
+          ) < 0.15
+        for: 30m
+        labels:
+          severity: warning
+          service: trip-api
+        annotations:
+          summary: "Plan cache hit rate is low"
+          description: "Cache hit ratio is below 15% for 30m."
+
+      - alert: TripReplanFailureRateHigh
+        expr: |
+          (
+            sum(rate(trip_plan_replan_applied_total{job="trip-api",status="failure"}[15m])) /
+            clamp_min(sum(rate(trip_plan_replan_applied_total{job="trip-api"}[15m])), 0.001)
+          ) > 0.20
+        for: 15m
+        labels:
+          severity: warning
+          service: trip-api
+        annotations:
+          summary: "Replan failure rate is high"
+          description: "Replan failure ratio is above 20% for 15m."

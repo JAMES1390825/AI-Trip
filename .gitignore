@@ -1,0 +1,16 @@
+.idea/
+.vscode/
+*.iml
+
+build/
+out/
+
+*.log
+.env
+.env.*
+infra/docker/.env
+node_modules/
+dist/
+
+apps/trip-api-go/tmp/
+tmp/
