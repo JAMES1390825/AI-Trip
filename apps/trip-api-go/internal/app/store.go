@@ -13,51 +13,73 @@ import (
 )
 
 const (
-	storeFileVersion = 4
+	storeFileVersion = 8
 	maxPlanVersions  = 20
 )
 
 var (
-	ErrSavedPlanNotFound      = errors.New("saved plan not found")
-	ErrSavedPlanForbidden     = errors.New("saved plan forbidden")
-	ErrTargetVersionNotFound  = errors.New("target version not found")
-	ErrShareTokenNotFound     = errors.New("share token not found")
-	ErrShareTokenExpired      = errors.New("share token expired")
-	ErrExecutionStateNotFound = errors.New("execution state not found")
+	ErrSavedPlanNotFound          = errors.New("saved plan not found")
+	ErrSavedPlanForbidden         = errors.New("saved plan forbidden")
+	ErrTargetVersionNotFound      = errors.New("target version not found")
+	ErrShareTokenNotFound         = errors.New("share token not found")
+	ErrShareTokenExpired          = errors.New("share token expired")
+	ErrExecutionStateNotFound     = errors.New("execution state not found")
+	ErrCommunityPostNotFound      = errors.New("community post not found")
+	ErrCommunityVoteInvalid       = errors.New("community vote invalid")
+	ErrCommunityReportInvalid     = errors.New("community report invalid")
+	ErrCommunityModerationInvalid = errors.New("community moderation invalid")
 )
 
 type storeState struct {
-	Version             int                           `json:"version"`
-	SavedByUser         map[string][]SavedPlan        `json:"saved_by_user"`
-	VersionsByPlan      map[string][]SavedPlanVersion `json:"versions_by_plan"`
-	ShareByToken        map[string]ShareTokenRecord   `json:"share_by_token"`
-	ExecutionByPlanDate map[string]PlanExecutionState `json:"execution_by_plan_date"`
-	Events              []EventRecord                 `json:"events"`
+	Version                   int                                    `json:"version"`
+	SavedByUser               map[string][]SavedPlan                 `json:"saved_by_user"`
+	VersionsByPlan            map[string][]SavedPlanVersion          `json:"versions_by_plan"`
+	ShareByToken              map[string]ShareTokenRecord            `json:"share_by_token"`
+	ExecutionByPlanDate       map[string]PlanExecutionState          `json:"execution_by_plan_date"`
+	Events                    []EventRecord                          `json:"events"`
+	ProfilesByUser            map[string]UserPrivateProfile          `json:"profiles_by_user"`
+	PersonalizationByUser     map[string]UserPersonalizationSettings `json:"personalization_by_user"`
+	CommunityPostsByID        map[string]CommunityPost               `json:"community_posts_by_id"`
+	CommunityVotesByPost      map[string][]CommunityVote             `json:"community_votes_by_post"`
+	CommunityReportsByPost    map[string][]CommunityReport           `json:"community_reports_by_post"`
+	CommunityModerationByPost map[string][]CommunityModerationLog    `json:"community_moderation_by_post"`
 }
 
 // Store keeps runtime data in memory and persists to a local JSON file.
 type Store struct {
-	mu                  sync.RWMutex
-	savedByUser         map[string][]SavedPlan
-	savedByID           map[string]SavedPlan
-	versionsByPlan      map[string][]SavedPlanVersion
-	shareByToken        map[string]ShareTokenRecord
-	sharesByPlan        map[string][]string
-	executionByPlanDate map[string]PlanExecutionState
-	events              []EventRecord
-	dataFile            string
+	mu                        sync.RWMutex
+	savedByUser               map[string][]SavedPlan
+	savedByID                 map[string]SavedPlan
+	versionsByPlan            map[string][]SavedPlanVersion
+	shareByToken              map[string]ShareTokenRecord
+	sharesByPlan              map[string][]string
+	executionByPlanDate       map[string]PlanExecutionState
+	events                    []EventRecord
+	profilesByUser            map[string]UserPrivateProfile
+	personalizationByUser     map[string]UserPersonalizationSettings
+	communityPostsByID        map[string]CommunityPost
+	communityVotesByPost      map[string][]CommunityVote
+	communityReportsByPost    map[string][]CommunityReport
+	communityModerationByPost map[string][]CommunityModerationLog
+	dataFile                  string
 }
 
 func NewStore(dataFile string) (*Store, error) {
 	s := &Store{
-		savedByUser:         map[string][]SavedPlan{},
-		savedByID:           map[string]SavedPlan{},
-		versionsByPlan:      map[string][]SavedPlanVersion{},
-		shareByToken:        map[string]ShareTokenRecord{},
-		sharesByPlan:        map[string][]string{},
-		executionByPlanDate: map[string]PlanExecutionState{},
-		events:              make([]EventRecord, 0, 128),
-		dataFile:            strings.TrimSpace(dataFile),
+		savedByUser:               map[string][]SavedPlan{},
+		savedByID:                 map[string]SavedPlan{},
+		versionsByPlan:            map[string][]SavedPlanVersion{},
+		shareByToken:              map[string]ShareTokenRecord{},
+		sharesByPlan:              map[string][]string{},
+		executionByPlanDate:       map[string]PlanExecutionState{},
+		events:                    make([]EventRecord, 0, 128),
+		profilesByUser:            map[string]UserPrivateProfile{},
+		personalizationByUser:     map[string]UserPersonalizationSettings{},
+		communityPostsByID:        map[string]CommunityPost{},
+		communityVotesByPost:      map[string][]CommunityVote{},
+		communityReportsByPost:    map[string][]CommunityReport{},
+		communityModerationByPost: map[string][]CommunityModerationLog{},
+		dataFile:                  strings.TrimSpace(dataFile),
 	}
 	if s.dataFile == "" {
 		return s, nil
@@ -554,11 +576,16 @@ func (s *Store) AddEvent(event EventRecord) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	previous := cloneEventList(s.events)
+	previousEvents := cloneEventList(s.events)
+	previousProfiles := cloneUserPrivateProfileMap(s.profilesByUser)
 	s.events = append(s.events, event)
+	if userID := strings.TrimSpace(event.UserID); userID != "" && s.personalizationEnabledLocked(userID) {
+		s.profilesByUser[userID] = projectUserPrivateProfile(userID, s.events)
+	}
 
 	if err := s.persistLocked(); err != nil {
-		s.events = previous
+		s.events = previousEvents
+		s.profilesByUser = previousProfiles
 		return err
 	}
 	return nil
@@ -593,6 +620,678 @@ func (s *Store) RecentEvents(limit int) []EventRecord {
 		out = append(out, item)
 	}
 	return out
+}
+
+func (s *Store) GetPrivateProfile(userID string) (UserPrivateProfile, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	profile, ok := s.profilesByUser[strings.TrimSpace(userID)]
+	if !ok {
+		return UserPrivateProfile{}, false
+	}
+	return cloneUserPrivateProfile(profile), true
+}
+
+func (s *Store) GetPersonalizationSettings(userID string) UserPersonalizationSettings {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return cloneUserPersonalizationSettings(s.personalizationSettingsLocked(userID))
+}
+
+func (s *Store) UpdatePersonalizationSettings(userID string, enabled bool) (UserPersonalizationSettings, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return UserPersonalizationSettings{}, errors.New("user id is required")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	previousProfiles := cloneUserPrivateProfileMap(s.profilesByUser)
+	previousSettings := cloneUserPersonalizationSettingsMap(s.personalizationByUser)
+
+	settings := s.personalizationSettingsLocked(userID)
+	settings.Enabled = enabled
+	settings.UpdatedAt = time.Now().UTC()
+	s.personalizationByUser[userID] = cloneUserPersonalizationSettings(settings)
+
+	if enabled {
+		if profile := projectUserPrivateProfile(userID, s.events); profile.UserID != "" {
+			s.profilesByUser[userID] = profile
+		}
+	} else {
+		delete(s.profilesByUser, userID)
+	}
+
+	if err := s.persistLocked(); err != nil {
+		s.profilesByUser = previousProfiles
+		s.personalizationByUser = previousSettings
+		return UserPersonalizationSettings{}, err
+	}
+	return cloneUserPersonalizationSettings(settings), nil
+}
+
+func (s *Store) ClearPrivateSignals(userID string) (UserPersonalizationSettings, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return UserPersonalizationSettings{}, errors.New("user id is required")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	previousEvents := cloneEventList(s.events)
+	previousProfiles := cloneUserPrivateProfileMap(s.profilesByUser)
+	previousSettings := cloneUserPersonalizationSettingsMap(s.personalizationByUser)
+
+	filtered := make([]EventRecord, 0, len(s.events))
+	for _, item := range s.events {
+		if strings.TrimSpace(item.UserID) == userID {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	s.events = filtered
+	delete(s.profilesByUser, userID)
+
+	settings := s.personalizationSettingsLocked(userID)
+	settings.ClearedAt = time.Now().UTC()
+	settings.UpdatedAt = settings.ClearedAt
+	s.personalizationByUser[userID] = cloneUserPersonalizationSettings(settings)
+
+	if err := s.persistLocked(); err != nil {
+		s.events = previousEvents
+		s.profilesByUser = previousProfiles
+		s.personalizationByUser = previousSettings
+		return UserPersonalizationSettings{}, err
+	}
+	return cloneUserPersonalizationSettings(settings), nil
+}
+
+func (s *Store) GetEffectivePrivateProfile(userID string) (UserPrivateProfile, UserPersonalizationSettings, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	settings := s.personalizationSettingsLocked(userID)
+	if !settings.Enabled {
+		return UserPrivateProfile{}, cloneUserPersonalizationSettings(settings), false
+	}
+	profile, ok := s.profilesByUser[strings.TrimSpace(userID)]
+	if !ok {
+		return UserPrivateProfile{}, cloneUserPersonalizationSettings(settings), false
+	}
+	return cloneUserPrivateProfile(profile), cloneUserPersonalizationSettings(settings), true
+}
+
+func (s *Store) CreateCommunityPost(post CommunityPost) (CommunityPost, error) {
+	post = normalizeCommunityPost(post)
+	if post.ID == "" {
+		post.ID = randomID()
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	previousPosts := cloneCommunityPostMap(s.communityPostsByID)
+	previousVotes := cloneCommunityVoteMap(s.communityVotesByPost)
+	previousReports := cloneCommunityReportMap(s.communityReportsByPost)
+	previousModeration := cloneCommunityModerationLogMap(s.communityModerationByPost)
+	post.VoteSummary = summarizeCommunityVotes(s.communityVotesByPost[post.ID])
+	s.communityPostsByID[post.ID] = cloneCommunityPost(post)
+
+	if err := s.persistLocked(); err != nil {
+		s.communityPostsByID = previousPosts
+		s.communityVotesByPost = previousVotes
+		s.communityReportsByPost = previousReports
+		s.communityModerationByPost = previousModeration
+		return CommunityPost{}, err
+	}
+	return cloneCommunityPost(post), nil
+}
+
+func (s *Store) ListCommunityPosts(filter CommunityPostFilter) []CommunityPost {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	limit := filter.Limit
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+
+	destination := &DestinationEntity{
+		DestinationID:    strings.TrimSpace(filter.DestinationID),
+		DestinationLabel: strings.TrimSpace(filter.DestinationLabel),
+	}
+	if destination.DestinationID == "" && destination.DestinationLabel == "" {
+		destination = nil
+	}
+
+	status := strings.TrimSpace(filter.Status)
+	items := make([]CommunityPost, 0, len(s.communityPostsByID))
+	for _, raw := range s.communityPostsByID {
+		post := s.decorateCommunityPostLocked(raw)
+		if filter.OwnerOnly {
+			if strings.TrimSpace(post.UserID) != strings.TrimSpace(filter.RequestUserID) {
+				continue
+			}
+		} else if !filter.AdminView && !communityPostVisibleToUser(post, filter.RequestUserID) {
+			continue
+		}
+		if status != "" && post.Status != status {
+			continue
+		}
+		if destination != nil && !communityPostMatchesDestination(post, destination, filter.DestinationLabel) {
+			continue
+		}
+		items = append(items, post)
+	}
+
+	sort.SliceStable(items, func(i, j int) bool {
+		leftScore := communityFeatureScore(items[i])
+		rightScore := communityFeatureScore(items[j])
+		if leftScore == rightScore {
+			leftTime := firstNonZeroTime(items[i].PublishedAt, items[i].UpdatedAt, items[i].CreatedAt)
+			rightTime := firstNonZeroTime(items[j].PublishedAt, items[j].UpdatedAt, items[j].CreatedAt)
+			if leftTime.Equal(rightTime) {
+				return items[i].ID < items[j].ID
+			}
+			return leftTime.After(rightTime)
+		}
+		return leftScore > rightScore
+	})
+
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return cloneCommunityPostList(items)
+}
+
+func (s *Store) GetCommunityPost(postID string) (CommunityPost, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	post, ok := s.communityPostsByID[strings.TrimSpace(postID)]
+	if !ok {
+		return CommunityPost{}, false
+	}
+	return s.decorateCommunityPostLocked(post), true
+}
+
+func (s *Store) GetCommunityPostDetail(postID, requestUserID string, limit int) (CommunityPostDetail, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	post, ok := s.communityPostsByID[strings.TrimSpace(postID)]
+	if !ok {
+		return CommunityPostDetail{}, false
+	}
+	post = s.decorateCommunityPostLocked(post)
+	if !communityPostVisibleToUser(post, requestUserID) {
+		return CommunityPostDetail{}, false
+	}
+
+	author, ok := s.buildCommunityAuthorPublicProfileLocked(post.UserID, requestUserID, 6)
+	if !ok {
+		return CommunityPostDetail{}, false
+	}
+
+	related := s.relatedCommunityPostsLocked(post, requestUserID, limit)
+	return CommunityPostDetail{
+		Post:                cloneCommunityPost(post),
+		Author:              cloneCommunityAuthorPublicProfile(author),
+		RelatedPosts:        cloneCommunityPostList(related),
+		ReferenceCount:      post.ReferenceCount,
+		ReferencedSaveCount: post.ReferencedSaveCount,
+	}, true
+}
+
+func (s *Store) GetCommunityAuthorPublicProfile(authorUserID, requestUserID string, limit int) (CommunityAuthorPublicProfile, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.buildCommunityAuthorPublicProfileLocked(authorUserID, requestUserID, limit)
+}
+
+func (s *Store) VoteCommunityPost(postID, userID, voteType string) (CommunityPost, error) {
+	postID = strings.TrimSpace(postID)
+	userID = strings.TrimSpace(userID)
+	voteType = normalizeCommunityVoteType(voteType)
+	if voteType == "" || userID == "" || postID == "" {
+		return CommunityPost{}, ErrCommunityVoteInvalid
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	post, ok := s.communityPostsByID[postID]
+	if !ok {
+		return CommunityPost{}, ErrCommunityPostNotFound
+	}
+
+	previousPosts := cloneCommunityPostMap(s.communityPostsByID)
+	previousVotes := cloneCommunityVoteMap(s.communityVotesByPost)
+	previousReports := cloneCommunityReportMap(s.communityReportsByPost)
+	previousModeration := cloneCommunityModerationLogMap(s.communityModerationByPost)
+
+	votes := cloneCommunityVoteList(s.communityVotesByPost[postID])
+	replaced := false
+	for idx, vote := range votes {
+		if strings.TrimSpace(vote.UserID) != userID {
+			continue
+		}
+		votes[idx] = CommunityVote{
+			PostID:    postID,
+			UserID:    userID,
+			VoteType:  voteType,
+			CreatedAt: time.Now().UTC(),
+		}
+		replaced = true
+		break
+	}
+	if !replaced {
+		votes = append(votes, CommunityVote{
+			PostID:    postID,
+			UserID:    userID,
+			VoteType:  voteType,
+			CreatedAt: time.Now().UTC(),
+		})
+	}
+	s.communityVotesByPost[postID] = votes
+	post.VoteSummary = summarizeCommunityVotes(votes)
+	s.communityPostsByID[postID] = cloneCommunityPost(post)
+
+	if err := s.persistLocked(); err != nil {
+		s.communityPostsByID = previousPosts
+		s.communityVotesByPost = previousVotes
+		s.communityReportsByPost = previousReports
+		s.communityModerationByPost = previousModeration
+		return CommunityPost{}, err
+	}
+	return cloneCommunityPost(post), nil
+}
+
+func (s *Store) ReportCommunityPost(postID, userID, reason, detail string) (CommunityPost, CommunityReport, error) {
+	postID = strings.TrimSpace(postID)
+	userID = strings.TrimSpace(userID)
+	reason = normalizeCommunityReportReason(reason)
+	detail = normalizeCommunityText(detail)
+	if postID == "" || userID == "" || reason == "" {
+		return CommunityPost{}, CommunityReport{}, ErrCommunityReportInvalid
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	post, ok := s.communityPostsByID[postID]
+	if !ok {
+		return CommunityPost{}, CommunityReport{}, ErrCommunityPostNotFound
+	}
+	if strings.TrimSpace(post.UserID) == userID || !communityPostCanBeReported(post) {
+		return CommunityPost{}, CommunityReport{}, ErrCommunityReportInvalid
+	}
+
+	previousPosts := cloneCommunityPostMap(s.communityPostsByID)
+	previousVotes := cloneCommunityVoteMap(s.communityVotesByPost)
+	previousReports := cloneCommunityReportMap(s.communityReportsByPost)
+	previousModeration := cloneCommunityModerationLogMap(s.communityModerationByPost)
+
+	now := time.Now().UTC()
+	reports := cloneCommunityReportList(s.communityReportsByPost[postID])
+	var savedReport CommunityReport
+	replaced := false
+	for idx, report := range reports {
+		if strings.TrimSpace(report.ReporterUserID) != userID {
+			continue
+		}
+		report.Reason = reason
+		report.Detail = detail
+		report.Status = communityReportStatusOpen
+		report.UpdatedAt = now
+		report.ResolvedAt = time.Time{}
+		reports[idx] = cloneCommunityReport(report)
+		savedReport = cloneCommunityReport(report)
+		replaced = true
+		break
+	}
+	if !replaced {
+		savedReport = CommunityReport{
+			ID:             randomID(),
+			PostID:         postID,
+			ReporterUserID: userID,
+			Reason:         reason,
+			Detail:         detail,
+			Status:         communityReportStatusOpen,
+			CreatedAt:      now,
+			UpdatedAt:      now,
+		}
+		reports = append(reports, cloneCommunityReport(savedReport))
+	}
+
+	post.VoteSummary = summarizeCommunityVotes(s.communityVotesByPost[postID])
+	if countDistinctOpenCommunityReporters(reports) >= communityAutoReportThreshold && post.Status == communityPostStatusPublished {
+		post.Status = communityPostStatusReported
+		post.ProcessingNote = communityAutoReportedNote()
+		post.UpdatedAt = now
+	}
+
+	s.communityReportsByPost[postID] = cloneCommunityReportList(reports)
+	s.communityPostsByID[postID] = cloneCommunityPost(post)
+
+	if err := s.persistLocked(); err != nil {
+		s.communityPostsByID = previousPosts
+		s.communityVotesByPost = previousVotes
+		s.communityReportsByPost = previousReports
+		s.communityModerationByPost = previousModeration
+		return CommunityPost{}, CommunityReport{}, err
+	}
+	return cloneCommunityPost(post), cloneCommunityReport(savedReport), nil
+}
+
+func (s *Store) ModerateCommunityPost(postID, adminUserID, action, reason, note string) (CommunityPost, CommunityModerationLog, error) {
+	postID = strings.TrimSpace(postID)
+	adminUserID = strings.TrimSpace(adminUserID)
+	action = normalizeCommunityModerationAction(action)
+	reason = normalizedSignalKey(reason)
+	note = normalizeCommunityText(note)
+	if postID == "" || adminUserID == "" || action == "" || reason == "" {
+		return CommunityPost{}, CommunityModerationLog{}, ErrCommunityModerationInvalid
+	}
+
+	nextStatus := communityModerationNextStatus(action)
+	if nextStatus == "" {
+		return CommunityPost{}, CommunityModerationLog{}, ErrCommunityModerationInvalid
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	post, ok := s.communityPostsByID[postID]
+	if !ok {
+		return CommunityPost{}, CommunityModerationLog{}, ErrCommunityPostNotFound
+	}
+
+	previousPosts := cloneCommunityPostMap(s.communityPostsByID)
+	previousVotes := cloneCommunityVoteMap(s.communityVotesByPost)
+	previousReports := cloneCommunityReportMap(s.communityReportsByPost)
+	previousModeration := cloneCommunityModerationLogMap(s.communityModerationByPost)
+
+	now := time.Now().UTC()
+	logEntry := CommunityModerationLog{
+		ID:             randomID(),
+		PostID:         postID,
+		OperatorUserID: adminUserID,
+		Action:         action,
+		Reason:         reason,
+		Note:           note,
+		PreviousStatus: post.Status,
+		NextStatus:     nextStatus,
+		CreatedAt:      now,
+	}
+
+	post.Status = nextStatus
+	post.ProcessingNote = communityModerationNote(action)
+	post.UpdatedAt = now
+	if nextStatus == communityPostStatusPublished && post.PublishedAt.IsZero() {
+		post.PublishedAt = now
+	}
+
+	reportResolution := communityReportStatusResolvedValid
+	if nextStatus == communityPostStatusPublished {
+		reportResolution = communityReportStatusResolvedInvalid
+	}
+	s.communityReportsByPost[postID] = resolveOpenCommunityReports(s.communityReportsByPost[postID], reportResolution, now)
+	logs := append(cloneCommunityModerationLogList(s.communityModerationByPost[postID]), cloneCommunityModerationLog(logEntry))
+	s.communityModerationByPost[postID] = logs
+	post.VoteSummary = summarizeCommunityVotes(s.communityVotesByPost[postID])
+	s.communityPostsByID[postID] = cloneCommunityPost(post)
+
+	if err := s.persistLocked(); err != nil {
+		s.communityPostsByID = previousPosts
+		s.communityVotesByPost = previousVotes
+		s.communityReportsByPost = previousReports
+		s.communityModerationByPost = previousModeration
+		return CommunityPost{}, CommunityModerationLog{}, err
+	}
+	return cloneCommunityPost(post), cloneCommunityModerationLog(logEntry), nil
+}
+
+func (s *Store) ListCommunityReports(limit int, status string) []CommunityReportAggregate {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	status = normalizeCommunityReportStatus(status)
+
+	items := make([]CommunityReportAggregate, 0, len(s.communityReportsByPost))
+	for postID, reports := range s.communityReportsByPost {
+		post, ok := s.communityPostsByID[postID]
+		if !ok {
+			continue
+		}
+		filteredReports := make([]CommunityReport, 0, len(reports))
+		openCount := 0
+		reasons := make([]string, 0, 4)
+		latest := time.Time{}
+		for _, raw := range reports {
+			report := cloneCommunityReport(raw)
+			if status != "" && report.Status != status {
+				continue
+			}
+			filteredReports = append(filteredReports, report)
+			reasons = append(reasons, report.Reason)
+			if report.Status == communityReportStatusOpen {
+				openCount++
+			}
+			if report.UpdatedAt.After(latest) {
+				latest = report.UpdatedAt
+			}
+		}
+		if len(filteredReports) == 0 {
+			continue
+		}
+		post = s.decorateCommunityPostLocked(post)
+		items = append(items, CommunityReportAggregate{
+			Post:            post,
+			OpenReportCount: openCount,
+			LatestReportAt:  latest,
+			Reasons:         uniqueStrings(reasons),
+			Reports:         filteredReports,
+			ModerationLogs:  cloneCommunityModerationLogList(s.communityModerationByPost[postID]),
+		})
+	}
+
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].OpenReportCount == items[j].OpenReportCount {
+			if items[i].LatestReportAt.Equal(items[j].LatestReportAt) {
+				return items[i].Post.ID < items[j].Post.ID
+			}
+			return items[i].LatestReportAt.After(items[j].LatestReportAt)
+		}
+		return items[i].OpenReportCount > items[j].OpenReportCount
+	})
+
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return cloneCommunityReportAggregateList(items)
+}
+
+func (s *Store) BuildCommunityPlanningSummary(destination *DestinationEntity, fallbackLabel string, explicitPostIDs []string, limit int) CommunityPlanningSummary {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	posts := make([]CommunityPost, 0, len(s.communityPostsByID))
+	for _, post := range s.communityPostsByID {
+		posts = append(posts, s.decorateCommunityPostLocked(post))
+	}
+	return buildCommunityPlanningSummaryFromPosts(destination, fallbackLabel, posts, explicitPostIDs, limit)
+}
+
+func (s *Store) decorateCommunityPostLocked(raw CommunityPost) CommunityPost {
+	post := cloneCommunityPost(raw)
+	post.VoteSummary = summarizeCommunityVotes(s.communityVotesByPost[post.ID])
+	post.ReferenceCount, post.ReferencedSaveCount = s.communityPostReferenceStatsLocked(post.ID)
+	return cloneCommunityPost(post)
+}
+
+func (s *Store) communityPostReferenceStatsLocked(postID string) (int, int) {
+	postID = strings.TrimSpace(postID)
+	if postID == "" {
+		return 0, 0
+	}
+
+	referenceCount := 0
+	referencedSaveCount := 0
+	for _, event := range s.events {
+		ids := uniqueStrings(asStringSlice(event.Metadata["community_referenced_post_ids"]))
+		if len(ids) == 0 {
+			ids = uniqueStrings(asStringSlice(event.Metadata["community_post_ids"]))
+		}
+		if !containsString(ids, postID) {
+			continue
+		}
+		switch strings.TrimSpace(event.EventName) {
+		case "plan_generated_v2", "plan_generated":
+			referenceCount++
+		case "plan_saved":
+			referencedSaveCount++
+		}
+	}
+	return referenceCount, referencedSaveCount
+}
+
+func (s *Store) relatedCommunityPostsLocked(post CommunityPost, requestUserID string, limit int) []CommunityPost {
+	if limit <= 0 || limit > 12 {
+		limit = 4
+	}
+
+	items := make([]CommunityPost, 0, limit)
+	for _, raw := range s.communityPostsByID {
+		if strings.TrimSpace(raw.ID) == strings.TrimSpace(post.ID) {
+			continue
+		}
+		candidate := s.decorateCommunityPostLocked(raw)
+		if !communityPostVisibleToUser(candidate, requestUserID) {
+			continue
+		}
+		if !communityPostsAreRelated(post, candidate) {
+			continue
+		}
+		items = append(items, candidate)
+	}
+
+	sort.SliceStable(items, func(i, j int) bool {
+		leftScore := communityRelatedScore(post, items[i])
+		rightScore := communityRelatedScore(post, items[j])
+		if leftScore == rightScore {
+			return firstNonZeroTime(items[i].PublishedAt, items[i].UpdatedAt, items[i].CreatedAt).After(
+				firstNonZeroTime(items[j].PublishedAt, items[j].UpdatedAt, items[j].CreatedAt),
+			)
+		}
+		return leftScore > rightScore
+	})
+
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return cloneCommunityPostList(items)
+}
+
+func (s *Store) buildCommunityAuthorPublicProfileLocked(authorUserID, requestUserID string, limit int) (CommunityAuthorPublicProfile, bool) {
+	authorUserID = strings.TrimSpace(authorUserID)
+	if authorUserID == "" {
+		return CommunityAuthorPublicProfile{}, false
+	}
+	if limit <= 0 || limit > 20 {
+		limit = 8
+	}
+
+	visiblePosts := make([]CommunityPost, 0, limit)
+	destinationAgg := map[string]*CommunityAuthorDestinationSummary{}
+	tagScores := map[string]int{}
+	helpfulTotal := 0
+	referenceTotal := 0
+	referencedSaveTotal := 0
+	latest := time.Time{}
+
+	for _, raw := range s.communityPostsByID {
+		if strings.TrimSpace(raw.UserID) != authorUserID {
+			continue
+		}
+		post := s.decorateCommunityPostLocked(raw)
+		if !communityPostVisibleToUser(post, requestUserID) {
+			continue
+		}
+		visiblePosts = append(visiblePosts, post)
+		helpfulTotal += post.VoteSummary.HelpfulCount
+		referenceTotal += post.ReferenceCount
+		referencedSaveTotal += post.ReferencedSaveCount
+		if ts := firstNonZeroTime(post.PublishedAt, post.UpdatedAt, post.CreatedAt); ts.After(latest) {
+			latest = ts
+		}
+		destKey := firstNonBlank(post.DestinationID, post.DestinationLabel)
+		if destKey != "" {
+			entry, ok := destinationAgg[destKey]
+			if !ok {
+				entry = &CommunityAuthorDestinationSummary{
+					DestinationID:    strings.TrimSpace(post.DestinationID),
+					DestinationLabel: strings.TrimSpace(post.DestinationLabel),
+				}
+				destinationAgg[destKey] = entry
+			}
+			entry.PostCount++
+		}
+		for _, tag := range post.Tags {
+			tagScores[tag]++
+		}
+	}
+
+	if len(visiblePosts) == 0 {
+		return CommunityAuthorPublicProfile{}, false
+	}
+
+	sort.SliceStable(visiblePosts, func(i, j int) bool {
+		left := firstNonZeroTime(visiblePosts[i].PublishedAt, visiblePosts[i].UpdatedAt, visiblePosts[i].CreatedAt)
+		right := firstNonZeroTime(visiblePosts[j].PublishedAt, visiblePosts[j].UpdatedAt, visiblePosts[j].CreatedAt)
+		if left.Equal(right) {
+			return visiblePosts[i].ID < visiblePosts[j].ID
+		}
+		return left.After(right)
+	})
+	if len(visiblePosts) > limit {
+		visiblePosts = visiblePosts[:limit]
+	}
+
+	destinations := make([]CommunityAuthorDestinationSummary, 0, len(destinationAgg))
+	for _, item := range destinationAgg {
+		destinations = append(destinations, *item)
+	}
+	sort.SliceStable(destinations, func(i, j int) bool {
+		if destinations[i].PostCount == destinations[j].PostCount {
+			return destinations[i].DestinationLabel < destinations[j].DestinationLabel
+		}
+		return destinations[i].PostCount > destinations[j].PostCount
+	})
+	if len(destinations) > 4 {
+		destinations = destinations[:4]
+	}
+
+	topTags := sortedKeysByCount(tagScores, 5)
+	profile := CommunityAuthorPublicProfile{
+		UserID:              authorUserID,
+		DisplayName:         communityAuthorDisplayName(authorUserID),
+		PublishedPostCount:  len(visiblePosts),
+		HelpfulCount:        helpfulTotal,
+		ReferenceCount:      referenceTotal,
+		ReferencedSaveCount: referencedSaveTotal,
+		TopTags:             topTags,
+		Destinations:        destinations,
+		RecentPosts:         cloneCommunityPostList(visiblePosts),
+		UpdatedAt:           latest,
+	}
+	return cloneCommunityAuthorPublicProfile(profile), true
 }
 
 func (s *Store) getPlanAccessLocked(userID, id string) (SavedPlan, error) {
@@ -635,6 +1334,24 @@ func (s *Store) loadFromDisk() error {
 	if state.ExecutionByPlanDate == nil {
 		state.ExecutionByPlanDate = map[string]PlanExecutionState{}
 	}
+	if state.ProfilesByUser == nil {
+		state.ProfilesByUser = map[string]UserPrivateProfile{}
+	}
+	if state.PersonalizationByUser == nil {
+		state.PersonalizationByUser = map[string]UserPersonalizationSettings{}
+	}
+	if state.CommunityPostsByID == nil {
+		state.CommunityPostsByID = map[string]CommunityPost{}
+	}
+	if state.CommunityVotesByPost == nil {
+		state.CommunityVotesByPost = map[string][]CommunityVote{}
+	}
+	if state.CommunityReportsByPost == nil {
+		state.CommunityReportsByPost = map[string][]CommunityReport{}
+	}
+	if state.CommunityModerationByPost == nil {
+		state.CommunityModerationByPost = map[string][]CommunityModerationLog{}
+	}
 
 	s.savedByUser = map[string][]SavedPlan{}
 	s.savedByID = map[string]SavedPlan{}
@@ -642,6 +1359,12 @@ func (s *Store) loadFromDisk() error {
 	s.shareByToken = map[string]ShareTokenRecord{}
 	s.sharesByPlan = map[string][]string{}
 	s.executionByPlanDate = map[string]PlanExecutionState{}
+	s.profilesByUser = map[string]UserPrivateProfile{}
+	s.personalizationByUser = map[string]UserPersonalizationSettings{}
+	s.communityPostsByID = map[string]CommunityPost{}
+	s.communityVotesByPost = map[string][]CommunityVote{}
+	s.communityReportsByPost = map[string][]CommunityReport{}
+	s.communityModerationByPost = map[string][]CommunityModerationLog{}
 
 	for userID, plans := range state.SavedByUser {
 		copied := cloneSavedPlanList(plans)
@@ -688,6 +1411,26 @@ func (s *Store) loadFromDisk() error {
 	}
 
 	s.events = cloneEventList(state.Events)
+	s.profilesByUser = cloneUserPrivateProfileMap(state.ProfilesByUser)
+	s.personalizationByUser = cloneUserPersonalizationSettingsMap(state.PersonalizationByUser)
+	if len(s.profilesByUser) == 0 && len(s.events) > 0 {
+		s.profilesByUser = buildPrivateProfilesByUser(s.events)
+	}
+	for userID, profile := range cloneUserPrivateProfileMap(s.profilesByUser) {
+		if !s.personalizationEnabledLocked(userID) {
+			delete(s.profilesByUser, userID)
+			continue
+		}
+		s.profilesByUser[userID] = profile
+	}
+	s.communityPostsByID = cloneCommunityPostMap(state.CommunityPostsByID)
+	s.communityVotesByPost = cloneCommunityVoteMap(state.CommunityVotesByPost)
+	s.communityReportsByPost = cloneCommunityReportMap(state.CommunityReportsByPost)
+	s.communityModerationByPost = cloneCommunityModerationLogMap(state.CommunityModerationByPost)
+	for postID, post := range s.communityPostsByID {
+		post.VoteSummary = summarizeCommunityVotes(s.communityVotesByPost[postID])
+		s.communityPostsByID[postID] = cloneCommunityPost(post)
+	}
 	return nil
 }
 
@@ -697,12 +1440,18 @@ func (s *Store) persistLocked() error {
 	}
 
 	state := storeState{
-		Version:             storeFileVersion,
-		SavedByUser:         map[string][]SavedPlan{},
-		VersionsByPlan:      map[string][]SavedPlanVersion{},
-		ShareByToken:        cloneShareTokenMap(s.shareByToken),
-		ExecutionByPlanDate: clonePlanExecutionStateMap(s.executionByPlanDate),
-		Events:              cloneEventList(s.events),
+		Version:                   storeFileVersion,
+		SavedByUser:               map[string][]SavedPlan{},
+		VersionsByPlan:            map[string][]SavedPlanVersion{},
+		ShareByToken:              cloneShareTokenMap(s.shareByToken),
+		ExecutionByPlanDate:       clonePlanExecutionStateMap(s.executionByPlanDate),
+		Events:                    cloneEventList(s.events),
+		ProfilesByUser:            cloneUserPrivateProfileMap(s.profilesByUser),
+		PersonalizationByUser:     cloneUserPersonalizationSettingsMap(s.personalizationByUser),
+		CommunityPostsByID:        cloneCommunityPostMap(s.communityPostsByID),
+		CommunityVotesByPost:      cloneCommunityVoteMap(s.communityVotesByPost),
+		CommunityReportsByPost:    cloneCommunityReportMap(s.communityReportsByPost),
+		CommunityModerationByPost: cloneCommunityModerationLogMap(s.communityModerationByPost),
 	}
 
 	for userID, plans := range s.savedByUser {
@@ -1121,4 +1870,364 @@ func cloneEventList(events []EventRecord) []EventRecord {
 		out = append(out, event)
 	}
 	return out
+}
+
+func cloneUserPrivateProfileMap(values map[string]UserPrivateProfile) map[string]UserPrivateProfile {
+	if len(values) == 0 {
+		return map[string]UserPrivateProfile{}
+	}
+	out := make(map[string]UserPrivateProfile, len(values))
+	for key, value := range values {
+		out[key] = cloneUserPrivateProfile(value)
+	}
+	return out
+}
+
+func cloneUserPrivateProfile(profile UserPrivateProfile) UserPrivateProfile {
+	profile.UserID = strings.TrimSpace(profile.UserID)
+	profile.ExplicitPreferences.TravelStyles = append([]string{}, profile.ExplicitPreferences.TravelStyles...)
+	profile.BehavioralAffinity.Categories = cloneStringFloatMap(profile.BehavioralAffinity.Categories)
+	profile.BehavioralAffinity.Tags = cloneStringFloatMap(profile.BehavioralAffinity.Tags)
+	profile.BehavioralAffinity.Districts = cloneStringFloatMap(profile.BehavioralAffinity.Districts)
+	return normalizeUserPrivateProfile(profile)
+}
+
+func defaultUserPersonalizationSettings() UserPersonalizationSettings {
+	return UserPersonalizationSettings{
+		Enabled: true,
+	}
+}
+
+func normalizeUserPersonalizationSettings(settings UserPersonalizationSettings) UserPersonalizationSettings {
+	if settings.UpdatedAt.IsZero() && !settings.ClearedAt.IsZero() {
+		settings.UpdatedAt = settings.ClearedAt
+	}
+	if settings.UpdatedAt.IsZero() {
+		settings.UpdatedAt = time.Now().UTC()
+	}
+	return settings
+}
+
+func cloneUserPersonalizationSettings(settings UserPersonalizationSettings) UserPersonalizationSettings {
+	return normalizeUserPersonalizationSettings(settings)
+}
+
+func cloneUserPersonalizationSettingsMap(values map[string]UserPersonalizationSettings) map[string]UserPersonalizationSettings {
+	if len(values) == 0 {
+		return map[string]UserPersonalizationSettings{}
+	}
+	out := make(map[string]UserPersonalizationSettings, len(values))
+	for key, value := range values {
+		out[key] = cloneUserPersonalizationSettings(value)
+	}
+	return out
+}
+
+func (s *Store) personalizationSettingsLocked(userID string) UserPersonalizationSettings {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return cloneUserPersonalizationSettings(defaultUserPersonalizationSettings())
+	}
+	settings, ok := s.personalizationByUser[userID]
+	if !ok {
+		return cloneUserPersonalizationSettings(defaultUserPersonalizationSettings())
+	}
+	return cloneUserPersonalizationSettings(settings)
+}
+
+func (s *Store) personalizationEnabledLocked(userID string) bool {
+	return s.personalizationSettingsLocked(userID).Enabled
+}
+
+func cloneStringFloatMap(values map[string]float64) map[string]float64 {
+	if len(values) == 0 {
+		return map[string]float64{}
+	}
+	out := make(map[string]float64, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
+}
+
+func cloneCommunityPost(post CommunityPost) CommunityPost {
+	post.Title = strings.TrimSpace(post.Title)
+	post.Content = strings.TrimSpace(post.Content)
+	post.DestinationID = strings.TrimSpace(post.DestinationID)
+	post.DestinationLabel = strings.TrimSpace(post.DestinationLabel)
+	post.DestinationAdcode = strings.TrimSpace(post.DestinationAdcode)
+	post.Tags = append([]string{}, post.Tags...)
+	post.ImageURLs = append([]string{}, post.ImageURLs...)
+	post.FavoriteRestaurants = append([]string{}, post.FavoriteRestaurants...)
+	post.FavoriteAttractions = append([]string{}, post.FavoriteAttractions...)
+	post.MentionedPlaces = append([]string{}, post.MentionedPlaces...)
+	post.VoteSummary = normalizeCommunityVoteSummary(post.VoteSummary)
+	return post
+}
+
+func cloneCommunityPostList(posts []CommunityPost) []CommunityPost {
+	if len(posts) == 0 {
+		return []CommunityPost{}
+	}
+	out := make([]CommunityPost, 0, len(posts))
+	for _, post := range posts {
+		out = append(out, cloneCommunityPost(post))
+	}
+	return out
+}
+
+func cloneCommunityPostMap(values map[string]CommunityPost) map[string]CommunityPost {
+	if len(values) == 0 {
+		return map[string]CommunityPost{}
+	}
+	out := make(map[string]CommunityPost, len(values))
+	for key, value := range values {
+		out[key] = cloneCommunityPost(value)
+	}
+	return out
+}
+
+func cloneCommunityVoteList(votes []CommunityVote) []CommunityVote {
+	if len(votes) == 0 {
+		return []CommunityVote{}
+	}
+	out := make([]CommunityVote, 0, len(votes))
+	for _, vote := range votes {
+		out = append(out, vote)
+	}
+	return out
+}
+
+func cloneCommunityVoteMap(values map[string][]CommunityVote) map[string][]CommunityVote {
+	if len(values) == 0 {
+		return map[string][]CommunityVote{}
+	}
+	out := make(map[string][]CommunityVote, len(values))
+	for key, votes := range values {
+		out[key] = cloneCommunityVoteList(votes)
+	}
+	return out
+}
+
+func cloneCommunityReport(report CommunityReport) CommunityReport {
+	report.ID = strings.TrimSpace(report.ID)
+	report.PostID = strings.TrimSpace(report.PostID)
+	report.ReporterUserID = strings.TrimSpace(report.ReporterUserID)
+	report.Reason = normalizeCommunityReportReason(report.Reason)
+	report.Detail = strings.TrimSpace(report.Detail)
+	report.Status = normalizeCommunityReportStatus(report.Status)
+	return report
+}
+
+func cloneCommunityReportList(reports []CommunityReport) []CommunityReport {
+	if len(reports) == 0 {
+		return []CommunityReport{}
+	}
+	out := make([]CommunityReport, 0, len(reports))
+	for _, report := range reports {
+		out = append(out, cloneCommunityReport(report))
+	}
+	return out
+}
+
+func cloneCommunityReportMap(values map[string][]CommunityReport) map[string][]CommunityReport {
+	if len(values) == 0 {
+		return map[string][]CommunityReport{}
+	}
+	out := make(map[string][]CommunityReport, len(values))
+	for key, reports := range values {
+		out[key] = cloneCommunityReportList(reports)
+	}
+	return out
+}
+
+func cloneCommunityModerationLog(logEntry CommunityModerationLog) CommunityModerationLog {
+	logEntry.ID = strings.TrimSpace(logEntry.ID)
+	logEntry.PostID = strings.TrimSpace(logEntry.PostID)
+	logEntry.OperatorUserID = strings.TrimSpace(logEntry.OperatorUserID)
+	logEntry.Action = normalizeCommunityModerationAction(logEntry.Action)
+	logEntry.Reason = normalizedSignalKey(logEntry.Reason)
+	logEntry.Note = strings.TrimSpace(logEntry.Note)
+	logEntry.PreviousStatus = normalizeCommunityPostStatus(logEntry.PreviousStatus)
+	logEntry.NextStatus = normalizeCommunityPostStatus(logEntry.NextStatus)
+	return logEntry
+}
+
+func cloneCommunityModerationLogList(values []CommunityModerationLog) []CommunityModerationLog {
+	if len(values) == 0 {
+		return []CommunityModerationLog{}
+	}
+	out := make([]CommunityModerationLog, 0, len(values))
+	for _, value := range values {
+		out = append(out, cloneCommunityModerationLog(value))
+	}
+	return out
+}
+
+func cloneCommunityModerationLogMap(values map[string][]CommunityModerationLog) map[string][]CommunityModerationLog {
+	if len(values) == 0 {
+		return map[string][]CommunityModerationLog{}
+	}
+	out := make(map[string][]CommunityModerationLog, len(values))
+	for key, logs := range values {
+		out[key] = cloneCommunityModerationLogList(logs)
+	}
+	return out
+}
+
+func cloneCommunityReportAggregate(item CommunityReportAggregate) CommunityReportAggregate {
+	item.Post = cloneCommunityPost(item.Post)
+	item.Reasons = append([]string{}, item.Reasons...)
+	item.Reports = cloneCommunityReportList(item.Reports)
+	item.ModerationLogs = cloneCommunityModerationLogList(item.ModerationLogs)
+	return item
+}
+
+func cloneCommunityAuthorPublicProfile(profile CommunityAuthorPublicProfile) CommunityAuthorPublicProfile {
+	profile.UserID = strings.TrimSpace(profile.UserID)
+	profile.DisplayName = strings.TrimSpace(profile.DisplayName)
+	profile.TopTags = append([]string{}, profile.TopTags...)
+	profile.Destinations = append([]CommunityAuthorDestinationSummary{}, profile.Destinations...)
+	profile.RecentPosts = cloneCommunityPostList(profile.RecentPosts)
+	return profile
+}
+
+func cloneCommunityReportAggregateList(values []CommunityReportAggregate) []CommunityReportAggregate {
+	if len(values) == 0 {
+		return []CommunityReportAggregate{}
+	}
+	out := make([]CommunityReportAggregate, 0, len(values))
+	for _, value := range values {
+		out = append(out, cloneCommunityReportAggregate(value))
+	}
+	return out
+}
+
+func summarizeCommunityVotes(votes []CommunityVote) CommunityVoteSummary {
+	summary := CommunityVoteSummary{}
+	for _, vote := range votes {
+		switch normalizeCommunityVoteType(vote.VoteType) {
+		case communityVoteTypeHelpful:
+			summary.HelpfulCount++
+		case communityVoteTypeWantToGo:
+			summary.WantToGoCount++
+		}
+	}
+	return summary
+}
+
+func countDistinctOpenCommunityReporters(reports []CommunityReport) int {
+	distinct := map[string]bool{}
+	for _, report := range reports {
+		if report.Status != communityReportStatusOpen {
+			continue
+		}
+		userID := strings.TrimSpace(report.ReporterUserID)
+		if userID == "" {
+			continue
+		}
+		distinct[userID] = true
+	}
+	return len(distinct)
+}
+
+func resolveOpenCommunityReports(reports []CommunityReport, nextStatus string, resolvedAt time.Time) []CommunityReport {
+	nextStatus = normalizeCommunityReportStatus(nextStatus)
+	if nextStatus == "" {
+		return cloneCommunityReportList(reports)
+	}
+	out := make([]CommunityReport, 0, len(reports))
+	for _, raw := range reports {
+		report := cloneCommunityReport(raw)
+		if report.Status == communityReportStatusOpen {
+			report.Status = nextStatus
+			report.UpdatedAt = resolvedAt
+			report.ResolvedAt = resolvedAt
+		}
+		out = append(out, report)
+	}
+	return out
+}
+
+func firstNonZeroTime(values ...time.Time) time.Time {
+	for _, value := range values {
+		if !value.IsZero() {
+			return value
+		}
+	}
+	return time.Time{}
+}
+
+func communityPostsAreRelated(left, right CommunityPost) bool {
+	if left.DestinationID != "" && right.DestinationID != "" && left.DestinationID == right.DestinationID {
+		return true
+	}
+	if left.DestinationLabel != "" && right.DestinationLabel != "" && strings.EqualFold(left.DestinationLabel, right.DestinationLabel) {
+		return true
+	}
+	for _, leftTag := range left.Tags {
+		if containsString(right.Tags, leftTag) {
+			return true
+		}
+	}
+	return false
+}
+
+func communityRelatedScore(target, candidate CommunityPost) float64 {
+	score := communityFeatureScore(candidate)
+	if target.DestinationID != "" && candidate.DestinationID == target.DestinationID {
+		score += 2.5
+	}
+	if target.DestinationLabel != "" && strings.EqualFold(candidate.DestinationLabel, target.DestinationLabel) {
+		score += 1.5
+	}
+	for _, tag := range target.Tags {
+		if containsString(candidate.Tags, tag) {
+			score += 0.6
+		}
+	}
+	return score
+}
+
+func sortedKeysByCount(values map[string]int, limit int) []string {
+	if len(values) == 0 {
+		return []string{}
+	}
+	type pair struct {
+		Key   string
+		Count int
+	}
+	items := make([]pair, 0, len(values))
+	for key, count := range values {
+		if strings.TrimSpace(key) == "" || count <= 0 {
+			continue
+		}
+		items = append(items, pair{Key: key, Count: count})
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].Count == items[j].Count {
+			return items[i].Key < items[j].Key
+		}
+		return items[i].Count > items[j].Count
+	})
+	if limit > 0 && len(items) > limit {
+		items = items[:limit]
+	}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		out = append(out, item.Key)
+	}
+	return out
+}
+
+func communityAuthorDisplayName(userID string) string {
+	trimmed := strings.TrimSpace(userID)
+	if trimmed == "" {
+		return "匿名旅行者"
+	}
+	suffix := trimmed
+	if len(suffix) > 4 {
+		suffix = suffix[len(suffix)-4:]
+	}
+	return "旅行者 " + suffix
 }

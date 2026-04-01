@@ -1,5 +1,5 @@
 ﻿param(
-    [ValidateSet("help", "up-local", "backend-dev", "frontend-dev", "smoke")]
+    [ValidateSet("help", "up-local", "ai-service-dev", "backend-dev", "frontend-dev", "smoke")]
     [string]$Task = "help"
 )
 
@@ -8,6 +8,7 @@ $ErrorActionPreference = "Stop"
 
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $backendDir = Join-Path $root "apps\trip-api-go"
+$aiServiceDir = Join-Path $root "apps\trip-ai-service"
 $frontendDir = Join-Path $root "apps\web-client"
 
 function Step($text) {
@@ -73,9 +74,10 @@ function Print-Help {
     Write-Host ""
     Write-Host "Tasks:" -ForegroundColor Yellow
     Write-Host "  help         Show this help"
-    Write-Host "  up-local     Print independent backend/frontend start commands"
+    Write-Host "  up-local     Print independent backend/admin start commands"
+    Write-Host "  ai-service-dev Start Python AI service (trip-ai-service)"
     Write-Host "  backend-dev  Start Go backend (trip-api-go)"
-    Write-Host "  frontend-dev Start React frontend (web-client)"
+    Write-Host "  frontend-dev Start admin console (web-client)"
     Write-Host "  smoke        Basic smoke check (health + auth token)"
 }
 
@@ -84,18 +86,29 @@ switch ($Task) {
         Print-Help
     }
     "up-local" {
-        Write-Host "Start backend in terminal A:" -ForegroundColor Green
+        Write-Host "Start AI service in terminal A:" -ForegroundColor Green
+        Write-Host "  cd apps/trip-ai-service"
+        Write-Host "  set BAILIAN_API_KEY=your-bailian-key"
+        Write-Host "  python main.py"
+        Write-Host ""
+        Write-Host "Start backend in terminal B:" -ForegroundColor Green
         Write-Host "  cd apps/trip-api-go"
+        Write-Host "  set AI_SERVICE_BASE_URL=http://127.0.0.1:8091"
         Write-Host "  go run ./cmd/trip-api-go"
         Write-Host ""
-        Write-Host "Start frontend in terminal B:" -ForegroundColor Green
+        Write-Host "Start admin console in terminal C:" -ForegroundColor Green
         Write-Host "  cd apps/web-client"
         Write-Host "  npm install"
         Write-Host "  npm run dev -- --host 127.0.0.1 --port 5500"
         Write-Host ""
         Write-Host "Open:" -ForegroundColor Green
-        Write-Host "  Web:      http://127.0.0.1:5500"
+        Write-Host "  Admin:    http://127.0.0.1:5500"
         Write-Host "  Trip API: http://127.0.0.1:8080/api/v1/health"
+    }
+    "ai-service-dev" {
+        Ensure-Command "python" "Install Python 3 from https://www.python.org/downloads/"
+        Step "Starting trip-ai-service"
+        Run "python main.py" $aiServiceDir
     }
     "backend-dev" {
         $goExe = Resolve-GoExe
@@ -104,7 +117,7 @@ switch ($Task) {
     }
     "frontend-dev" {
         Ensure-Command "npm" "Install Node.js from https://nodejs.org/"
-        Step "Installing frontend dependencies"
+        Step "Installing admin console dependencies"
         Run "npm install" $frontendDir
         Step "Starting web-client"
         Run "npm run dev -- --host 127.0.0.1 --port 5500" $frontendDir

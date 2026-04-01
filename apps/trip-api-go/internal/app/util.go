@@ -265,6 +265,19 @@ func uniqueStrings(values []string) []string {
 	return out
 }
 
+func containsString(items []string, value string) bool {
+	target := strings.TrimSpace(value)
+	if target == "" {
+		return false
+	}
+	for _, item := range items {
+		if strings.TrimSpace(item) == target {
+			return true
+		}
+	}
+	return false
+}
+
 func deepCloneMap(input map[string]any) map[string]any {
 	if input == nil {
 		return map[string]any{}

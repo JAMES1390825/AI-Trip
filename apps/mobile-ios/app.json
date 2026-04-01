@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Trip Canvas",
+    "slug": "trip-mobile-ios",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.tripcanvas.mobile"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "允许 AI Trip 访问你的位置，用于生成附近可执行行程建议。"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "允许 AI Trip 访问你的相册，用于上传旅行图片到社区分享。"
+        }
+      ]
+    ],
+    "assetBundlePatterns": ["**/*"]
+  }
+}

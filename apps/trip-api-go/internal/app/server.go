@@ -1,12 +1,15 @@
 package app
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -14,6 +17,8 @@ import (
 type App struct {
 	config Config
 	store  *Store
+	ai     *AIServiceClient
+	amap   *AmapClient
 }
 
 func New() (*App, error) {
@@ -22,7 +27,12 @@ func New() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &App{config: cfg, store: store}, nil
+	return &App{
+		config: cfg,
+		store:  store,
+		ai:     NewAIServiceClient(cfg.AI),
+		amap:   NewAmapClient(cfg.Amap),
+	}, nil
 }
 
 func (a *App) Run() error {
@@ -51,6 +61,13 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"scope":   "ai-planner-v1",
 		})
 		return
+	}
+
+	if r.Method == http.MethodGet {
+		if fileName, ok := parseCommunityMediaEntityRoute(r.URL.Path); ok {
+			a.handlePublicCommunityMediaRead(w, r, fileName)
+			return
+		}
 	}
 
 	if r.Method == http.MethodPost && r.URL.Path == "/api/v1/auth/token" {
@@ -166,6 +183,26 @@ func (a *App) handleAuthed(w http.ResponseWriter, r *http.Request, user *AuthUse
 	switch {
 	case method == http.MethodPost && path == "/api/v1/chat/intake/next":
 		a.handleChatIntakeNext(w, r, user)
+	case method == http.MethodGet && path == "/api/v1/destinations/resolve":
+		a.handleDestinationResolve(w, r, user)
+	case method == http.MethodGet && path == "/api/v1/destinations/search":
+		a.handleDestinationSearch(w, r, user)
+	case method == http.MethodPost && path == "/api/v1/plans/brief":
+		a.handlePlanningBrief(w, r, user)
+	case method == http.MethodPost && path == "/api/v1/plans/generate-v2":
+		a.handleGeneratePlanV2(w, r, user)
+	case method == http.MethodPost && path == "/api/v1/community/posts":
+		a.handleCreateCommunityPost(w, r, user)
+	case method == http.MethodGet && path == "/api/v1/community/posts":
+		a.handleListCommunityPosts(w, r, user)
+	case method == http.MethodPost && path == "/api/v1/community/media":
+		a.handleUploadCommunityMedia(w, r, user)
+	case method == http.MethodGet && path == "/api/v1/admin/community/posts":
+		a.handleAdminListCommunityPosts(w, r, user)
+	case method == http.MethodGet && path == "/api/v1/admin/community/reports":
+		a.handleAdminListCommunityReports(w, r, user)
+	case method == http.MethodPost && path == "/api/v1/plans/validate":
+		a.handleValidatePlan(w, r, user)
 	case method == http.MethodPost && path == "/api/v1/plans/generate":
 		a.handleGeneratePlan(w, r, user)
 	case method == http.MethodPost && path == "/api/v1/plans/replan":
@@ -178,6 +215,12 @@ func (a *App) handleAuthed(w http.ResponseWriter, r *http.Request, user *AuthUse
 		a.handleListSavedPlans(w, r, user)
 	case method == http.MethodPost && path == "/api/v1/events":
 		a.handleTrackEvent(w, r, user)
+	case method == http.MethodGet && path == "/api/v1/profile/private-summary":
+		a.handlePrivateProfileSummary(w, user)
+	case method == http.MethodPut && path == "/api/v1/profile/private-settings":
+		a.handleUpdatePrivatePersonalizationSettings(w, r, user)
+	case method == http.MethodDelete && path == "/api/v1/profile/private-signals":
+		a.handleClearPrivateSignals(w, user)
 	case method == http.MethodGet && path == "/api/v1/events/summary":
 		a.handleEventSummary(w, user)
 	case method == http.MethodGet && path == "/api/v1/events/recent":
@@ -223,6 +266,10 @@ func (a *App) handleAuthed(w http.ResponseWriter, r *http.Request, user *AuthUse
 			a.handleSavedPlanSummary(w, user, id)
 			return
 		}
+		if id, ok := parseSavedPlanCommunityDraftRoute(path); ok && method == http.MethodGet {
+			a.handleSavedPlanCommunityDraft(w, user, id)
+			return
+		}
 		if id, ok := parseSavedPlanEntityRoute(path); ok {
 			switch method {
 			case http.MethodGet:
@@ -232,6 +279,34 @@ func (a *App) handleAuthed(w http.ResponseWriter, r *http.Request, user *AuthUse
 				a.handleDeleteSavedPlan(w, user, id)
 				return
 			}
+		}
+		if provider, placeID, ok := parsePlaceDetailRoute(path); ok && method == http.MethodGet {
+			a.handlePlaceDetail(w, user, provider, placeID)
+			return
+		}
+		if id, ok := parseCommunityPostDetailRoute(path); ok && method == http.MethodGet {
+			a.handleGetCommunityPostDetail(w, user, id)
+			return
+		}
+		if authorUserID, ok := parseCommunityAuthorEntityRoute(path); ok && method == http.MethodGet {
+			a.handleGetCommunityAuthorProfile(w, user, authorUserID)
+			return
+		}
+		if id, ok := parseCommunityPostEntityRoute(path); ok && method == http.MethodGet {
+			a.handleGetCommunityPost(w, user, id)
+			return
+		}
+		if id, ok := parseCommunityPostReportRoute(path); ok && method == http.MethodPost {
+			a.handleReportCommunityPost(w, r, user, id)
+			return
+		}
+		if id, ok := parseCommunityPostVoteRoute(path); ok && method == http.MethodPost {
+			a.handleVoteCommunityPost(w, r, user, id)
+			return
+		}
+		if id, ok := parseAdminCommunityPostModerateRoute(path); ok && method == http.MethodPost {
+			a.handleAdminModerateCommunityPost(w, r, user, id)
+			return
 		}
 		writeAppError(w, appError(http.StatusNotFound, "NOT_FOUND", "route not found"))
 	}
@@ -248,6 +323,14 @@ func parseSavedPlanEntityRoute(path string) (id string, ok bool) {
 func parseSavedPlanSummaryRoute(path string) (id string, ok bool) {
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 	if len(parts) == 6 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "plans" && parts[3] == "saved" && parts[5] == "summary" {
+		return parts[4], true
+	}
+	return "", false
+}
+
+func parseSavedPlanCommunityDraftRoute(path string) (id string, ok bool) {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) == 6 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "plans" && parts[3] == "saved" && parts[5] == "community-draft" {
 		return parts[4], true
 	}
 	return "", false
@@ -293,6 +376,54 @@ func parseSavedPlanShareRoute(path string) (id string, ok bool) {
 	return "", false
 }
 
+func parseCommunityPostEntityRoute(path string) (id string, ok bool) {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) == 5 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "community" && parts[3] == "posts" {
+		return parts[4], true
+	}
+	return "", false
+}
+
+func parseCommunityPostDetailRoute(path string) (id string, ok bool) {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) == 6 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "community" && parts[3] == "posts" && parts[5] == "detail" {
+		return parts[4], true
+	}
+	return "", false
+}
+
+func parseCommunityAuthorEntityRoute(path string) (userID string, ok bool) {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) == 5 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "community" && parts[3] == "authors" {
+		return parts[4], true
+	}
+	return "", false
+}
+
+func parseCommunityPostVoteRoute(path string) (id string, ok bool) {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) == 6 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "community" && parts[3] == "posts" && parts[5] == "vote" {
+		return parts[4], true
+	}
+	return "", false
+}
+
+func parseCommunityPostReportRoute(path string) (id string, ok bool) {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) == 6 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "community" && parts[3] == "posts" && parts[5] == "report" {
+		return parts[4], true
+	}
+	return "", false
+}
+
+func parseAdminCommunityPostModerateRoute(path string) (id string, ok bool) {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) == 7 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "admin" && parts[3] == "community" && parts[4] == "posts" && parts[6] == "moderate" {
+		return parts[5], true
+	}
+	return "", false
+}
+
 func parseSavedPlanShareTokenRoute(path string) (id, token string, ok bool) {
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 	if len(parts) == 7 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "plans" && parts[3] == "saved" && parts[5] == "share" {
@@ -309,6 +440,14 @@ func parsePublicShareRoute(path string) (token string, ok bool) {
 	return "", false
 }
 
+func parsePlaceDetailRoute(path string) (provider, placeID string, ok bool) {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) == 5 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "places" {
+		return parts[3], parts[4], true
+	}
+	return "", "", false
+}
+
 func (a *App) handleChatIntakeNext(w http.ResponseWriter, r *http.Request, user *AuthUser) {
 	body := map[string]any{}
 	if err := decodeJSONBody(r, &body); err != nil {
@@ -322,16 +461,499 @@ func (a *App) handleChatIntakeNext(w http.ResponseWriter, r *http.Request, user 
 		history = append(history, ChatTurn{Role: asString(turn["role"]), Message: asString(turn["message"])})
 	}
 
-	response := nextChatResponse(history, asMap(body["draft_plan_request"]), user.UserID)
+	response := a.nextChatResponsePayload(r.Context(), history, asMap(body["draft_plan_request"]), user.UserID)
 	a.trackEvent("chat_turn_submitted", user.UserID, map[string]any{
 		"history_size":  len(history),
 		"locale":        firstNonEmpty(body["locale"], "zh-CN"),
 		"fallback_mode": response["fallback_mode"],
 		"intent":        response["intent"],
 		"next_action":   response["next_action"],
+		"source_mode":   response["source_mode"],
 	})
 
 	writeJSON(w, http.StatusOK, response)
+}
+
+func (a *App) handleDestinationSearch(w http.ResponseWriter, r *http.Request, user *AuthUser) {
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	limit := asIntOrZero(firstNonEmpty(r.URL.Query().Get("limit"), "10"))
+	if limit <= 0 || limit > 20 {
+		limit = 10
+	}
+
+	items := searchDestinations(query, limit)
+	a.trackEvent("destination_search", user.UserID, map[string]any{
+		"query": query,
+		"count": len(items),
+	})
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"items": items,
+	})
+}
+
+func (a *App) handleDestinationResolve(w http.ResponseWriter, r *http.Request, user *AuthUser) {
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	limit := asIntOrZero(firstNonEmpty(r.URL.Query().Get("limit"), "10"))
+	if limit <= 0 || limit > 20 {
+		limit = 10
+	}
+
+	response := a.resolveDestinationsWithProvider(r.Context(), query, limit)
+	a.trackEvent("destination_resolve", user.UserID, map[string]any{
+		"query":    query,
+		"count":    len(response.Items),
+		"degraded": response.Degraded,
+	})
+
+	writeJSON(w, http.StatusOK, response)
+}
+
+func (a *App) handlePlanningBrief(w http.ResponseWriter, r *http.Request, user *AuthUser) {
+	input := planningBriefRequest{}
+	if err := decodeJSONBody(r, &input); err != nil {
+		writeAppError(w, err)
+		return
+	}
+
+	response := a.buildPlanningBriefResponse(r.Context(), input, user.UserID)
+	a.trackEvent("planning_brief_created", user.UserID, map[string]any{
+		"ready_to_generate": response.PlanningBrief.ReadyToGenerate,
+		"missing_fields":    response.PlanningBrief.MissingFields,
+		"degraded":          response.Degraded,
+		"next_action":       response.NextAction,
+		"source_mode":       response.SourceMode,
+		"destination_id": func() string {
+			if response.PlanningBrief.Destination == nil {
+				return ""
+			}
+			return response.PlanningBrief.Destination.DestinationID
+		}(),
+	})
+
+	writeJSON(w, http.StatusOK, response)
+}
+
+func (a *App) handleGeneratePlanV2(w http.ResponseWriter, r *http.Request, user *AuthUser) {
+	body := map[string]any{}
+	if err := decodeJSONBody(r, &body); err != nil {
+		writeAppError(w, err)
+		return
+	}
+
+	brief := planningBriefFromMap(body["planning_brief"])
+	if brief.Destination == nil {
+		writeAppError(w, appError(http.StatusBadRequest, "INVALID_DESTINATION", "planning_brief.destination is required"))
+		return
+	}
+	if !brief.ReadyToGenerate {
+		writeAppError(w, appError(http.StatusBadRequest, "BRIEF_INCOMPLETE", "planning_brief is not ready_to_generate"))
+		return
+	}
+
+	options := asMap(body["options"])
+	variants := asIntOrZero(firstNonEmpty(options["variants"], 1))
+	if variants <= 0 {
+		variants = 1
+	}
+	if variants != 1 && variants != 2 {
+		writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "options.variants must be 1 or 2"))
+		return
+	}
+
+	allowFallback := true
+	if _, exists := options["allow_fallback"]; exists {
+		allowFallback = asBool(options["allow_fallback"])
+	}
+
+	generateOptions := PlanGenerateOptions{
+		CommunityPostIDs: uniqueStrings(asStringSlice(options["community_post_ids"])),
+	}
+
+	plans := make([]map[string]any, 0, variants)
+	balanced := a.buildV2VariantItineraryWithOptions(r.Context(), brief, user.UserID, "balanced", generateOptions)
+	plans = append(plans, map[string]any{
+		"plan_variant": "balanced",
+		"itinerary":    balanced,
+	})
+	if variants == 2 {
+		experience := a.buildV2VariantItineraryWithOptions(r.Context(), brief, user.UserID, "experience", generateOptions)
+		plans = append(plans, map[string]any{
+			"plan_variant": "experience",
+			"itinerary":    experience,
+		})
+	}
+
+	degraded := false
+	for _, item := range plans {
+		if asBool(asMap(asMap(item)["itinerary"])["degraded"]) {
+			degraded = true
+			break
+		}
+	}
+
+	if !allowFallback && degraded {
+		writeAppError(w, appError(http.StatusBadRequest, "PROVIDER_COVERAGE_LOW", "provider grounding is still incomplete for this itinerary"))
+		return
+	}
+
+	a.trackEvent("plan_generated_v2", user.UserID, map[string]any{
+		"destination_id":                brief.Destination.DestinationID,
+		"destination_label":             brief.Destination.DestinationLabel,
+		"days":                          brief.Days,
+		"variants":                      variants,
+		"degraded":                      degraded,
+		"community_reference_count":     len(generateOptions.CommunityPostIDs),
+		"community_post_ids":            uniqueStrings(append([]string{}, generateOptions.CommunityPostIDs...)),
+		"community_referenced_post_ids": extractCommunityReferencedPostIDsFromPlans(plans),
+	})
+
+	degradedReason := ""
+	if degraded {
+		degradedReason = "provider_coverage_low"
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"plans":           plans,
+		"degraded":        degraded,
+		"degraded_reason": degradedReason,
+	})
+}
+
+func (a *App) handleCreateCommunityPost(w http.ResponseWriter, r *http.Request, user *AuthUser) {
+	body := map[string]any{}
+	if err := decodeJSONBody(r, &body); err != nil {
+		writeAppError(w, err)
+		return
+	}
+
+	destination := destinationEntityFromMap(body["destination"])
+	if destination == nil {
+		destination = buildCommunityFallbackDestination(asString(body["destination_label"]))
+	}
+	if destination == nil {
+		writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "destination or destination_label is required"))
+		return
+	}
+
+	title := normalizeCommunityText(asString(body["title"]))
+	content := normalizeCommunityText(asString(body["content"]))
+	if title == "" && content == "" {
+		writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "title or content is required"))
+		return
+	}
+	if title == "" {
+		title = firstNonBlank(destination.DestinationLabel+"旅行分享", "旅行分享")
+	}
+
+	post, err := a.store.CreateCommunityPost(CommunityPost{
+		UserID:              user.UserID,
+		Title:               title,
+		Content:             content,
+		DestinationID:       destination.DestinationID,
+		DestinationLabel:    destination.DestinationLabel,
+		DestinationAdcode:   destination.Adcode,
+		Tags:                asStringSlice(body["tags"]),
+		ImageURLs:           asStringSlice(body["image_urls"]),
+		FavoriteRestaurants: asStringSlice(body["favorite_restaurants"]),
+		FavoriteAttractions: asStringSlice(body["favorite_attractions"]),
+	})
+	if err != nil {
+		writeAppError(w, appError(http.StatusInternalServerError, "INTERNAL_ERROR", "failed to create community post"))
+		return
+	}
+
+	a.trackEvent("community_post_created", user.UserID, map[string]any{
+		"community_post_id": post.ID,
+		"destination_id":    post.DestinationID,
+		"status":            post.Status,
+		"quality_score":     post.QualityScore,
+		"tag_count":         len(post.Tags),
+		"image_count":       len(post.ImageURLs),
+	})
+	if post.Status == communityPostStatusPublished {
+		a.trackEvent("community_route_published", user.UserID, map[string]any{
+			"community_post_id": post.ID,
+			"destination_id":    post.DestinationID,
+			"tag_count":         len(post.Tags),
+			"image_count":       len(post.ImageURLs),
+		})
+	}
+
+	writeJSON(w, http.StatusOK, post)
+}
+
+func (a *App) handleListCommunityPosts(w http.ResponseWriter, r *http.Request, user *AuthUser) {
+	limit := clampLimit(r.URL.Query().Get("limit"), 1, 50, 20)
+	mine := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("mine")), "true") || strings.TrimSpace(r.URL.Query().Get("mine")) == "1"
+	status := normalizeCommunityPostStatus(r.URL.Query().Get("status"))
+	if rawStatus := strings.TrimSpace(r.URL.Query().Get("status")); rawStatus != "" && status == "" {
+		writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "invalid community post status"))
+		return
+	}
+	if !mine && status == "" {
+		status = communityPostStatusPublished
+	}
+	items := a.store.ListCommunityPosts(CommunityPostFilter{
+		RequestUserID:    user.UserID,
+		OwnerOnly:        mine,
+		DestinationID:    strings.TrimSpace(r.URL.Query().Get("destination_id")),
+		DestinationLabel: strings.TrimSpace(r.URL.Query().Get("destination_label")),
+		Status:           status,
+		Limit:            limit,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"items": items,
+		"count": len(items),
+	})
+}
+
+func (a *App) handleGetCommunityPost(w http.ResponseWriter, user *AuthUser, postID string) {
+	post, ok := a.store.GetCommunityPost(postID)
+	if !ok || (user.Role != "ADMIN" && !communityPostVisibleToUser(post, user.UserID)) {
+		writeAppError(w, appError(http.StatusNotFound, "NOT_FOUND", "community post not found"))
+		return
+	}
+	writeJSON(w, http.StatusOK, post)
+}
+
+func (a *App) handleGetCommunityPostDetail(w http.ResponseWriter, user *AuthUser, postID string) {
+	detail, ok := a.store.GetCommunityPostDetail(postID, user.UserID, 4)
+	if !ok {
+		writeAppError(w, appError(http.StatusNotFound, "NOT_FOUND", "community post not found"))
+		return
+	}
+	writeJSON(w, http.StatusOK, detail)
+}
+
+func (a *App) handleGetCommunityAuthorProfile(w http.ResponseWriter, user *AuthUser, authorUserID string) {
+	profile, ok := a.store.GetCommunityAuthorPublicProfile(authorUserID, user.UserID, 8)
+	if !ok {
+		writeAppError(w, appError(http.StatusNotFound, "NOT_FOUND", "community author not found"))
+		return
+	}
+	writeJSON(w, http.StatusOK, profile)
+}
+
+func (a *App) handleReportCommunityPost(w http.ResponseWriter, r *http.Request, user *AuthUser, postID string) {
+	post, ok := a.store.GetCommunityPost(postID)
+	if !ok || !communityPostVisibleToUser(post, user.UserID) {
+		writeAppError(w, appError(http.StatusNotFound, "NOT_FOUND", "community post not found"))
+		return
+	}
+
+	body := map[string]any{}
+	if err := decodeJSONBody(r, &body); err != nil {
+		writeAppError(w, err)
+		return
+	}
+
+	reason := normalizeCommunityReportReason(asString(body["reason"]))
+	detail := normalizeCommunityText(asString(body["detail"]))
+	if reason == "" {
+		writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "reason must be factually_incorrect, advertising, unsafe, spam, or other"))
+		return
+	}
+
+	reportedPost, report, err := a.store.ReportCommunityPost(postID, user.UserID, reason, detail)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrCommunityPostNotFound):
+			writeAppError(w, appError(http.StatusNotFound, "NOT_FOUND", "community post not found"))
+		case errors.Is(err, ErrCommunityReportInvalid):
+			writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "cannot report this community post"))
+		default:
+			writeAppError(w, appError(http.StatusInternalServerError, "INTERNAL_ERROR", "failed to report community post"))
+		}
+		return
+	}
+
+	a.trackEvent("community_post_reported", user.UserID, map[string]any{
+		"community_post_id": postID,
+		"reason":            reason,
+		"post_status":       reportedPost.Status,
+		"destination_id":    reportedPost.DestinationID,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"post":   reportedPost,
+		"report": report,
+	})
+}
+
+func (a *App) handleVoteCommunityPost(w http.ResponseWriter, r *http.Request, user *AuthUser, postID string) {
+	post, ok := a.store.GetCommunityPost(postID)
+	if !ok || !communityPostVisibleToUser(post, user.UserID) {
+		writeAppError(w, appError(http.StatusNotFound, "NOT_FOUND", "community post not found"))
+		return
+	}
+
+	body := map[string]any{}
+	if err := decodeJSONBody(r, &body); err != nil {
+		writeAppError(w, err)
+		return
+	}
+
+	voteType := normalizeCommunityVoteType(asString(firstNonEmpty(body["vote_type"], communityVoteTypeHelpful)))
+	if voteType == "" {
+		writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "vote_type must be helpful or want_to_go"))
+		return
+	}
+
+	voted, err := a.store.VoteCommunityPost(postID, user.UserID, voteType)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrCommunityPostNotFound):
+			writeAppError(w, appError(http.StatusNotFound, "NOT_FOUND", "community post not found"))
+		case errors.Is(err, ErrCommunityVoteInvalid):
+			writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "vote_type must be helpful or want_to_go"))
+		default:
+			writeAppError(w, appError(http.StatusInternalServerError, "INTERNAL_ERROR", "failed to vote community post"))
+		}
+		return
+	}
+
+	a.trackEvent("community_post_voted", user.UserID, map[string]any{
+		"community_post_id": postID,
+		"vote_type":         voteType,
+		"destination_id":    voted.DestinationID,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"post": voted,
+	})
+}
+
+func (a *App) handleAdminListCommunityPosts(w http.ResponseWriter, r *http.Request, user *AuthUser) {
+	if err := requireAdmin(user); err != nil {
+		writeAppError(w, err)
+		return
+	}
+
+	limit := clampLimit(r.URL.Query().Get("limit"), 1, 50, 20)
+	status := normalizeCommunityPostStatus(r.URL.Query().Get("status"))
+	if rawStatus := strings.TrimSpace(r.URL.Query().Get("status")); rawStatus != "" && status == "" {
+		writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "invalid community post status"))
+		return
+	}
+
+	items := a.store.ListCommunityPosts(CommunityPostFilter{
+		AdminView:        true,
+		DestinationID:    strings.TrimSpace(r.URL.Query().Get("destination_id")),
+		DestinationLabel: strings.TrimSpace(r.URL.Query().Get("destination_label")),
+		Status:           status,
+		Limit:            limit,
+	})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"items": items,
+		"count": len(items),
+	})
+}
+
+func (a *App) handleAdminListCommunityReports(w http.ResponseWriter, r *http.Request, user *AuthUser) {
+	if err := requireAdmin(user); err != nil {
+		writeAppError(w, err)
+		return
+	}
+
+	limit := clampLimit(r.URL.Query().Get("limit"), 1, 50, 20)
+	status := normalizeCommunityReportStatus(firstNonBlank(r.URL.Query().Get("status"), communityReportStatusOpen))
+	if rawStatus := strings.TrimSpace(r.URL.Query().Get("status")); rawStatus != "" && status == "" {
+		writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "invalid community report status"))
+		return
+	}
+
+	items := a.store.ListCommunityReports(limit, status)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"items": items,
+		"count": len(items),
+	})
+}
+
+func (a *App) handleAdminModerateCommunityPost(w http.ResponseWriter, r *http.Request, user *AuthUser, postID string) {
+	if err := requireAdmin(user); err != nil {
+		writeAppError(w, err)
+		return
+	}
+
+	body := map[string]any{}
+	if err := decodeJSONBody(r, &body); err != nil {
+		writeAppError(w, err)
+		return
+	}
+
+	action := normalizeCommunityModerationAction(asString(body["action"]))
+	reason := normalizedSignalKey(asString(firstNonEmpty(body["reason"], action)))
+	note := normalizeCommunityText(asString(body["note"]))
+	if action == "" {
+		writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "action must be approve, limit, remove, or restore"))
+		return
+	}
+	if reason == "" {
+		writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "reason is required"))
+		return
+	}
+
+	post, logEntry, err := a.store.ModerateCommunityPost(postID, user.UserID, action, reason, note)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrCommunityPostNotFound):
+			writeAppError(w, appError(http.StatusNotFound, "NOT_FOUND", "community post not found"))
+		case errors.Is(err, ErrCommunityModerationInvalid):
+			writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "invalid moderation action"))
+		default:
+			writeAppError(w, appError(http.StatusInternalServerError, "INTERNAL_ERROR", "failed to moderate community post"))
+		}
+		return
+	}
+
+	a.trackEvent("community_post_moderated", user.UserID, map[string]any{
+		"community_post_id": postID,
+		"action":            action,
+		"reason":            reason,
+		"post_status":       post.Status,
+		"destination_id":    post.DestinationID,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"post": post,
+		"log":  logEntry,
+	})
+}
+
+func (a *App) handleValidatePlan(w http.ResponseWriter, r *http.Request, user *AuthUser) {
+	body := map[string]any{}
+	if err := decodeJSONBody(r, &body); err != nil {
+		writeAppError(w, err)
+		return
+	}
+	itinerary := asMap(body["itinerary"])
+	if len(itinerary) == 0 {
+		writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "itinerary is required"))
+		return
+	}
+	result := validateItineraryPayload(itinerary, asBool(body["strict"]))
+	writeJSON(w, http.StatusOK, map[string]any{
+		"validation_result": validationResultMap(result),
+	})
+}
+
+func (a *App) handlePlaceDetail(w http.ResponseWriter, user *AuthUser, provider, placeID string) {
+	decodedPlaceID, err := url.PathUnescape(placeID)
+	if err != nil {
+		writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "invalid place id"))
+		return
+	}
+	detail, ok := a.lookupPlaceDetail(context.Background(), provider, decodedPlaceID)
+	if !ok {
+		writeAppError(w, appError(http.StatusNotFound, "NOT_FOUND", "place detail not found"))
+		return
+	}
+	a.trackEvent("place_detail_viewed", user.UserID, map[string]any{
+		"provider":          detail.Provider,
+		"provider_place_id": detail.ProviderPlaceID,
+	})
+	writeJSON(w, http.StatusOK, detail)
 }
 
 func (a *App) handleGeneratePlan(w http.ResponseWriter, r *http.Request, user *AuthUser) {
@@ -458,6 +1080,7 @@ func (a *App) handleReplanPlan(w http.ResponseWriter, r *http.Request, user *Aut
 	}
 
 	next := replanItinerary(itinerary, patch)
+	refreshV2ItineraryMetadata(next)
 	a.trackEvent("plan_replanned", user.UserID, map[string]any{"change_type": firstNonEmpty(patch["change_type"], "unknown")})
 	writeJSON(w, http.StatusOK, next)
 }
@@ -1308,6 +1931,22 @@ func (a *App) handleSavePlan(w http.ResponseWriter, r *http.Request, user *AuthU
 		return
 	}
 
+	latestPlans := a.store.ListSavedPlans(user.UserID, 1)
+	if len(latestPlans) > 0 && itinerarySignature(latestPlans[0].Itinerary) == itinerarySignature(itinerary) {
+		latest := latestPlans[0]
+		a.trackEvent("plan_save_deduped", user.UserID, map[string]any{"saved_plan_id": latest.ID})
+		writeJSON(w, http.StatusOK, map[string]any{
+			"id":            latest.ID,
+			"saved_plan_id": latest.ID,
+			"user_id":       latest.UserID,
+			"itinerary":     latest.Itinerary,
+			"saved_at":      toRFC3339(latest.SavedAt),
+			"updated_at":    toRFC3339(latest.SavedAt),
+			"deduped":       true,
+		})
+		return
+	}
+
 	now := time.Now().UTC()
 	id := randomID()
 	saved, err := a.store.SavePlan(SavedPlan{
@@ -1321,7 +1960,9 @@ func (a *App) handleSavePlan(w http.ResponseWriter, r *http.Request, user *AuthU
 		return
 	}
 
-	a.trackEvent("plan_saved", user.UserID, map[string]any{"saved_plan_id": saved.ID})
+	saveMetadata := buildPlanSavedEventMetadata(saved.Itinerary)
+	saveMetadata["saved_plan_id"] = saved.ID
+	a.trackEvent("plan_saved", user.UserID, saveMetadata)
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"id":            saved.ID,
 		"saved_plan_id": saved.ID,
@@ -1329,7 +1970,100 @@ func (a *App) handleSavePlan(w http.ResponseWriter, r *http.Request, user *AuthU
 		"itinerary":     saved.Itinerary,
 		"saved_at":      toRFC3339(saved.SavedAt),
 		"updated_at":    toRFC3339(saved.SavedAt),
+		"deduped":       false,
 	})
+}
+
+func itinerarySignature(itinerary map[string]any) string {
+	if len(itinerary) == 0 {
+		return ""
+	}
+	normalized := normalizeItineraryForStorage(itinerary)
+	raw, err := json.Marshal(normalized)
+	if err != nil {
+		return ""
+	}
+	return string(raw)
+}
+
+func extractCommunityReferencedPostIDsFromPlans(plans []map[string]any) []string {
+	ids := make([]string, 0, 6)
+	for _, item := range plans {
+		ids = append(ids, extractCommunityReferencedPostIDsFromItinerary(asMap(item["itinerary"]))...)
+	}
+	return uniqueStrings(ids)
+}
+
+func extractCommunityReferencedPostIDsFromItinerary(itinerary map[string]any) []string {
+	summary := asMap(itinerary["community_reference_summary"])
+	return uniqueStrings(asStringSlice(summary["referenced_post_ids"]))
+}
+
+func buildPlanSavedEventMetadata(itinerary map[string]any) map[string]any {
+	requestSnapshot := asMap(itinerary["request_snapshot"])
+	destinationEntity := asMap(firstNonEmpty(itinerary["destination_entity"], requestSnapshot["destination_entity"]))
+	days := asSlice(itinerary["days"])
+	totalBlocks := 0
+	blockTypeCount := map[string]int{}
+	tagSeen := map[string]bool{}
+	topTags := make([]string, 0, 8)
+
+	for _, dayItem := range days {
+		day := asMap(dayItem)
+		blocks := asSlice(day["blocks"])
+		totalBlocks += len(blocks)
+		for _, blockItem := range blocks {
+			block := asMap(blockItem)
+			blockType := strings.TrimSpace(asString(block["block_type"]))
+			if blockType != "" {
+				blockTypeCount[blockType]++
+			}
+			for _, tag := range asStringSlice(block["poi_tags"]) {
+				tag = strings.TrimSpace(tag)
+				if tag == "" || tagSeen[tag] {
+					continue
+				}
+				tagSeen[tag] = true
+				topTags = append(topTags, tag)
+				if len(topTags) >= 6 {
+					break
+				}
+			}
+		}
+	}
+
+	dailyBlockCount := 0.0
+	if len(days) > 0 {
+		dailyBlockCount = float64(totalBlocks) / float64(len(days))
+	}
+	dominantBlockType := firstSortedKeyByCount(blockTypeCount)
+
+	return map[string]any{
+		"destination":                   strings.TrimSpace(asString(firstNonEmpty(itinerary["destination"], requestSnapshot["destination"]))),
+		"destination_adcode":            strings.TrimSpace(asString(destinationEntity["adcode"])),
+		"daily_block_count":             roundToOneDecimal(dailyBlockCount),
+		"poi_category":                  dominantBlockType,
+		"poi_tags":                      topTags,
+		"budget_level":                  strings.TrimSpace(asString(requestSnapshot["budget_level"])),
+		"pace":                          strings.TrimSpace(asString(requestSnapshot["pace"])),
+		"travel_styles":                 uniqueStrings(asStringSlice(requestSnapshot["travel_styles"])),
+		"community_referenced_post_ids": extractCommunityReferencedPostIDsFromItinerary(itinerary),
+	}
+}
+
+func firstSortedKeyByCount(values map[string]int) string {
+	bestKey := ""
+	bestCount := 0
+	for key, count := range values {
+		if strings.TrimSpace(key) == "" {
+			continue
+		}
+		if count > bestCount || (count == bestCount && (bestKey == "" || key < bestKey)) {
+			bestKey = key
+			bestCount = count
+		}
+	}
+	return bestKey
 }
 
 func (a *App) handleGetSavedPlan(w http.ResponseWriter, user *AuthUser, id string) {
@@ -1379,6 +2113,24 @@ func (a *App) handleSavedPlanSummary(w http.ResponseWriter, user *AuthUser, id s
 	writeJSON(w, http.StatusOK, map[string]any{"summary": summarizeItinerary(saved.Itinerary)})
 }
 
+func (a *App) handleSavedPlanCommunityDraft(w http.ResponseWriter, user *AuthUser, id string) {
+	saved, ok := a.store.GetSavedPlan(user.UserID, id)
+	if !ok {
+		writeAppError(w, appError(http.StatusNotFound, "NOT_FOUND", "saved plan not found"))
+		return
+	}
+
+	draft := buildCommunityPostDraftSeed(saved)
+	a.trackEvent("community_draft_seeded_from_saved_plan", user.UserID, map[string]any{
+		"saved_plan_id":     id,
+		"destination_label": draft.DestinationLabel,
+		"tag_count":         len(draft.Tags),
+		"restaurant_count":  len(draft.FavoriteRestaurants),
+		"attraction_count":  len(draft.FavoriteAttractions),
+	})
+	writeJSON(w, http.StatusOK, draft)
+}
+
 func (a *App) handleDeleteSavedPlan(w http.ResponseWriter, user *AuthUser, id string) {
 	ok, err := a.store.DeleteSavedPlan(user.UserID, id)
 	if err != nil {
@@ -1413,9 +2165,16 @@ func (a *App) handleTrackEvent(w http.ResponseWriter, r *http.Request, user *Aut
 	w.WriteHeader(http.StatusAccepted)
 }
 
+func requireAdmin(user *AuthUser) *AppError {
+	if user == nil || user.Role != "ADMIN" {
+		return appError(http.StatusForbidden, "FORBIDDEN", "admin role required")
+	}
+	return nil
+}
+
 func (a *App) handleEventSummary(w http.ResponseWriter, user *AuthUser) {
-	if user.Role != "ADMIN" {
-		writeAppError(w, appError(http.StatusForbidden, "FORBIDDEN", "admin role required"))
+	if err := requireAdmin(user); err != nil {
+		writeAppError(w, err)
 		return
 	}
 	summary := a.store.EventSummary()
@@ -1423,8 +2182,8 @@ func (a *App) handleEventSummary(w http.ResponseWriter, user *AuthUser) {
 }
 
 func (a *App) handleEventRecent(w http.ResponseWriter, user *AuthUser) {
-	if user.Role != "ADMIN" {
-		writeAppError(w, appError(http.StatusForbidden, "FORBIDDEN", "admin role required"))
+	if err := requireAdmin(user); err != nil {
+		writeAppError(w, err)
 		return
 	}
 
@@ -1439,6 +2198,62 @@ func (a *App) handleEventRecent(w http.ResponseWriter, user *AuthUser) {
 		})
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+func (a *App) handlePrivateProfileSummary(w http.ResponseWriter, user *AuthUser) {
+	settings := a.store.GetPersonalizationSettings(user.UserID)
+	profile, ok := a.store.GetPrivateProfile(user.UserID)
+	if !ok {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ready":    false,
+			"settings": settings,
+			"profile":  defaultUserPrivateProfile(user.UserID),
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ready":    settings.Enabled,
+		"settings": settings,
+		"profile":  profile,
+	})
+}
+
+func (a *App) handleUpdatePrivatePersonalizationSettings(w http.ResponseWriter, r *http.Request, user *AuthUser) {
+	body := map[string]any{}
+	if err := decodeJSONBody(r, &body); err != nil {
+		writeAppError(w, err)
+		return
+	}
+	enabled, exists := body["enabled"]
+	if !exists {
+		writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "enabled is required"))
+		return
+	}
+
+	settings, err := a.store.UpdatePersonalizationSettings(user.UserID, asBool(enabled))
+	if err != nil {
+		writeAppError(w, appError(http.StatusInternalServerError, "INTERNAL_ERROR", "failed to update personalization settings"))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"settings": settings,
+	})
+}
+
+func (a *App) handleClearPrivateSignals(w http.ResponseWriter, user *AuthUser) {
+	settings, err := a.store.ClearPrivateSignals(user.UserID)
+	if err != nil {
+		writeAppError(w, appError(http.StatusInternalServerError, "INTERNAL_ERROR", "failed to clear personalization history"))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"cleared":  true,
+		"settings": settings,
+		"profile":  defaultUserPrivateProfile(user.UserID),
+	})
 }
 
 func (a *App) recordEvent(eventName, userID string, metadata map[string]any) error {

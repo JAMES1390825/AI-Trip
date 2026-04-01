@@ -1,49 +1,58 @@
 # ADR-001: Tech Stack and Service Boundaries
 
 - Date: 2026-03-11
-- Status: Amended (Go backend + React frontend only path on 2026-03-17)
+- Status: Amended on 2026-03-31
 
 ## Context
 
-The product requires:
+The current product requires:
 
-- high-stability business backend for account-centric flows, persistence, and analytics;
-- fast iteration on AI planning algorithms and prompt/data orchestration within the same delivery unit;
-- support for hour-level executable itineraries with partial replanning and fallback;
-- frontend/backend independent startup for local development without Docker-coupled orchestration.
+- a stable backend for auth, saved plans, event tracking, planning orchestration, validation, and storage;
+- an isolated AI integration layer that can evolve prompts / models without taking over factual planning truth;
+- an iOS-first user experience plus a lightweight admin console;
+- local single-machine startup with independently launched services;
+- a roadmap toward feedback loops, aggregate signals, and future community data without mixing those concerns into the factual planning core.
 
 ## Decision
 
-Adopt a Go + React full-stack delivery boundary:
+Adopt the following active delivery boundary:
 
-1. `trip-api` (Go)
-- Owns external API boundary and business workflows.
-- Performs request validation, auth boundary, event tracking, and planning/replanning logic.
-- Starts via local command (`go run`) without mandatory Docker dependencies.
-- Persists local runtime data to a file-backed store by default.
+1. `trip-api-go` (Go)
+- Owns the external API boundary and business workflows.
+- Owns planning brief normalization, candidate retrieval, deterministic scoring, itinerary assembly, validation, auth, event tracking, and local persistence.
+- Acts as the source of truth for factual planning state and user-owned data.
 
-2. `web-client` (React + Vite)
-- Owns user-facing planning workflows and operations configuration screens.
-- Integrates with `trip-api` APIs through configurable base URL.
-- Starts via local command (`npm run dev`) independently from backend startup.
+2. `trip-ai-service` (Python)
+- Owns model integration and prompt orchestration.
+- Enhances brief understanding, chat intake wording, and itinerary explain surfaces.
+- Does not own final factual POI truth, route truth, weather truth, or cross-user ranking logic.
+
+3. `mobile-ios` (React Native + Expo)
+- Owns the end-user mobile planning flow and execution UX.
+- Collects user input, planning context, and later feedback / community actions.
+
+4. `web-client` (React + Vite)
+- Owns admin / operations workflows and inspection surfaces.
+- Continues to be useful for local debugging, contract inspection, and operations support.
 
 ## Consequences
 
 Positive:
 
-- Lower local startup friction (frontend/backend independent commands).
-- Reduced dependency on local Docker runtime for daily development.
-- Single active backend runtime and language for delivery.
-- Repository boundary now matches active delivery stack (Go + React only).
-- Local saved plans and event records can survive service restart.
+- The factual planning core stays deterministic and auditable in Go.
+- AI capabilities can evolve independently without becoming the truth source for itinerary facts.
+- Mobile and admin clients can iterate independently while sharing a single backend contract.
+- Local startup remains simple and does not require container orchestration by default.
 
 Trade-offs:
 
-- File-backed local persistence is suitable for development but not production-grade HA.
-- Requires a dedicated database integration later for production-hardening.
+- More boundary discipline is required between deterministic planning and AI explain layers.
+- File-backed local persistence remains suitable for development only, not production-grade HA.
+- Feedback, aggregate learning, and future community capabilities should be added as logically separated modules rather than mixed directly into the planning core.
 
 ## Scope Guardrails
 
-- V1 excludes community, Xiaohongshu publishing, and booking transactions.
-- V1 supports Mainland China single-city trips only.
-- V1 client is web-first (React).
+- Current mainline remains Mainland China single-city trip planning first.
+- Community, public routes, and cross-user learning are roadmap items and should be introduced with explicit privacy and aggregation boundaries.
+- Personal feedback is private by default; only aggregate or explicitly public data may cross user boundaries.
+- The model layer remains post-fact and post-validation, not a replacement for provider-grounded planning.

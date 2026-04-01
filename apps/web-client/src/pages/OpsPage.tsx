@@ -1,5 +1,4 @@
 ﻿import React, { useState } from "react";
-import { Link } from "react-router-dom";
 import { getConfig, healthCheck, parseError, toast, updateConfig } from "../../assets/js/core";
 
 function initialConfig() {
@@ -44,8 +43,8 @@ export default function OpsPage() {
   return (
     <main className="ops-shell">
       <section className="card settings-form">
-        <h1>Trip Canvas 运维配置</h1>
-        <p>此页仅用于本地调试和环境切换，不属于用户前台页面。</p>
+        <h1>Trip Canvas Admin 运维配置</h1>
+        <p>当前仓库仅保留后台 Web 管理台，用户端将迁移到 iOS App。</p>
 
         <div className="field-row">
           <label>API 地址</label>
@@ -74,9 +73,6 @@ export default function OpsPage() {
           <button className="btn secondary" type="button" onClick={() => void checkHealth()}>
             检查服务连接
           </button>
-          <Link className="btn secondary" to="/" style={{ textDecoration: "none" }}>
-            返回用户首页
-          </Link>
         </div>
 
         <div className={`status-banner ${status.mode}`}>{status.text}</div>

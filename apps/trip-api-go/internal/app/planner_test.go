@@ -51,6 +51,20 @@ func TestGenerateItineraryShape(t *testing.T) {
 		if len(blocks) != 4 {
 			t.Fatalf("expected 4 blocks for day %d, got %d", i, len(blocks))
 		}
+		for blockIdx, block := range blocks {
+			reason := strings.TrimSpace(asString(block["recommend_reason"]))
+			if reason == "" {
+				t.Fatalf("expected recommend_reason for day %d block %d", i, blockIdx)
+			}
+			riskLevel := strings.TrimSpace(asString(block["risk_level"]))
+			if riskLevel != "low" && riskLevel != "medium" && riskLevel != "high" {
+				t.Fatalf("unexpected risk_level %q for day %d block %d", riskLevel, i, blockIdx)
+			}
+			alternatives := asSlice(block["alternatives"])
+			if len(alternatives) == 0 {
+				t.Fatalf("expected alternatives for day %d block %d", i, blockIdx)
+			}
+		}
 	}
 
 	transitLegs, ok := itinerary["transit_legs"].([]map[string]any)
@@ -106,6 +120,53 @@ func TestGenerateItineraryUnknownDestinationFallsBackToDefaultCatalog(t *testing
 	firstPOI := asString(blocks[0]["poi"])
 	if firstPOI != catalogByCity["default"][0].POI {
 		t.Fatalf("expected default catalog first poi %q, got %q", catalogByCity["default"][0].POI, firstPOI)
+	}
+}
+
+func TestBuildRecommendReasonAvoidsShoppingLanguageForWaterfront(t *testing.T) {
+	reason := buildRecommendReason(
+		"night",
+		"钱塘江沿岸",
+		map[string]any{
+			"travel_styles": []string{"逛街购物"},
+			"budget_level":  "medium",
+			"pace":          "relaxed",
+		},
+		0,
+		19,
+		[]string{"风景名胜", "河流"},
+	)
+
+	if strings.Contains(reason, "购物") || strings.Contains(reason, "商场") {
+		t.Fatalf("expected waterfront reason without shopping wording, got %q", reason)
+	}
+	if !strings.Contains(reason, "夜景") && !strings.Contains(reason, "收尾") {
+		t.Fatalf("expected waterfront/night semantics in reason, got %q", reason)
+	}
+}
+
+func TestPickBestGroundingPOIPrefersScenicStreetOverPhotoStudio(t *testing.T) {
+	pois := []amapPOI{
+		{
+			ID:   "photo-studio",
+			Name: "专业证件照河坊街照相馆(建国南苑南2区店)",
+			Type: "生活服务;摄影冲印店;照相馆",
+			Lat:  30.2471,
+			Lng:  120.1691,
+		},
+		{
+			ID:     "hefang-street",
+			Name:   "河坊街",
+			Type:   "风景名胜;景点;特色街区",
+			Lat:    30.2468,
+			Lng:    120.1688,
+			Rating: 4.7,
+		},
+	}
+
+	best := pickBestGroundingPOI("河坊街", "experience", pois)
+	if best.ID != "hefang-street" {
+		t.Fatalf("expected scenic street chosen, got %q (%s)", best.ID, best.Name)
 	}
 }
 
@@ -249,15 +310,6 @@ func TestSummarizeItinerary(t *testing.T) {
 	if !strings.Contains(summary, "low") {
 		t.Fatalf("expected budget level in summary, got %q", summary)
 	}
-}
-
-func containsString(items []string, value string) bool {
-	for _, item := range items {
-		if item == value {
-			return true
-		}
-	}
-	return false
 }
 
 func TestGenerateItineraryVersionAndBlockID(t *testing.T) {

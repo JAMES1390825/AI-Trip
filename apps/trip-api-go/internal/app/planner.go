@@ -18,43 +18,43 @@ type poiPoint struct {
 var catalogByCity = map[string][]poiPoint{
 	"beijing": {
 
-		{POI: "Forbidden City", Lat: 39.9163, Lon: 116.3972},
+		{POI: "故宫", Lat: 39.9163, Lon: 116.3972},
 
-		{POI: "Temple of Heaven", Lat: 39.8822, Lon: 116.4065},
+		{POI: "天坛", Lat: 39.8822, Lon: 116.4065},
 
-		{POI: "Shichahai", Lat: 39.9434, Lon: 116.3863},
+		{POI: "什刹海", Lat: 39.9434, Lon: 116.3863},
 
-		{POI: "Summer Palace", Lat: 39.9996, Lon: 116.2755},
+		{POI: "颐和园", Lat: 39.9996, Lon: 116.2755},
 	},
 	"shanghai": {
 
-		{POI: "The Bund", Lat: 31.2400, Lon: 121.4900},
+		{POI: "外滩", Lat: 31.2400, Lon: 121.4900},
 
-		{POI: "Wukang Road", Lat: 31.2058, Lon: 121.4378},
+		{POI: "武康路", Lat: 31.2058, Lon: 121.4378},
 
-		{POI: "Yu Garden", Lat: 31.2272, Lon: 121.4921},
+		{POI: "豫园", Lat: 31.2272, Lon: 121.4921},
 
-		{POI: "Lujiazui", Lat: 31.2354, Lon: 121.4998},
+		{POI: "陆家嘴", Lat: 31.2354, Lon: 121.4998},
 	},
 	"hangzhou": {
 
-		{POI: "West Lake", Lat: 30.2589, Lon: 120.1303},
+		{POI: "西湖", Lat: 30.2589, Lon: 120.1303},
 
-		{POI: "Lingyin Temple", Lat: 30.2428, Lon: 120.1049},
+		{POI: "灵隐寺", Lat: 30.2428, Lon: 120.1049},
 
-		{POI: "Hefang Street", Lat: 30.2468, Lon: 120.1688},
+		{POI: "河坊街", Lat: 30.2468, Lon: 120.1688},
 
-		{POI: "", Lat: 30.2462, Lon: 120.2192},
+		{POI: "钱塘江沿岸", Lat: 30.2462, Lon: 120.2192},
 	},
 	"default": {
 
-		{POI: "City Landmark", Lat: 31.2304, Lon: 121.4737},
+		{POI: "城市地标", Lat: 31.2304, Lon: 121.4737},
 
-		{POI: "City Riverside", Lat: 31.2280, Lon: 121.4850},
+		{POI: "城市滨水步道", Lat: 31.2280, Lon: 121.4850},
 
-		{POI: "Local Food District", Lat: 31.2250, Lon: 121.4750},
+		{POI: "本地美食街区", Lat: 31.2250, Lon: 121.4750},
 
-		{POI: "Night Viewpoint", Lat: 31.2350, Lon: 121.4900},
+		{POI: "夜景观景点", Lat: 31.2350, Lon: 121.4900},
 	}}
 
 func budgetMultiplier(level string) float64 {
@@ -160,17 +160,246 @@ func pickReplacementPOI(destination, oldPOI string, dayIndex, startHour int) poi
 		catalog = catalogByCity["default"]
 	}
 	seed := hashCode(fmt.Sprintf("%s-%s-%d-%d", destination, oldPOI, dayIndex, startHour))
+	normalizedOld := strings.ToLower(strings.TrimSpace(oldPOI))
 	for i := 0; i < len(catalog); i++ {
 
 		candidate := catalog[(seed+i)%len(catalog)]
 
-		if candidate.POI != oldPOI {
+		candidatePOI := strings.TrimSpace(candidate.POI)
+		if candidatePOI == "" {
+
+			continue
+
+		}
+
+		if strings.ToLower(candidatePOI) != normalizedOld {
+
+			return candidate
+
+		}
+	}
+	for _, candidate := range catalog {
+
+		if strings.TrimSpace(candidate.POI) != "" {
 
 			return candidate
 
 		}
 	}
 	return catalog[seed%len(catalog)]
+}
+
+func buildWeatherRisk(closedOnDate, withinWindow bool, openHour, closeHour int) string {
+	if closedOnDate {
+
+		return "当日营业状态不稳定，建议优先使用备选地点"
+	}
+	if !withinWindow {
+
+		return fmt.Sprintf("时段与营业窗口不完全匹配（开放 %02d:00-%02d:00）", openHour, closeHour)
+	}
+	return ""
+}
+
+func deriveRiskLevel(slotType string, closedOnDate, withinWindow bool, weatherRisk string) string {
+	if closedOnDate {
+
+		return "high"
+	}
+	if strings.TrimSpace(weatherRisk) != "" || !withinWindow {
+
+		return "medium"
+	}
+	if strings.EqualFold(strings.TrimSpace(slotType), "night") {
+
+		return "medium"
+	}
+	return "low"
+}
+
+func buildPOIAlternatives(destination, currentPOI string, dayIndex, startHour, limit int) []map[string]any {
+	if limit <= 0 {
+
+		limit = 3
+	}
+	catalog := selectCatalogByDestination(destination)
+	if len(catalog) == 0 {
+
+		catalog = catalogByCity["default"]
+	}
+	seed := hashCode(fmt.Sprintf("%s|%s|%d|%d|alts", normalizeCity(destination), currentPOI, dayIndex, startHour))
+	out := make([]map[string]any, 0, limit)
+	seen := map[string]bool{
+		strings.ToLower(strings.TrimSpace(currentPOI)): true,
+	}
+	for i := 0; i < len(catalog)*2 && len(out) < limit; i++ {
+
+		candidate := catalog[(seed+i)%len(catalog)]
+
+		poi := strings.TrimSpace(candidate.POI)
+		if poi == "" {
+
+			continue
+
+		}
+
+		key := strings.ToLower(poi)
+		if seen[key] {
+
+			continue
+
+		}
+		seen[key] = true
+
+		out = append(out, map[string]any{
+
+			"poi": poi,
+
+			"poi_lat": candidate.Lat,
+
+			"poi_lon": candidate.Lon,
+
+			"poi_map_url": fmt.Sprintf("https://uri.amap.com/marker?position=%v,%v&name=%s", candidate.Lon, candidate.Lat, poi),
+
+			"note": fmt.Sprintf("同区域备选，预计切换成本 %d 分钟", 8+(hashCode(fmt.Sprintf("%s-%d", poi, dayIndex))%18)),
+		})
+	}
+	return out
+}
+
+func poiSemanticKind(poi string, tags []string) string {
+	text := strings.ToLower(strings.TrimSpace(joinNonBlank(" ", append([]string{poi}, tags...)...)))
+	switch {
+	case strings.Contains(text, "江"), strings.Contains(text, "河"), strings.Contains(text, "湖"), strings.Contains(text, "海"), strings.Contains(text, "滩"), strings.Contains(text, "沿岸"), strings.Contains(text, "滨江"), strings.Contains(text, "滨水"), strings.Contains(text, "码头"), strings.Contains(text, "海滨"), strings.Contains(text, "河流"):
+		return "waterfront"
+	case strings.Contains(text, "街"), strings.Contains(text, "巷"), strings.Contains(text, "路"), strings.Contains(text, "里"), strings.Contains(text, "坊"), strings.Contains(text, "胡同"), strings.Contains(text, "步行街"), strings.Contains(text, "特色街区"):
+		return "street"
+	case strings.Contains(text, "寺"), strings.Contains(text, "庙"), strings.Contains(text, "宫"), strings.Contains(text, "馆"), strings.Contains(text, "博物"), strings.Contains(text, "美术"), strings.Contains(text, "艺术馆"), strings.Contains(text, "遗址"), strings.Contains(text, "塔"), strings.Contains(text, "城"), strings.Contains(text, "园林"):
+		return "culture"
+	case strings.Contains(text, "公园"), strings.Contains(text, "山"), strings.Contains(text, "岛"), strings.Contains(text, "森林"), strings.Contains(text, "植物园"), strings.Contains(text, "自然"), strings.Contains(text, "湿地"):
+		return "nature"
+	case strings.Contains(text, "餐饮服务"), strings.Contains(text, "美食"), strings.Contains(text, "餐厅"), strings.Contains(text, "咖啡"), strings.Contains(text, "茶馆"), strings.Contains(text, "小吃"), strings.Contains(text, "酒吧"):
+		return "food"
+	default:
+		return "generic"
+	}
+}
+
+func buildRecommendReason(slotType, poi string, requestSnapshot map[string]any, dayIndex, startHour int, poiTags []string) string {
+	targetPOI := strings.TrimSpace(poi)
+	if targetPOI == "" {
+
+		targetPOI = "候选地点"
+	}
+
+	budgetHint := "兼顾体验与性价比"
+	switch strings.ToLower(strings.TrimSpace(asString(requestSnapshot["budget_level"]))) {
+	case "low":
+
+		budgetHint = "优先控制预算"
+	case "high":
+
+		budgetHint = "优先保证体验"
+	}
+
+	paceHint := "建议按当前节奏推进"
+	switch strings.ToLower(strings.TrimSpace(asString(requestSnapshot["pace"]))) {
+	case "compact":
+
+		paceHint = "路线更紧凑，建议准点出发"
+	case "relaxed":
+
+		paceHint = "节奏较宽松，可保留拍照与休息时间"
+	}
+
+	semantic := poiSemanticKind(targetPOI, poiTags)
+	switch strings.ToLower(strings.TrimSpace(slotType)) {
+	case "sight":
+		switch semantic {
+		case "waterfront":
+			return fmt.Sprintf("将 %s 放在白天主游时段，适合沿线看景和慢走。%s。", targetPOI, paceHint)
+		case "street":
+			return fmt.Sprintf("将 %s 放在白天主游时段，更适合边走边逛，动线也更顺。%s。", targetPOI, paceHint)
+		case "culture":
+			return fmt.Sprintf("将 %s 放在白天主游时段，更适合完整参观和拍照。%s。", targetPOI, paceHint)
+		default:
+			return fmt.Sprintf("将 %s 放在白天主游时段，便于步行串联。%s。", targetPOI, paceHint)
+		}
+	case "food":
+		return fmt.Sprintf("安排 %s 于就餐窗口，%s。", targetPOI, budgetHint)
+	case "experience":
+		switch semantic {
+		case "waterfront":
+			return fmt.Sprintf("把 %s 放在中段体验时段，适合留出沿线漫走和拍照时间。", targetPOI)
+		case "street":
+			return fmt.Sprintf("把 %s 放在中段体验时段，适合边走边逛，也方便穿插短暂停留。", targetPOI)
+		case "culture":
+			return fmt.Sprintf("把 %s 放在中段体验时段，便于集中安排参观与停留。", targetPOI)
+		default:
+			return fmt.Sprintf("把 %s 放在中段体验时段，避免全天节奏单一。", targetPOI)
+		}
+	case "night":
+		switch semantic {
+		case "waterfront":
+			return fmt.Sprintf("将 %s 作为夜间收束点，更适合看夜景、吹风和慢慢收尾。", targetPOI)
+		case "street":
+			return fmt.Sprintf("将 %s 作为夜间收束点，夜间氛围和灯光更适合慢逛。", targetPOI)
+		default:
+			return fmt.Sprintf("将 %s 作为夜间收束点，适合晚间活动。", targetPOI)
+		}
+	default:
+
+		return fmt.Sprintf("%s，建议第 %d 天 %02d:00 前后前往。", budgetHint, dayIndex+1, startHour)
+	}
+}
+
+func enrichBlockInsights(block map[string]any, destination string, requestSnapshot map[string]any, dayIndex int, date string) {
+	slotType := strings.ToLower(strings.TrimSpace(asString(block["block_type"])))
+	poi := strings.TrimSpace(asString(block["poi"]))
+	startHour := asIntOrZero(block["start_hour"])
+	endHour := asIntOrZero(block["end_hour"])
+	openHour, closeHour, closedOnDate := resolveOpeningWindow(slotType, poi, date)
+	withinWindow := !closedOnDate && startHour >= openHour && endHour <= closeHour
+
+	weatherRisk := buildWeatherRisk(closedOnDate, withinWindow, openHour, closeHour)
+	recommendReason := buildRecommendReason(slotType, poi, requestSnapshot, dayIndex, startHour, asStringSlice(block["poi_tags"]))
+	riskLevel := deriveRiskLevel(slotType, closedOnDate, withinWindow, weatherRisk)
+
+	block["weather_risk"] = weatherRisk
+	block["recommend_reason"] = recommendReason
+	block["risk_level"] = riskLevel
+	block["alternatives"] = buildPOIAlternatives(destination, poi, dayIndex, startHour, 3)
+
+	reason := asMap(block["reason"])
+	if len(reason) == 0 {
+
+		reason = map[string]any{
+
+			"distance_fit": 0.82,
+
+			"time_window_fit": 0.88,
+
+			"budget_fit": 0.80,
+
+			"weather_fit": 0.85,
+		}
+	}
+
+	reason["note"] = recommendReason
+	if closedOnDate {
+
+		reason["time_window_fit"] = 0.35
+
+		reason["weather_fit"] = 0.45
+
+	} else if !withinWindow {
+
+		reason["time_window_fit"] = 0.62
+
+		reason["weather_fit"] = 0.70
+	}
+	block["reason"] = reason
+
 }
 
 func ensureBlockIDs(itinerary map[string]any) {
@@ -258,6 +487,12 @@ func isWindowOverlap(blockStart, blockEnd, windowStart, windowEnd int) bool {
 }
 
 func rebuildItineraryDerivedFields(itinerary map[string]any) {
+	requestSnapshot := asMap(itinerary["request_snapshot"])
+	destination := strings.TrimSpace(asString(firstNonEmpty(itinerary["destination"], requestSnapshot["destination"])))
+	if destination == "" {
+
+		destination = "default"
+	}
 	poiSequence := make([]string, 0)
 	transitLegs := make([]map[string]any, 0)
 	for dayIdx, dayItem := range asSlice(itinerary["days"]) {
@@ -271,12 +506,14 @@ func rebuildItineraryDerivedFields(itinerary map[string]any) {
 			resolvedDayIndex = parsed
 
 		}
+		date := strings.TrimSpace(asString(day["date"]))
 
 		blocks := asSlice(day["blocks"])
 
 		for _, blockItem := range blocks {
 
 			block := asMap(blockItem)
+			enrichBlockInsights(block, destination, requestSnapshot, resolvedDayIndex, date)
 
 			poi := strings.TrimSpace(asString(block["poi"]))
 
@@ -358,13 +595,37 @@ func generateItinerary(req PlanRequest) map[string]any {
 		Type string
 	}{
 
-		{Start: 9, End: 11, Title: "Morning sightseeing", Type: "sight"},
+		{Start: 9, End: 11, Title: "上午主游", Type: "sight"},
 
-		{Start: 11, End: 13, Title: "Local lunch", Type: "food"},
+		{Start: 11, End: 13, Title: "午餐安排", Type: "food"},
 
-		{Start: 14, End: 17, Title: "", Type: "experience"},
+		{Start: 14, End: 17, Title: "下午体验", Type: "experience"},
 
-		{Start: 19, End: 21, Title: "Night walk", Type: "night"},
+		{Start: 19, End: 21, Title: "夜游收束", Type: "night"},
+	}
+	requestSnapshot := map[string]any{
+
+		"origin_city": req.OriginCity,
+
+		"destination": req.Destination,
+
+		"days": req.Days,
+
+		"budget_level": req.BudgetLevel,
+
+		"companions": req.Companions,
+
+		"travel_styles": req.TravelStyles,
+
+		"must_go": req.MustGo,
+
+		"avoid": req.Avoid,
+
+		"start_date": req.StartDate,
+
+		"pace": req.Pace,
+
+		"user_id": req.UserID,
 	}
 	days := make([]map[string]any, 0, req.Days)
 	poiSequence := make([]string, 0, req.Days*len(slots))
@@ -416,20 +677,7 @@ func generateItinerary(req PlanRequest) map[string]any {
 
 				"source": "local_catalog",
 			})
-
-			weatherRisk := ""
-
-			if closedOnDate {
-
-				weatherRisk = ""
-
-			} else if !withinWindow {
-
-				weatherRisk = fmt.Sprintf(" %02d:00-%02d:00", openHour, closeHour)
-
-			}
-
-			blocks = append(blocks, map[string]any{
+			block := map[string]any{
 
 				"block_id": blockID,
 
@@ -462,14 +710,14 @@ func generateItinerary(req PlanRequest) map[string]any {
 
 				"lock_reason": "",
 
-				"weather_risk": weatherRisk,
-
 				"poi_lat": point.Lat,
 
 				"poi_lon": point.Lon,
 
 				"poi_map_url": fmt.Sprintf("https://uri.amap.com/marker?position=%v,%v&name=%s", point.Lon, point.Lat, point.POI),
-			})
+			}
+			enrichBlockInsights(block, destination, requestSnapshot, dayIndex, date)
+			blocks = append(blocks, block)
 
 		}
 
@@ -532,30 +780,6 @@ func generateItinerary(req PlanRequest) map[string]any {
 		}
 	}
 	estimatedCost := int(math.Round(float64(req.Days) * 380 * budgetMultiplier(req.BudgetLevel)))
-	requestSnapshot := map[string]any{
-
-		"origin_city": req.OriginCity,
-
-		"destination": req.Destination,
-
-		"days": req.Days,
-
-		"budget_level": req.BudgetLevel,
-
-		"companions": req.Companions,
-
-		"travel_styles": req.TravelStyles,
-
-		"must_go": req.MustGo,
-
-		"avoid": req.Avoid,
-
-		"start_date": req.StartDate,
-
-		"pace": req.Pace,
-
-		"user_id": req.UserID,
-	}
 	itinerary := map[string]any{
 
 		"request_id": fmt.Sprintf("req-%d-%d", time.Now().UnixMilli(), hashCode(time.Now().String())%1_000_000),
@@ -599,6 +823,8 @@ func generateItinerary(req PlanRequest) map[string]any {
 		"conflicts": []map[string]any{},
 	}
 	attachDataDiagnostics(itinerary)
+	attachMobileSummaryFields(itinerary)
+	attachLegacyMetadata(itinerary)
 	return itinerary
 }
 
@@ -731,6 +957,7 @@ func replanItinerary(itinerary map[string]any, patch map[string]any) map[string]
 			for dayIdx, dayItem := range asSlice(next["days"]) {
 
 				day := asMap(dayItem)
+				date := strings.TrimSpace(asString(day["date"]))
 
 				resolvedDayIndex := dayIdx
 
@@ -769,6 +996,7 @@ func replanItinerary(itinerary map[string]any, patch map[string]any) map[string]
 					block["poi_lon"] = replacement.Lon
 
 					block["poi_map_url"] = fmt.Sprintf("https://uri.amap.com/marker?position=%v,%v&name=%s", replacement.Lon, replacement.Lat, replacement.POI)
+					enrichBlockInsights(block, destination, requestSnapshot, resolvedDayIndex, date)
 
 					replaced++
 
@@ -811,7 +1039,7 @@ func replanItinerary(itinerary map[string]any, patch map[string]any) map[string]
 
 				"failed_poi": removePOI,
 
-				"replacement_poi": "Alt POI",
+				"replacement_poi": "备选地点",
 
 				"reason": "poi replaced by fallback",
 			})
@@ -982,6 +1210,7 @@ func replanItinerary(itinerary map[string]any, patch map[string]any) map[string]
 			for dayIdx, dayItem := range asSlice(next["days"]) {
 
 				day := asMap(dayItem)
+				date := strings.TrimSpace(asString(day["date"]))
 
 				resolvedDayIndex := dayIdx
 
@@ -1032,19 +1261,7 @@ func replanItinerary(itinerary map[string]any, patch map[string]any) map[string]
 					block["poi_lon"] = replacement.Lon
 
 					block["poi_map_url"] = fmt.Sprintf("https://uri.amap.com/marker?position=%v,%v&name=%s", replacement.Lon, replacement.Lat, replacement.POI)
-
-					block["reason"] = map[string]any{
-
-						"distance_fit": 0.84,
-
-						"time_window_fit": 0.91,
-
-						"budget_fit": 0.82,
-
-						"weather_fit": 0.86,
-
-						"note": "window replan applied",
-					}
+					enrichBlockInsights(block, destination, requestSnapshot, resolvedDayIndex, date)
 
 					windowChanged++
 
@@ -1132,6 +1349,7 @@ func replanItinerary(itinerary map[string]any, patch map[string]any) map[string]
 	next["changes"] = changes
 	next["conflicts"] = conflicts
 	attachDataDiagnostics(next)
+	attachMobileSummaryFields(next)
 	return next
 }
 

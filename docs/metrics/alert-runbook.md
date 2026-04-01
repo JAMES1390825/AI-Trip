@@ -2,6 +2,9 @@
 
 This runbook maps Prometheus alerts to first-response actions.
 
+> Note: In current single-machine mode, Prometheus scraping is disabled by default.
+> Re-enable alert rules only after `trip-api` exposes a Prometheus-compatible metrics endpoint.
+
 ## Active Rule File
 
 - `infra/monitoring/alerts/trip-alerts.yml`
@@ -12,7 +15,7 @@ This runbook maps Prometheus alerts to first-response actions.
 
 - Trigger: 5xx ratio > 5% for 10m.
 - First checks:
-  - `trip-api` container logs
+  - `trip-api` process logs
   - `trip-api` recent API/event trends (`/api/v1/events/summary` for admin)
   - current environment variable changes (JWT/CORS/bootstrap secret)
 - Mitigation:
@@ -59,4 +62,3 @@ This runbook maps Prometheus alerts to first-response actions.
 - Mitigation:
   - Fallback to full replan for impacted users
   - disable problematic patch type in feature flags
-
