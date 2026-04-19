@@ -177,20 +177,18 @@ func (a *App) handleIssueToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleAuthed(w http.ResponseWriter, r *http.Request, user *AuthUser) {
+	if a.handleMainlineAuthed(w, r, user) {
+		return
+	}
+
 	path := r.URL.Path
 	method := r.Method
 
 	switch {
 	case method == http.MethodPost && path == "/api/v1/chat/intake/next":
 		a.handleChatIntakeNext(w, r, user)
-	case method == http.MethodGet && path == "/api/v1/destinations/resolve":
-		a.handleDestinationResolve(w, r, user)
 	case method == http.MethodGet && path == "/api/v1/destinations/search":
 		a.handleDestinationSearch(w, r, user)
-	case method == http.MethodPost && path == "/api/v1/plans/brief":
-		a.handlePlanningBrief(w, r, user)
-	case method == http.MethodPost && path == "/api/v1/plans/generate-v2":
-		a.handleGeneratePlanV2(w, r, user)
 	case method == http.MethodPost && path == "/api/v1/community/posts":
 		a.handleCreateCommunityPost(w, r, user)
 	case method == http.MethodGet && path == "/api/v1/community/posts":
@@ -201,20 +199,14 @@ func (a *App) handleAuthed(w http.ResponseWriter, r *http.Request, user *AuthUse
 		a.handleAdminListCommunityPosts(w, r, user)
 	case method == http.MethodGet && path == "/api/v1/admin/community/reports":
 		a.handleAdminListCommunityReports(w, r, user)
-	case method == http.MethodPost && path == "/api/v1/plans/validate":
-		a.handleValidatePlan(w, r, user)
 	case method == http.MethodPost && path == "/api/v1/plans/generate":
 		a.handleGeneratePlan(w, r, user)
 	case method == http.MethodPost && path == "/api/v1/plans/replan":
 		a.handleReplanPlan(w, r, user)
 	case method == http.MethodPost && path == "/api/v1/plans/revert":
 		a.handleRevertPlan(w, r, user)
-	case method == http.MethodPost && path == "/api/v1/plans/save":
-		a.handleSavePlan(w, r, user)
 	case method == http.MethodGet && path == "/api/v1/plans/saved":
 		a.handleListSavedPlans(w, r, user)
-	case method == http.MethodPost && path == "/api/v1/events":
-		a.handleTrackEvent(w, r, user)
 	case method == http.MethodGet && path == "/api/v1/profile/private-summary":
 		a.handlePrivateProfileSummary(w, user)
 	case method == http.MethodPut && path == "/api/v1/profile/private-settings":
@@ -312,142 +304,6 @@ func (a *App) handleAuthed(w http.ResponseWriter, r *http.Request, user *AuthUse
 	}
 }
 
-func parseSavedPlanEntityRoute(path string) (id string, ok bool) {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 5 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "plans" && parts[3] == "saved" {
-		return parts[4], true
-	}
-	return "", false
-}
-
-func parseSavedPlanSummaryRoute(path string) (id string, ok bool) {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 6 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "plans" && parts[3] == "saved" && parts[5] == "summary" {
-		return parts[4], true
-	}
-	return "", false
-}
-
-func parseSavedPlanCommunityDraftRoute(path string) (id string, ok bool) {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 6 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "plans" && parts[3] == "saved" && parts[5] == "community-draft" {
-		return parts[4], true
-	}
-	return "", false
-}
-
-func parseSavedPlanVersionsRoute(path string) (id string, ok bool) {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 6 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "plans" && parts[3] == "saved" && parts[5] == "versions" {
-		return parts[4], true
-	}
-	return "", false
-}
-
-func parseSavedPlanTasksRoute(path string) (id string, ok bool) {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 6 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "plans" && parts[3] == "saved" && parts[5] == "tasks" {
-		return parts[4], true
-	}
-	return "", false
-}
-
-func parseSavedPlanExecutionRoute(path string) (id string, ok bool) {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 6 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "plans" && parts[3] == "saved" && parts[5] == "execution" {
-		return parts[4], true
-	}
-	return "", false
-}
-
-func parseSavedPlanDiffRoute(path string) (id string, ok bool) {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 6 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "plans" && parts[3] == "saved" && parts[5] == "diff" {
-		return parts[4], true
-	}
-	return "", false
-}
-
-func parseSavedPlanShareRoute(path string) (id string, ok bool) {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 6 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "plans" && parts[3] == "saved" && parts[5] == "share" {
-		return parts[4], true
-	}
-	return "", false
-}
-
-func parseCommunityPostEntityRoute(path string) (id string, ok bool) {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 5 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "community" && parts[3] == "posts" {
-		return parts[4], true
-	}
-	return "", false
-}
-
-func parseCommunityPostDetailRoute(path string) (id string, ok bool) {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 6 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "community" && parts[3] == "posts" && parts[5] == "detail" {
-		return parts[4], true
-	}
-	return "", false
-}
-
-func parseCommunityAuthorEntityRoute(path string) (userID string, ok bool) {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 5 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "community" && parts[3] == "authors" {
-		return parts[4], true
-	}
-	return "", false
-}
-
-func parseCommunityPostVoteRoute(path string) (id string, ok bool) {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 6 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "community" && parts[3] == "posts" && parts[5] == "vote" {
-		return parts[4], true
-	}
-	return "", false
-}
-
-func parseCommunityPostReportRoute(path string) (id string, ok bool) {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 6 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "community" && parts[3] == "posts" && parts[5] == "report" {
-		return parts[4], true
-	}
-	return "", false
-}
-
-func parseAdminCommunityPostModerateRoute(path string) (id string, ok bool) {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 7 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "admin" && parts[3] == "community" && parts[4] == "posts" && parts[6] == "moderate" {
-		return parts[5], true
-	}
-	return "", false
-}
-
-func parseSavedPlanShareTokenRoute(path string) (id, token string, ok bool) {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 7 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "plans" && parts[3] == "saved" && parts[5] == "share" {
-		return parts[4], parts[6], true
-	}
-	return "", "", false
-}
-
-func parsePublicShareRoute(path string) (token string, ok bool) {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 4 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "share" {
-		return parts[3], true
-	}
-	return "", false
-}
-
-func parsePlaceDetailRoute(path string) (provider, placeID string, ok bool) {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 5 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "places" {
-		return parts[3], parts[4], true
-	}
-	return "", "", false
-}
-
 func (a *App) handleChatIntakeNext(w http.ResponseWriter, r *http.Request, user *AuthUser) {
 	body := map[string]any{}
 	if err := decodeJSONBody(r, &body); err != nil {
@@ -490,48 +346,6 @@ func (a *App) handleDestinationSearch(w http.ResponseWriter, r *http.Request, us
 	writeJSON(w, http.StatusOK, map[string]any{
 		"items": items,
 	})
-}
-
-func (a *App) handleDestinationResolve(w http.ResponseWriter, r *http.Request, user *AuthUser) {
-	query := strings.TrimSpace(r.URL.Query().Get("q"))
-	limit := asIntOrZero(firstNonEmpty(r.URL.Query().Get("limit"), "10"))
-	if limit <= 0 || limit > 20 {
-		limit = 10
-	}
-
-	response := a.resolveDestinationsWithProvider(r.Context(), query, limit)
-	a.trackEvent("destination_resolve", user.UserID, map[string]any{
-		"query":    query,
-		"count":    len(response.Items),
-		"degraded": response.Degraded,
-	})
-
-	writeJSON(w, http.StatusOK, response)
-}
-
-func (a *App) handlePlanningBrief(w http.ResponseWriter, r *http.Request, user *AuthUser) {
-	input := planningBriefRequest{}
-	if err := decodeJSONBody(r, &input); err != nil {
-		writeAppError(w, err)
-		return
-	}
-
-	response := a.buildPlanningBriefResponse(r.Context(), input, user.UserID)
-	a.trackEvent("planning_brief_created", user.UserID, map[string]any{
-		"ready_to_generate": response.PlanningBrief.ReadyToGenerate,
-		"missing_fields":    response.PlanningBrief.MissingFields,
-		"degraded":          response.Degraded,
-		"next_action":       response.NextAction,
-		"source_mode":       response.SourceMode,
-		"destination_id": func() string {
-			if response.PlanningBrief.Destination == nil {
-				return ""
-			}
-			return response.PlanningBrief.Destination.DestinationID
-		}(),
-	})
-
-	writeJSON(w, http.StatusOK, response)
 }
 
 func (a *App) handleCreateCommunityPost(w http.ResponseWriter, r *http.Request, user *AuthUser) {
@@ -833,23 +647,6 @@ func (a *App) handleAdminModerateCommunityPost(w http.ResponseWriter, r *http.Re
 	writeJSON(w, http.StatusOK, map[string]any{
 		"post": post,
 		"log":  logEntry,
-	})
-}
-
-func (a *App) handleValidatePlan(w http.ResponseWriter, r *http.Request, user *AuthUser) {
-	body := map[string]any{}
-	if err := decodeJSONBody(r, &body); err != nil {
-		writeAppError(w, err)
-		return
-	}
-	itinerary := asMap(body["itinerary"])
-	if len(itinerary) == 0 {
-		writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "itinerary is required"))
-		return
-	}
-	result := validateItineraryPayload(itinerary, asBool(body["strict"]))
-	writeJSON(w, http.StatusOK, map[string]any{
-		"validation_result": validationResultMap(result),
 	})
 }
 
@@ -1827,70 +1624,6 @@ func (a *App) writeDiffError(w http.ResponseWriter, err error) {
 	}
 }
 
-func (a *App) handleSavePlan(w http.ResponseWriter, r *http.Request, user *AuthUser) {
-	body := map[string]any{}
-	if err := decodeJSONBody(r, &body); err != nil {
-		writeAppError(w, err)
-		return
-	}
-
-	itinerary := asMap(body["itinerary"])
-	if len(itinerary) == 0 {
-		writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "itinerary is required"))
-		return
-	}
-
-	itinerary = normalizeMainlineItineraryForSave(itinerary)
-
-	owner := asString(asMap(itinerary["request_snapshot"])["user_id"])
-	if strings.TrimSpace(owner) != strings.TrimSpace(user.UserID) {
-		writeAppError(w, appError(http.StatusForbidden, "FORBIDDEN", "cannot save other user itinerary"))
-		return
-	}
-
-	latestPlans := a.store.ListSavedPlans(user.UserID, 1)
-	if len(latestPlans) > 0 && itinerarySignature(latestPlans[0].Itinerary) == itinerarySignature(itinerary) {
-		latest := latestPlans[0]
-		a.trackEvent("plan_save_deduped", user.UserID, map[string]any{"saved_plan_id": latest.ID})
-		writeJSON(w, http.StatusOK, map[string]any{
-			"id":            latest.ID,
-			"saved_plan_id": latest.ID,
-			"user_id":       latest.UserID,
-			"itinerary":     latest.Itinerary,
-			"saved_at":      toRFC3339(latest.SavedAt),
-			"updated_at":    toRFC3339(latest.SavedAt),
-			"deduped":       true,
-		})
-		return
-	}
-
-	now := time.Now().UTC()
-	id := randomID()
-	saved, err := a.store.SavePlan(SavedPlan{
-		ID:        id,
-		UserID:    user.UserID,
-		Itinerary: itinerary,
-		SavedAt:   now,
-	})
-	if err != nil {
-		writeAppError(w, appError(http.StatusInternalServerError, "INTERNAL_ERROR", "failed to persist saved plan"))
-		return
-	}
-
-	saveMetadata := buildPlanSavedEventMetadata(saved.Itinerary)
-	saveMetadata["saved_plan_id"] = saved.ID
-	a.trackEvent("plan_saved", user.UserID, saveMetadata)
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"id":            saved.ID,
-		"saved_plan_id": saved.ID,
-		"user_id":       saved.UserID,
-		"itinerary":     saved.Itinerary,
-		"saved_at":      toRFC3339(saved.SavedAt),
-		"updated_at":    toRFC3339(saved.SavedAt),
-		"deduped":       false,
-	})
-}
-
 func itinerarySignature(itinerary map[string]any) string {
 	if len(itinerary) == 0 {
 		return ""
@@ -2060,26 +1793,6 @@ func (a *App) handleDeleteSavedPlan(w http.ResponseWriter, user *AuthUser, id st
 	}
 	a.trackEvent("plan_deleted", user.UserID, map[string]any{"saved_plan_id": id})
 	w.WriteHeader(http.StatusNoContent)
-}
-
-func (a *App) handleTrackEvent(w http.ResponseWriter, r *http.Request, user *AuthUser) {
-	body := map[string]any{}
-	if err := decodeJSONBody(r, &body); err != nil {
-		writeAppError(w, err)
-		return
-	}
-	eventName := strings.TrimSpace(asString(body["event_name"]))
-	if eventName == "" {
-		writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "event_name is required"))
-		return
-	}
-
-	metadata := asMap(body["metadata"])
-	if err := a.recordEvent(eventName, user.UserID, metadata); err != nil {
-		writeAppError(w, appError(http.StatusInternalServerError, "INTERNAL_ERROR", "failed to persist event"))
-		return
-	}
-	w.WriteHeader(http.StatusAccepted)
 }
 
 func requireAdmin(user *AuthUser) *AppError {
