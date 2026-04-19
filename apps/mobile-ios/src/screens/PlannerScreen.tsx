@@ -16,7 +16,6 @@ import {
 import { TripApiClient } from "../api/client";
 import { RUNTIME_CONFIG } from "../config/runtime";
 import type { ItineraryAlternative, ItineraryBlock, ItineraryLeg } from "../types/itinerary";
-import type { DiscoverDraftSeed } from "../types/discover";
 import type { BudgetLevel, PaceLevel, PlanDraft } from "../types/plan";
 import { defaultStartDate } from "../utils/date";
 import {
@@ -33,10 +32,18 @@ type PageMode = "input" | "result";
 type DayFilter = "all" | number;
 type BlockCategoryFilter = "all" | "sight" | "food" | "experience" | "night";
 
+type PlannerDraftSeed = {
+  source: "search" | "topic" | "nearby";
+  destination?: string;
+  keyword?: string;
+  mustGo?: string[];
+  travelStyles?: string[];
+};
+
 type PlannerScreenProps = {
   preloadedItinerary?: Record<string, unknown> | null;
   preloadedToken?: number;
-  draftSeed?: DiscoverDraftSeed | null;
+  draftSeed?: PlannerDraftSeed | null;
   draftSeedToken?: number;
   entryPreset?: Partial<PlanDraft> | null;
   entryPresetToken?: number;

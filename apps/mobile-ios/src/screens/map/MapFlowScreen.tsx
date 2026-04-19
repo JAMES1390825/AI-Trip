@@ -4,7 +4,6 @@ import { TripApiClient } from "../../api/client";
 import { RUNTIME_CONFIG } from "../../config/runtime";
 import {
   type BudgetLevel,
-  type CommunityPost,
   type DestinationEntity,
   type PaceLevel,
   type PlanDraft,
@@ -22,8 +21,6 @@ import { PlanEntryView } from "./PlanEntryView";
 type MapFlowScreenProps = {
   preloadedItinerary?: Record<string, unknown> | null;
   preloadedToken?: number;
-  communitySeed?: { destination: string; postIds: string[] } | null;
-  communitySeedToken?: number;
   onPlanSaved?: (savedPlanId: string, itinerary: Record<string, unknown>) => void;
 };
 
@@ -57,8 +54,6 @@ function formatSuccessText(itinerary: Record<string, unknown> | null): string {
 export function MapFlowScreen({
   preloadedItinerary = null,
   preloadedToken = 0,
-  communitySeed = null,
-  communitySeedToken = 0,
   onPlanSaved,
 }: MapFlowScreenProps) {
   const api = useMemo(() => new TripApiClient(() => RUNTIME_CONFIG), []);
@@ -74,9 +69,6 @@ export function MapFlowScreen({
   const [pace, setPace] = useState<PaceLevel>("relaxed");
   const [mustGo, setMustGo] = useState<string[]>([]);
   const [planningNote, setPlanningNote] = useState("");
-  const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>([]);
-  const [referencedCommunityPostIDs, setReferencedCommunityPostIDs] = useState<string[]>([]);
-  const [seededCommunityDestination, setSeededCommunityDestination] = useState("");
   const [entryStatus, setEntryStatus] = useState("填好目的地、日期和偏好，就能开始 AI 规划。");
   const [clarificationQuestion, setClarificationQuestion] = useState("");
   const [suggestedOptions, setSuggestedOptions] = useState<string[]>([]);
@@ -106,75 +98,6 @@ export function MapFlowScreen({
     setBriefNextAction("");
     setFlowMode("result");
   }, [preloadedItinerary, preloadedToken]);
-
-  useEffect(() => {
-    if (!communitySeedToken || !communitySeed) return;
-    const nextDestination = String(communitySeed.destination || "").trim();
-    const nextPostIds = Array.isArray(communitySeed.postIds)
-      ? communitySeed.postIds.map((item) => String(item || "").trim()).filter(Boolean)
-      : [];
-    setDestination(nextDestination);
-    setSelectedDestination(null);
-    setReferencedCommunityPostIDs(nextPostIds);
-    setSeededCommunityDestination(nextDestination);
-    setEntryStatus("已带入一条旅途分享作为参考，你可以直接继续生成，也可以再补充自己的偏好。");
-    setClarificationQuestion("");
-    setSuggestedOptions([]);
-    setBriefNextAction("");
-    setFlowMode("entry");
-  }, [communitySeed, communitySeedToken]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const destinationId = selectedDestination?.destination_id?.trim() || "";
-    const destinationLabel = (selectedDestination?.destination_label || destination).trim();
-    if (!destinationId && !destinationLabel) {
-      setCommunityPosts([]);
-      setReferencedCommunityPostIDs([]);
-      setSeededCommunityDestination("");
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    void (async () => {
-      try {
-        const items = await api.listCommunityPosts({
-          destinationId,
-          destinationLabel,
-          limit: 6,
-        });
-        if (cancelled) return;
-        setCommunityPosts(items);
-      } catch (error) {
-        if (cancelled) return;
-        const message = error instanceof Error ? error.message : String(error);
-        setCommunityPosts([]);
-        if (referencedCommunityPostIDs.length > 0) {
-          setEntryStatus(`已保留外部带入的旅途分享参考，社区候选池读取失败：${message}`);
-        } else {
-          setEntryStatus("已按目的地生成基础规划条件，社区候选池暂时不可用。");
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [api, destination, referencedCommunityPostIDs.length, selectedDestination]);
-
-  useEffect(() => {
-    if (!referencedCommunityPostIDs.length || !seededCommunityDestination.trim()) return;
-    if (isSameDestinationText(destination, seededCommunityDestination)) return;
-    setReferencedCommunityPostIDs([]);
-    setSeededCommunityDestination("");
-  }, [destination, referencedCommunityPostIDs.length, seededCommunityDestination]);
-
-  const effectiveCommunityPostIDs = useMemo(() => {
-    const manual = Array.from(new Set(referencedCommunityPostIDs.map((item) => item.trim()).filter(Boolean)));
-    if (manual.length) return manual.slice(0, 3);
-    return communityPosts.map((item) => item.id).filter(Boolean).slice(0, 3);
-  }, [communityPosts, referencedCommunityPostIDs]);
 
   function toggleStyle(style: string) {
     setTravelStyles((prev) => {
@@ -247,7 +170,6 @@ export function MapFlowScreen({
         travel_styles: brief.travel_styles,
         weather_preference: brief.constraints.weather_preference || "",
         dining_preference: brief.constraints.dining_preference || "",
-        community_post_ids: effectiveCommunityPostIDs,
       }).catch(() => undefined);
 
       setGeneratingPhaseIndex(0);
@@ -257,7 +179,6 @@ export function MapFlowScreen({
       const result = await api.generatePlanV2(brief, {
         variants: 1,
         allowFallback: true,
-        communityPostIds: effectiveCommunityPostIDs,
       });
       if (requestIdRef.current !== requestId) return;
       const primary = extractPrimaryItinerary(result);
@@ -278,7 +199,6 @@ export function MapFlowScreen({
         budget_level: brief.budget_level,
         pace: brief.pace,
         travel_styles: brief.travel_styles,
-        community_post_ids: effectiveCommunityPostIDs,
         source_mode: String(primary.source_mode || ""),
       }).catch(() => undefined);
     } catch (error) {
