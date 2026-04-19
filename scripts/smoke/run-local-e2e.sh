@@ -179,12 +179,17 @@ invoke_api_json() {
 
 json_get() {
   local path="$1"
-  python3 - "$path" <<'PY'
+  python3 -c '
 import json
 import sys
 
 path = sys.argv[1]
-obj = json.load(sys.stdin)
+raw = sys.stdin.read().strip()
+if not raw:
+    print("")
+    raise SystemExit(0)
+
+obj = json.loads(raw)
 parts = [p for p in path.split(".") if p]
 
 cur = obj
@@ -200,11 +205,13 @@ for part in parts:
 
 if cur is None:
     print("")
+elif isinstance(cur, bool):
+    print("true" if cur else "false")
 elif isinstance(cur, (dict, list)):
     print(json.dumps(cur, ensure_ascii=False))
 else:
     print(cur)
-PY
+' "$path"
 }
 
 ensure_command "go" "Install Go from https://go.dev/dl/ and make sure it is on PATH."
@@ -213,7 +220,7 @@ ensure_command "python3" "Python 3 is required for JSON parsing in this smoke sc
 
 load_env_file "$ENV_FILE"
 
-echo "[1/7] Starting trip-api on :8080 ..."
+echo "[1/8] Starting trip-api on :8080 ..."
 (
   cd "$TRIP_API_DIR"
   BOOTSTRAP_CLIENT_SECRET="$BOOTSTRAP_SECRET" go run ./cmd/trip-api-go
@@ -221,10 +228,10 @@ echo "[1/7] Starting trip-api on :8080 ..."
 trip_api_pid="$!"
 
 wait_http_ready "http://127.0.0.1:8080/api/v1/health" 120
-echo "[2/7] trip-api is healthy."
+echo "[2/8] trip-api is healthy."
 
 BASE_URL="http://127.0.0.1:8080"
-echo "[3/7] Issuing token ..."
+echo "[3/8] Issuing token ..."
 token_body="$(cat <<JSON
 {"user_id":"$USER_ID","role":"USER","client_secret":"$BOOTSTRAP_SECRET"}
 JSON
@@ -236,42 +243,53 @@ if [[ -z "$ACCESS_TOKEN" ]]; then
   exit 1
 fi
 
-echo "[4/7] Generating and replanning itinerary ..."
-generate_body="$(cat <<JSON
+echo "[4/8] Resolving destination and building planning brief ..."
+resolved="$(invoke_api_json "GET" "$BASE_URL/api/v1/destinations/resolve?q=$DESTINATION&limit=5" "$ACCESS_TOKEN" "")"
+selected_destination="$(printf '%s' "$resolved" | json_get "items.0")"
+if [[ -z "$selected_destination" ]]; then
+  echo "failed to resolve destination" >&2
+  exit 1
+fi
+
+brief_body="$(cat <<JSON
 {
   "origin_city":"shanghai",
-  "destination":"$DESTINATION",
+  "destination_text":"$DESTINATION",
+  "selected_destination":$selected_destination,
   "days":3,
   "budget_level":"medium",
-  "companions":["friend"],
-  "travel_styles":["history","food"],
-  "must_go":[],
-  "avoid":[],
   "start_date":"2026-05-01",
   "pace":"relaxed",
-  "user_id":"$USER_ID"
+  "travel_styles":["history","food"]
 }
 JSON
 )"
-generated="$(invoke_api_json "POST" "$BASE_URL/api/v1/plans/generate" "$ACCESS_TOKEN" "$generate_body")"
+brief="$(invoke_api_json "POST" "$BASE_URL/api/v1/plans/brief" "$ACCESS_TOKEN" "$brief_body")"
+planning_brief="$(printf '%s' "$brief" | json_get "planning_brief")"
+ready_to_generate="$(printf '%s' "$brief" | json_get "planning_brief.ready_to_generate")"
+if [[ "$ready_to_generate" != "true" ]]; then
+  echo "planning brief is not ready_to_generate" >&2
+  printf '%s\n' "$brief" >&2
+  exit 1
+fi
 
-replan_body="$(cat <<JSON
-{
-  "itinerary":$generated,
-  "patch":{
-    "change_type":"budget",
-    "affected_days":[0],
-    "new_budget_level":"high",
-    "preserve_locked":true
-  }
-}
+echo "[5/8] Generating and validating itinerary ..."
+generate_body="$(cat <<JSON
+{"planning_brief":$planning_brief,"options":{"variants":1,"allow_fallback":true}}
 JSON
 )"
-replanned="$(invoke_api_json "POST" "$BASE_URL/api/v1/plans/replan" "$ACCESS_TOKEN" "$replan_body")"
+generated="$(invoke_api_json "POST" "$BASE_URL/api/v1/plans/generate-v2" "$ACCESS_TOKEN" "$generate_body")"
+itinerary="$(printf '%s' "$generated" | json_get "plans.0.itinerary")"
+if [[ -z "$itinerary" ]]; then
+  echo "generate-v2 did not return itinerary" >&2
+  printf '%s\n' "$generated" >&2
+  exit 1
+fi
+validated="$(invoke_api_json "POST" "$BASE_URL/api/v1/plans/validate" "$ACCESS_TOKEN" "{\"itinerary\":$itinerary,\"strict\":false}")"
 
-echo "[5/7] Saving and reading history ..."
+echo "[6/8] Saving and recording event ..."
 save_body="$(cat <<JSON
-{"user_id":"$USER_ID","itinerary":$replanned}
+{"itinerary":$itinerary}
 JSON
 )"
 saved="$(invoke_api_json "POST" "$BASE_URL/api/v1/plans/save" "$ACCESS_TOKEN" "$save_body")"
@@ -279,34 +297,39 @@ SAVED_ID="$(printf '%s' "$saved" | json_get "id")"
 history="$(invoke_api_json "GET" "$BASE_URL/api/v1/plans/saved?limit=20" "$ACCESS_TOKEN" "")"
 loaded="$(invoke_api_json "GET" "$BASE_URL/api/v1/plans/saved/$SAVED_ID" "$ACCESS_TOKEN" "")"
 summary="$(invoke_api_json "GET" "$BASE_URL/api/v1/plans/saved/$SAVED_ID/summary" "$ACCESS_TOKEN" "")"
+invoke_api_json "POST" "$BASE_URL/api/v1/events" "$ACCESS_TOKEN" '{"event_name":"mainline_smoke_checked","metadata":{"source":"run-local-e2e"}}' >/dev/null
 
-echo "[6/7] Validating smoke result payload."
+echo "[7/8] Validating smoke result payload."
 if [[ -z "$SAVED_ID" ]]; then
   echo "saved plan id is missing" >&2
   exit 1
 fi
 
-REQUEST_ID="$(printf '%s' "$generated" | json_get "request_id")"
-REPLAN_CONFIDENCE="$(printf '%s' "$replanned" | json_get "confidence")"
+GENERATED_DEGRADED="$(printf '%s' "$generated" | json_get "degraded")"
+ITINERARY_CONFIDENCE="$(printf '%s' "$itinerary" | json_get "confidence")"
+VALIDATION_PASSED="$(printf '%s' "$validated" | json_get "validation_result.passed")"
+VALIDATION_TIER="$(printf '%s' "$validated" | json_get "validation_result.confidence_tier")"
 LOADED_DESTINATION="$(printf '%s' "$loaded" | json_get "itinerary.destination")"
 HISTORY_COUNT="$(printf '%s' "$history" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(len(data) if isinstance(data, list) else len(data.get("items", [])) if isinstance(data, dict) and isinstance(data.get("items"), list) else 0)')"
 SUMMARY_PREVIEW="$(printf '%s' "$summary" | python3 -c 'import json,sys; text=str(json.load(sys.stdin).get("summary","")); print(text[:80])')"
 
-echo "[7/7] Smoke flow complete."
-python3 - "$USER_ID" "$REQUEST_ID" "$REPLAN_CONFIDENCE" "$SAVED_ID" "$HISTORY_COUNT" "$LOADED_DESTINATION" "$SUMMARY_PREVIEW" "$TRIP_API_OUT_LOG" "$TRIP_API_ERR_LOG" <<'PY'
+echo "[8/8] Smoke flow complete."
+python3 - "$USER_ID" "$GENERATED_DEGRADED" "$ITINERARY_CONFIDENCE" "$VALIDATION_PASSED" "$VALIDATION_TIER" "$SAVED_ID" "$HISTORY_COUNT" "$LOADED_DESTINATION" "$SUMMARY_PREVIEW" "$TRIP_API_OUT_LOG" "$TRIP_API_ERR_LOG" <<'PY'
 import json
 import sys
 
 payload = {
     "user_id": sys.argv[1],
-    "request_id": sys.argv[2],
-    "replan_confidence": sys.argv[3],
-    "saved_plan_id": sys.argv[4],
-    "history_count": int(sys.argv[5]),
-    "loaded_destination": sys.argv[6],
-    "summary_preview": sys.argv[7],
-    "trip_api_stdout_log": sys.argv[8],
-    "trip_api_stderr_log": sys.argv[9],
+    "generated_degraded": sys.argv[2],
+    "itinerary_confidence": sys.argv[3],
+    "validation_passed": sys.argv[4],
+    "validation_confidence_tier": sys.argv[5],
+    "saved_plan_id": sys.argv[6],
+    "history_count": int(sys.argv[7]),
+    "loaded_destination": sys.argv[8],
+    "summary_preview": sys.argv[9],
+    "trip_api_stdout_log": sys.argv[10],
+    "trip_api_stderr_log": sys.argv[11],
 }
 print(json.dumps(payload, ensure_ascii=False, indent=2))
 PY
