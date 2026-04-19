@@ -133,6 +133,10 @@ bash scripts/smoke/run-local-e2e.sh
 powershell -ExecutionPolicy Bypass -File scripts/smoke/run-local-e2e.ps1
 ```
 
+The smoke flow validates the backend mainline path:
+
+`auth/token -> destinations/resolve -> plans/brief -> plans/generate-v2 -> plans/validate -> plans/save -> events`
+
 ## Environment Notes
 
 可以先执行：
