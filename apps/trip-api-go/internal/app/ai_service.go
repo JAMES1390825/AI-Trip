@@ -1,19 +1,12 @@
 package app
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
-	"net/http"
 	"strings"
-	"time"
 )
 
 type AIServiceClient struct {
-	baseURL  string
-	apiToken string
-	client   *http.Client
+	llm *LLMService
 }
 
 type aiPlanningBriefEnhancementRequest struct {
@@ -69,86 +62,35 @@ type aiItineraryExplainResponse struct {
 }
 
 func NewAIServiceClient(cfg AIServiceConfig) *AIServiceClient {
-	baseURL := strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/")
-	if baseURL == "" {
-		return nil
-	}
-	timeout := time.Duration(cfg.TimeoutMs) * time.Millisecond
-	if timeout <= 0 {
-		timeout = 4 * time.Second
-	}
 	return &AIServiceClient{
-		baseURL:  baseURL,
-		apiToken: strings.TrimSpace(cfg.APIToken),
-		client: &http.Client{
-			Timeout: timeout,
-		},
+		llm: NewLLMService(LLMConfig{
+			BaseURL:   cfg.BaseURL,
+			APIToken:  cfg.APIToken,
+			ModelName: cfg.ModelName,
+			TimeoutMs: cfg.TimeoutMs,
+		}),
 	}
-}
-
-func (c *AIServiceClient) postJSON(ctx context.Context, path string, body any, out any) error {
-	if c == nil || strings.TrimSpace(c.baseURL) == "" {
-		return fmt.Errorf("ai service disabled")
-	}
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(payload))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if c.apiToken != "" {
-		req.Header.Set("X-AI-Service-Key", c.apiToken)
-	}
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("ai service %s failed with %d", path, resp.StatusCode)
-	}
-	if out == nil {
-		return nil
-	}
-	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (c *AIServiceClient) EnhancePlanningBrief(ctx context.Context, userID string, input planningBriefRequest, fallback PlanningBriefResponse) (aiPlanningBriefEnhancementResponse, error) {
-	response := aiPlanningBriefEnhancementResponse{}
-	err := c.postJSON(ctx, "/v1/brief/enhance", aiPlanningBriefEnhancementRequest{
-		UserID:           userID,
-		Input:            input,
-		FallbackResponse: fallback,
-	}, &response)
-	return response, err
+	if c == nil || c.llm == nil {
+		return fallbackPlanningBriefEnhancement(fallback), nil
+	}
+	return c.llm.EnhancePlanningBrief(ctx, userID, input, fallback)
 }
 
 func (c *AIServiceClient) EnhanceChatIntake(ctx context.Context, userID string, history []ChatTurn, draft map[string]any, fallback map[string]any) (aiChatEnhancementResponse, error) {
-	response := aiChatEnhancementResponse{}
-	err := c.postJSON(ctx, "/v1/chat/enhance", aiChatEnhancementRequest{
-		UserID:           userID,
-		History:          history,
-		DraftPlanRequest: draft,
-		FallbackResponse: fallback,
-	}, &response)
-	return response, err
+	if c == nil || c.llm == nil {
+		return fallbackChatEnhancement(fallback), nil
+	}
+	return c.llm.EnhanceChatIntake(ctx, userID, history, draft, fallback)
 }
 
 func (c *AIServiceClient) ExplainItinerary(ctx context.Context, userID string, brief PlanningBrief, itinerary map[string]any) (aiItineraryExplainResponse, error) {
-	response := aiItineraryExplainResponse{}
-	err := c.postJSON(ctx, "/v1/itinerary/explain", aiItineraryExplainRequest{
-		UserID:        userID,
-		PlanningBrief: brief,
-		Itinerary:     itinerary,
-	}, &response)
-	return response, err
+	if c == nil || c.llm == nil {
+		return aiItineraryExplainResponse{}, nil
+	}
+	return c.llm.ExplainItinerary(ctx, userID, brief, itinerary)
 }
 
 func mergePlanningBriefEnhancement(fallback PlanningBriefResponse, enhancement aiPlanningBriefEnhancementResponse) PlanningBriefResponse {

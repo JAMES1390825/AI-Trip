@@ -25,6 +25,7 @@ type StorageConfig struct {
 type AIServiceConfig struct {
 	BaseURL   string
 	APIToken  string
+	ModelName string
 	TimeoutMs int
 }
 

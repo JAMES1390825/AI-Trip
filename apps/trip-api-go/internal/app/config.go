@@ -27,7 +27,8 @@ func LoadConfig() Config {
 		},
 		AI: AIServiceConfig{
 			BaseURL:   strings.TrimSpace(os.Getenv("AI_SERVICE_BASE_URL")),
-			APIToken:  firstNonBlank(os.Getenv("AI_SERVICE_API_KEY"), os.Getenv("AI_SERVICE_INTERNAL_TOKEN")),
+			APIToken:  firstNonBlank(os.Getenv("AI_SERVICE_API_KEY"), os.Getenv("AI_SERVICE_INTERNAL_TOKEN"), os.Getenv("BAILIAN_API_KEY")),
+			ModelName: firstNonBlank(os.Getenv("AI_SERVICE_MODEL_NAME"), os.Getenv("BAILIAN_MODEL_NAME")),
 			TimeoutMs: toInt(os.Getenv("AI_SERVICE_TIMEOUT_MS"), 4000),
 		},
 		Amap: AmapConfig{

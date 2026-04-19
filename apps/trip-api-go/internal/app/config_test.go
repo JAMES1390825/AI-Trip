@@ -17,6 +17,9 @@ func TestLoadConfigDefaults(t *testing.T) {
 	t.Setenv("AI_SERVICE_BASE_URL", "")
 	t.Setenv("AI_SERVICE_API_KEY", "")
 	t.Setenv("AI_SERVICE_INTERNAL_TOKEN", "")
+	t.Setenv("BAILIAN_API_KEY", "")
+	t.Setenv("AI_SERVICE_MODEL_NAME", "")
+	t.Setenv("BAILIAN_MODEL_NAME", "")
 	t.Setenv("AI_SERVICE_TIMEOUT_MS", "")
 	t.Setenv("AMAP_API_KEY", "")
 	t.Setenv("AMAP_BASE_URL", "")
@@ -54,6 +57,9 @@ func TestLoadConfigDefaults(t *testing.T) {
 	if cfg.AI.APIToken != "" {
 		t.Fatalf("expected default ai token blank, got %q", cfg.AI.APIToken)
 	}
+	if cfg.AI.ModelName != "" {
+		t.Fatalf("expected default ai model name blank, got %q", cfg.AI.ModelName)
+	}
 	if cfg.AI.TimeoutMs != 4000 {
 		t.Fatalf("expected default ai timeout 4000, got %d", cfg.AI.TimeoutMs)
 	}
@@ -78,6 +84,7 @@ func TestLoadConfigEnvOverrides(t *testing.T) {
 	t.Setenv("DATA_FILE", "tmp/data/custom.json")
 	t.Setenv("AI_SERVICE_BASE_URL", "http://127.0.0.1:8091")
 	t.Setenv("AI_SERVICE_API_KEY", "service-key")
+	t.Setenv("AI_SERVICE_MODEL_NAME", "qwen-plus")
 	t.Setenv("AI_SERVICE_TIMEOUT_MS", "5500")
 	t.Setenv("AMAP_API_KEY", "amap-key")
 	t.Setenv("AMAP_BASE_URL", "http://127.0.0.1:8899")
@@ -108,6 +115,9 @@ func TestLoadConfigEnvOverrides(t *testing.T) {
 	}
 	if cfg.AI.APIToken != "service-key" {
 		t.Fatalf("unexpected ai token: %q", cfg.AI.APIToken)
+	}
+	if cfg.AI.ModelName != "qwen-plus" {
+		t.Fatalf("unexpected ai model name: %q", cfg.AI.ModelName)
 	}
 	if cfg.AI.TimeoutMs != 5500 {
 		t.Fatalf("unexpected ai timeout: %d", cfg.AI.TimeoutMs)
