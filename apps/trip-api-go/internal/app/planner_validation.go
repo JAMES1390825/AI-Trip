@@ -125,11 +125,11 @@ func normalizedCoverage(score float64, total int) float64 {
 
 func degradedReasonLabel(reason string) string {
 	switch strings.TrimSpace(reason) {
-	case "provider_coverage_low":
+	case mainlineDegradedReasonProviderCoverageLow:
 		return "当前结果仍是内置事实草案，真实 provider 覆盖不足"
-	case "validation_not_passed":
+	case mainlineDegradedReasonValidationNotPassed:
 		return "当前结果还没有通过最终校验"
-	case "destination_custom_unresolved":
+	case mainlineDegradedReasonDestinationCustomUnresolved:
 		return "目的地还没有完成标准化确认"
 	default:
 		return "当前结果处于降级模式，建议继续确认"

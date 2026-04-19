@@ -206,7 +206,7 @@ func refreshV2ItineraryMetadata(itinerary map[string]any) {
 	}
 	degradedReason := strings.TrimSpace(asString(itinerary["degraded_reason"]))
 	if degradedReason == "" && sourceMode != "provider" {
-		degradedReason = "provider_coverage_low"
+		degradedReason = mainlineDegradedReasonProviderCoverageLow
 	}
 	attachV2ItineraryMetadata(itinerary, brief, sourceMode, degradedReason)
 }
@@ -236,7 +236,7 @@ func attachV2ItineraryMetadata(itinerary map[string]any, brief PlanningBrief, so
 
 	degraded := sourceMode != "provider"
 	if degradedReason == "" && degraded {
-		degradedReason = "provider_coverage_low"
+		degradedReason = mainlineDegradedReasonProviderCoverageLow
 	}
 	if degradedReason == "" {
 		degradedReason = ""
