@@ -75,3 +75,118 @@ func TestHandleSavePlanDedupesLatestSameItinerary(t *testing.T) {
 		t.Fatalf("expected 1 saved plan after dedupe request, got %d", len(items))
 	}
 }
+
+func TestHandleSavePlanNormalizesReliabilityFieldsBeforePersist(t *testing.T) {
+	store, err := NewStore("")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	app := &App{store: store}
+
+	brief := PlanningBrief{
+		OriginCity: "上海",
+		Destination: &DestinationEntity{
+			DestinationID:    "builtin:cn-shanghai",
+			DestinationLabel: "上海市",
+			Provider:         "builtin",
+		},
+		Days:            2,
+		StartDate:       "2026-04-18",
+		BudgetLevel:     "medium",
+		Pace:            "relaxed",
+		TravelStyles:    []string{"citywalk"},
+		ReadyToGenerate: true,
+	}
+
+	itinerary := generateV2VariantItinerary(brief, "u-1", "balanced")
+	delete(itinerary, "validation_result")
+	delete(itinerary, "confidence")
+
+	body, err := json.Marshal(map[string]any{"itinerary": itinerary})
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/plans/save", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	app.handleSavePlan(rr, req, &AuthUser{UserID: "u-1"})
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", rr.Code)
+	}
+
+	resp := map[string]any{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	savedItinerary := asMap(resp["itinerary"])
+	if len(asMap(savedItinerary["validation_result"])) == 0 {
+		t.Fatalf("expected validation_result to be restored before persistence")
+	}
+	if _, ok := savedItinerary["confidence"]; !ok {
+		t.Fatalf("expected confidence to be restored before persistence")
+	}
+}
+
+func TestHandleSavePlanDedupesAfterMainlineNormalization(t *testing.T) {
+	store, err := NewStore("")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	app := &App{store: store}
+
+	brief := PlanningBrief{
+		OriginCity: "上海",
+		Destination: &DestinationEntity{
+			DestinationID:    "builtin:cn-shanghai",
+			DestinationLabel: "上海市",
+			Provider:         "builtin",
+		},
+		Days:            2,
+		StartDate:       "2026-04-18",
+		BudgetLevel:     "medium",
+		Pace:            "relaxed",
+		TravelStyles:    []string{"citywalk"},
+		ReadyToGenerate: true,
+	}
+
+	raw := generateV2VariantItinerary(brief, "u-1", "balanced")
+	seed := normalizeMainlineItineraryForSave(raw)
+	if _, err := app.store.SavePlan(SavedPlan{
+		ID:        "p-existing",
+		UserID:    "u-1",
+		Itinerary: seed,
+		SavedAt:   time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("seed save failed: %v", err)
+	}
+
+	incoming := deepCloneMap(raw)
+	delete(incoming, "validation_result")
+	delete(incoming, "confidence")
+
+	body, err := json.Marshal(map[string]any{"itinerary": incoming})
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/plans/save", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	app.handleSavePlan(rr, req, &AuthUser{UserID: "u-1"})
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 for deduped save, got %d", rr.Code)
+	}
+
+	resp := map[string]any{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !asBool(resp["deduped"]) {
+		t.Fatalf("expected deduped=true after normalization")
+	}
+}

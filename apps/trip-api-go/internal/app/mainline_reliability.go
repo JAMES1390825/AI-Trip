@@ -83,3 +83,38 @@ func validationResultFromMap(value any) ValidationResult {
 		},
 	}
 }
+
+func normalizeMainlineItineraryForSave(itinerary map[string]any) map[string]any {
+	next := deepCloneMap(itinerary)
+
+	briefMap := asMap(firstNonNil(
+		next["planning_brief"],
+		asMap(next["request_snapshot"])["planning_brief"],
+	))
+	sourceMode := strings.TrimSpace(asString(next["source_mode"]))
+	if sourceMode == "rules_legacy" {
+		return next
+	}
+	if sourceMode == "" && len(briefMap) == 0 {
+		return next
+	}
+
+	refreshV2ItineraryMetadata(next)
+
+	brief := planningBriefFromMap(briefMap)
+	if brief.Destination == nil {
+		brief.Destination = destinationEntityFromMap(firstNonNil(
+			next["destination_entity"],
+			asMap(next["request_snapshot"])["destination_entity"],
+		))
+	}
+
+	envelope := buildMainlineItineraryEnvelope(
+		next,
+		brief,
+		asString(next["source_mode"]),
+		asString(next["degraded_reason"]),
+	)
+
+	return envelope.Itinerary
+}

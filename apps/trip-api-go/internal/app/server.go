@@ -1840,6 +1840,8 @@ func (a *App) handleSavePlan(w http.ResponseWriter, r *http.Request, user *AuthU
 		return
 	}
 
+	itinerary = normalizeMainlineItineraryForSave(itinerary)
+
 	owner := asString(asMap(itinerary["request_snapshot"])["user_id"])
 	if strings.TrimSpace(owner) != strings.TrimSpace(user.UserID) {
 		writeAppError(w, appError(http.StatusForbidden, "FORBIDDEN", "cannot save other user itinerary"))
