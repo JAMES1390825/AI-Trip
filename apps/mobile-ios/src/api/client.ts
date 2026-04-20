@@ -1,18 +1,15 @@
 import type {
   AuthTokenResponse,
-  ChatIntakeResponse,
-  ChatTurnPayload,
   DestinationEntity,
   DestinationResolveResponse,
   HealthResponse,
-  PlanDraft,
   PlanningBriefRequest,
   PlanningBriefResponse,
   SavePlanResponse,
   SavedPlanDetail,
   SavedPlanListItem,
 } from "../types/plan";
-import type { PlaceDetail, ValidationResult } from "../types/itinerary";
+import type { ValidationResult } from "../types/itinerary";
 
 type RuntimeConfig = {
   apiBase: string;
@@ -239,52 +236,6 @@ export class TripApiClient {
     };
   }
 
-  async getPlaceDetail(provider: string, providerPlaceId: string): Promise<PlaceDetail> {
-    const response = (await this.request<Record<string, unknown>>(
-      `/api/v1/places/${encodeURIComponent(provider)}/${encodeURIComponent(providerPlaceId)}`,
-    )) as Record<string, unknown>;
-    return {
-      provider: String(response.provider || ""),
-      providerPlaceId: String(response.provider_place_id || ""),
-      name: String(response.name || ""),
-      address: String(response.address || ""),
-      lat: Number(response.lat || 0),
-      lng: Number(response.lng || 0),
-      rating: Number(response.rating || 0),
-      priceLevel: Number(response.price_level || 0),
-      openingHoursText: String(response.opening_hours_text || ""),
-      phone: String(response.phone || ""),
-      images: Array.isArray(response.images) ? response.images.map((item) => String(item || "")) : [],
-      tags: Array.isArray(response.tags) ? response.tags.map((item) => String(item || "")) : [],
-      sourceFetchedAt: String(response.source_fetched_at || ""),
-    };
-  }
-
-  async generatePlan(draft: PlanDraft): Promise<Record<string, unknown>> {
-    return this.request<Record<string, unknown>>("/api/v1/plans/generate", {
-      method: "POST",
-      body: {
-        origin_city: draft.origin_city.trim(),
-        destination: draft.destination.trim(),
-        days: draft.days,
-        budget_level: draft.budget_level,
-        companions: draft.companions,
-        travel_styles: draft.travel_styles,
-        must_go: draft.must_go,
-        avoid: draft.avoid,
-        start_date: draft.start_date.trim(),
-        pace: draft.pace,
-      },
-    });
-  }
-
-  async replanPlan(itinerary: Record<string, unknown>, patch: Record<string, unknown>): Promise<Record<string, unknown>> {
-    return this.request<Record<string, unknown>>("/api/v1/plans/replan", {
-      method: "POST",
-      body: { itinerary, patch },
-    });
-  }
-
   async savePlan(itinerary: Record<string, unknown>): Promise<SavePlanResponse> {
     return this.request<SavePlanResponse>("/api/v1/plans/save", {
       method: "POST",
@@ -307,23 +258,4 @@ export class TripApiClient {
     });
   }
 
-  async trackEvent(eventName: string, metadata: Record<string, unknown> = {}): Promise<void> {
-    await this.request<unknown>("/api/v1/events", {
-      method: "POST",
-      body: {
-        event_name: String(eventName || "").trim(),
-        metadata,
-      },
-    });
-  }
-
-  async chatIntakeNext(history: ChatTurnPayload[], draftPlanRequest: Record<string, unknown>): Promise<ChatIntakeResponse> {
-    return this.request<ChatIntakeResponse>("/api/v1/chat/intake/next", {
-      method: "POST",
-      body: {
-        history,
-        draft_plan_request: draftPlanRequest,
-      },
-    });
-  }
 }

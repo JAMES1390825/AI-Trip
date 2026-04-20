@@ -16,20 +16,6 @@ export type DestinationEntity = {
   match_type: DestinationMatchType;
 };
 
-export type PlanDraft = {
-  origin_city: string;
-  destination: string;
-  destination_entity?: DestinationEntity | null;
-  days: number;
-  budget_level: BudgetLevel;
-  companions: string[];
-  travel_styles: string[];
-  must_go: string[];
-  avoid: string[];
-  start_date: string;
-  pace: PaceLevel;
-};
-
 export type HealthResponse = {
   status?: string;
   service?: string;
@@ -277,20 +263,4 @@ export type CommunityPostCreateRequest = {
   image_urls: string[];
   favorite_restaurants: string[];
   favorite_attractions: string[];
-};
-
-export type ChatTurnPayload = {
-  role: "user" | "assistant";
-  message: string;
-};
-
-export type ChatIntakeResponse = {
-  assistant_message?: string;
-  updated_draft?: Record<string, unknown>;
-  missing_fields?: string[];
-  suggested_options?: string[];
-  ready_to_generate?: boolean;
-  confidence?: number;
-  next_action?: string;
-  source_mode?: string;
 };

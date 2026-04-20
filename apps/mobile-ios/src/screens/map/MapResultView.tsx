@@ -1,7 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
   Linking,
   Platform,
   Pressable,
@@ -12,10 +10,9 @@ import {
 } from "react-native";
 import { TripApiClient } from "../../api/client";
 import { RUNTIME_CONFIG } from "../../config/runtime";
-import type { ItineraryAlternative, ItineraryBlock, ItineraryLeg, ItineraryView, ValidationResult } from "../../types/itinerary";
+import type { ItineraryBlock, ItineraryLeg, ItineraryView, ValidationResult } from "../../types/itinerary";
 import { blockHasCoord, clamp, formatHourRange, groupDayLabel, toItineraryView } from "../../utils/itinerary";
 import { PoiDetailSheet } from "./PoiDetailSheet";
-import { QuickOptimizeSheet, type QuickOptimizeOptions } from "./QuickOptimizeSheet";
 
 type GeoPoint = {
   latitude: number;
@@ -73,7 +70,6 @@ type DaySelection = "all" | number;
 type MapResultViewProps = {
   itinerary: Record<string, unknown>;
   onBack: () => void;
-  onOpenLegacyEditor: (itinerary: Record<string, unknown>) => void;
   onPlanSaved?: (savedPlanId: string, itinerary: Record<string, unknown>) => void;
 };
 
@@ -325,16 +321,6 @@ function dayTransitMinutes(legs: ItineraryLeg[], dayIndex: number): number {
   return legs.filter((leg) => leg.dayIndex === dayIndex).reduce((sum, item) => sum + item.minutes, 0);
 }
 
-function summarizeOptimizeOptions(options: QuickOptimizeOptions): string {
-  const labels: string[] = [];
-  if (options.lessWalking) labels.push("少走路");
-  if (options.moreFood) labels.push("多安排美食");
-  if (options.rainFriendly) labels.push("偏雨天友好");
-  if (options.compressHalfDay) labels.push("压缩半天");
-  if (options.keepLocked) labels.push("保留锁定");
-  return labels.length ? labels.join(" / ") : "默认优化";
-}
-
 function currentISODate(): string {
   const date = new Date();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -403,64 +389,11 @@ function cloneItinerary(input: Record<string, unknown>): Record<string, unknown>
   return JSON.parse(JSON.stringify(input)) as Record<string, unknown>;
 }
 
-function toggleBlockLock(input: Record<string, unknown>, blockId: string): Record<string, unknown> {
-  const next = cloneItinerary(input);
-  for (const dayItem of asArray(next.days)) {
-    if (!isRecord(dayItem)) continue;
-    for (const blockItem of asArray(dayItem.blocks)) {
-      if (!isRecord(blockItem)) continue;
-      if (String(blockItem.block_id || "") !== blockId) continue;
-      const locked = Boolean(blockItem.locked);
-      blockItem.locked = !locked;
-      blockItem.lock_reason = locked ? "" : "manual_lock";
-      return next;
-    }
-  }
-  return next;
-}
-
-function applyAlternative(input: Record<string, unknown>, block: ItineraryBlock, alternative: ItineraryAlternative): Record<string, unknown> {
-  const next = cloneItinerary(input);
-  for (const dayItem of asArray(next.days)) {
-    if (!isRecord(dayItem)) continue;
-    for (const blockItem of asArray(dayItem.blocks)) {
-      if (!isRecord(blockItem)) continue;
-      if (String(blockItem.block_id || "") !== block.blockId) continue;
-      blockItem.poi = alternative.poi;
-      blockItem.poi_lat = alternative.poiLat;
-      blockItem.poi_lon = alternative.poiLon;
-      blockItem.poi_map_url = alternative.mapUrl;
-      blockItem.recommend_reason = alternative.note || `已替换为 ${alternative.poi}`;
-      blockItem.risk_level = "medium";
-      const reason = isRecord(blockItem.reason) ? blockItem.reason : {};
-      reason.note = blockItem.recommend_reason;
-      blockItem.reason = reason;
-      return next;
-    }
-  }
-  return next;
-}
-
-function removeBlockFromItinerary(input: Record<string, unknown>, block: ItineraryBlock): Record<string, unknown> {
-  const next = cloneItinerary(input);
-  const days = asArray(next.days);
-  for (const dayItem of days) {
-    if (!isRecord(dayItem)) continue;
-    const blocks = asArray(dayItem.blocks).filter((item) => String(asRecord(item).block_id || "") !== block.blockId);
-    dayItem.blocks = blocks;
-  }
-  next.transit_legs = asArray(next.transit_legs).filter((item) => {
-    const leg = asRecord(item);
-    return String(leg.from_poi || "") !== block.poi && String(leg.to_poi || "") !== block.poi;
-  });
-  return next;
-}
-
 function findDiagnostics(raw: Record<string, unknown>): Array<Record<string, unknown>> {
   return asArray(raw.diagnostics).filter((item): item is Record<string, unknown> => isRecord(item));
 }
 
-export function MapResultView({ itinerary, onBack, onOpenLegacyEditor, onPlanSaved }: MapResultViewProps) {
+export function MapResultView({ itinerary, onBack, onPlanSaved }: MapResultViewProps) {
   const api = useMemo(() => new TripApiClient(() => RUNTIME_CONFIG), []);
   const [localItinerary, setLocalItinerary] = useState<Record<string, unknown>>(itinerary);
   const [status, setStatus] = useState("已生成地图行程");
@@ -469,10 +402,7 @@ export function MapResultView({ itinerary, onBack, onOpenLegacyEditor, onPlanSav
   const [selectedBlockId, setSelectedBlockId] = useState("");
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
   const [showPoiDetail, setShowPoiDetail] = useState(false);
-  const [showOptimize, setShowOptimize] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isOptimizing, setIsOptimizing] = useState(false);
-  const [isAskingAI, setIsAskingAI] = useState(false);
   const [savedPlanId, setSavedPlanId] = useState("");
   const [lastSavedFingerprint, setLastSavedFingerprint] = useState("");
   const [saveHint, setSaveHint] = useState<{ text: string; tone: SaveHintTone } | null>(null);
@@ -653,153 +583,14 @@ export function MapResultView({ itinerary, onBack, onOpenLegacyEditor, onPlanSav
         return;
       }
       await Linking.openURL(selectedBlock.mapUrl);
-      void api.trackEvent("navigation_started", {
-        block_id: selectedBlock.blockId,
-        day_index: selectedBlock.dayIndex,
-        provider: selectedBlock.provider,
-        provider_place_id: selectedBlock.providerPlaceId,
-        poi_name: selectedBlock.poi,
-        poi_category: selectedBlock.blockType,
-        poi_tags: selectedBlock.poiTags,
-        route_minutes_from_prev: selectedBlock.evidence?.routeMinutesFromPrev || 0,
-      }).catch(() => undefined);
     } catch {
       setStatus("打开导航失败");
     }
   }
 
-  async function handleAskAI() {
-    if (!selectedBlock) return;
-    setIsAskingAI(true);
-    setStatus("AI 分析中...");
-    try {
-      const intake = await api.chatIntakeNext(
-        [
-          {
-            role: "user",
-            message: `我在 ${itineraryView?.destination || "目的地"} 的行程里选中了 ${selectedBlock.poi}，请给我是否保留、什么时候去更合适、以及一个替代建议。`,
-          },
-        ],
-        {
-          destination: itineraryView?.destination || "",
-          start_date: itineraryView?.startDate || "",
-        },
-      );
-      setStatus(String(intake.assistant_message || "建议已更新").trim() || "建议已更新");
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
-    } finally {
-      setIsAskingAI(false);
-    }
-  }
-
-  function handleToggleLock() {
-    if (!selectedBlock) return;
-    const wasLocked = selectedBlock.locked;
-    const next = toggleBlockLock(localItinerary, selectedBlock.blockId);
-    setLocalItinerary(next);
-    setStatus(`${selectedBlock.poi} 已${wasLocked ? "解锁" : "锁定"}`);
-    void api.trackEvent("block_locked", {
-      block_id: selectedBlock.blockId,
-      day_index: selectedBlock.dayIndex,
-      provider: selectedBlock.provider,
-      provider_place_id: selectedBlock.providerPlaceId,
-      poi_name: selectedBlock.poi,
-      poi_category: selectedBlock.blockType,
-      poi_tags: selectedBlock.poiTags,
-      route_minutes_from_prev: selectedBlock.evidence?.routeMinutesFromPrev || 0,
-    }).catch(() => undefined);
-    setShowPoiDetail(false);
-  }
-
-  function openBlockDetail(block: ItineraryBlock, source: "list_card" | "map_marker") {
+  function openBlockDetail(block: ItineraryBlock) {
     setSelectedBlockId(block.blockId);
     setShowPoiDetail(true);
-    void api.trackEvent("poi_detail_opened", {
-      block_id: block.blockId,
-      day_index: block.dayIndex,
-      provider: block.provider,
-      provider_place_id: block.providerPlaceId,
-      poi_name: block.poi,
-      poi_category: block.blockType,
-      poi_tags: block.poiTags,
-      route_minutes_from_prev: block.evidence?.routeMinutesFromPrev || 0,
-      open_source: source,
-      source_mode: block.sourceMode,
-    }).catch(() => undefined);
-  }
-
-  function handlePickAlternative(alternative: ItineraryAlternative) {
-    if (!selectedBlock) return;
-    const next = applyAlternative(localItinerary, selectedBlock, alternative);
-    setLocalItinerary(next);
-    setShowPoiDetail(false);
-    setStatus(`已切换为 ${alternative.poi}`);
-    void api.trackEvent("block_replaced", {
-      block_id: selectedBlock.blockId,
-      day_index: selectedBlock.dayIndex,
-      provider: selectedBlock.provider,
-      removed_provider_place_id: selectedBlock.providerPlaceId,
-      removed_category: selectedBlock.blockType,
-      removed_tags: selectedBlock.poiTags,
-      added_provider_place_id: "",
-      added_category: selectedBlock.blockType,
-      added_tags: selectedBlock.poiTags,
-      change_reason: alternative.note || "manual_replace",
-      route_minutes_from_prev: selectedBlock.evidence?.routeMinutesFromPrev || 0,
-    }).catch(() => undefined);
-  }
-
-  function handleRemoveBlock() {
-    if (!selectedBlock) return;
-    const next = removeBlockFromItinerary(localItinerary, selectedBlock);
-    setLocalItinerary(next);
-    setShowPoiDetail(false);
-    setStatus(`已从当前路线移除 ${selectedBlock.poi}`);
-    void api.trackEvent("block_removed", {
-      block_id: selectedBlock.blockId,
-      day_index: selectedBlock.dayIndex,
-      provider: selectedBlock.provider,
-      provider_place_id: selectedBlock.providerPlaceId,
-      poi_name: selectedBlock.poi,
-      poi_category: selectedBlock.blockType,
-      poi_tags: selectedBlock.poiTags,
-      route_minutes_from_prev: selectedBlock.evidence?.routeMinutesFromPrev || 0,
-    }).catch(() => undefined);
-  }
-
-  async function handleOptimize(options: QuickOptimizeOptions) {
-    const targetDay = currentDay || itineraryView?.days[0];
-    if (!targetDay) return;
-    const startHour = targetDay.blocks[0]?.startHour || 9;
-    const lastEndHour = targetDay.blocks[targetDay.blocks.length - 1]?.endHour || 18;
-    const endHour = options.compressHalfDay ? Math.min(startHour + 5, lastEndHour) : lastEndHour;
-
-    setIsOptimizing(true);
-    setShowOptimize(false);
-    setStatus(`优化中：${summarizeOptimizeOptions(options)}`);
-    try {
-      const patch: Record<string, unknown> = {
-        change_type: "replan_window",
-        keep_locked: options.keepLocked,
-        affected_days: [targetDay.dayIndex],
-        targets: [
-          {
-            day_index: targetDay.dayIndex,
-            start_hour: startHour,
-            end_hour: endHour,
-          },
-        ],
-        quick_preferences: options,
-      };
-      const next = await api.replanPlan(localItinerary, patch);
-      setLocalItinerary(next);
-      setStatus(`已优化 ${groupDayLabel(targetDay.dayIndex)} · ${summarizeOptimizeOptions(options)}`);
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
-    } finally {
-      setIsOptimizing(false);
-    }
   }
 
   if (!itineraryView) {
@@ -862,7 +653,7 @@ export function MapResultView({ itinerary, onBack, onOpenLegacyEditor, onPlanSav
                 onPress={() => {
                   const block = blockById.get(item.key);
                   if (block) {
-                    openBlockDetail(block, "map_marker");
+                    openBlockDetail(block);
                     return;
                   }
                   setSelectedBlockId(item.key);
@@ -884,7 +675,7 @@ export function MapResultView({ itinerary, onBack, onOpenLegacyEditor, onPlanSav
                 onPress={() => {
                   const block = blockById.get(point.key);
                   if (block) {
-                    openBlockDetail(block, "map_marker");
+                    openBlockDetail(block);
                     return;
                   }
                   setSelectedBlockId(point.key);
@@ -1058,11 +849,8 @@ export function MapResultView({ itinerary, onBack, onOpenLegacyEditor, onPlanSav
           </View>
 
           <View style={styles.primaryActionRow}>
-            <Pressable style={styles.primaryActionGhost} onPress={() => setShowOptimize(true)} disabled={isOptimizing}>
-              <Text style={styles.primaryActionGhostText}>{isOptimizing ? "优化中..." : "AI 优化"}</Text>
-            </Pressable>
-            <Pressable style={styles.primaryActionButton} onPress={() => onOpenLegacyEditor(localItinerary)}>
-              <Text style={styles.primaryActionButtonText}>编辑路线</Text>
+            <Pressable style={styles.primaryActionButton} onPress={() => void handleNavigate()}>
+              <Text style={styles.primaryActionButtonText}>导航到当前地点</Text>
             </Pressable>
           </View>
 
@@ -1083,7 +871,7 @@ export function MapResultView({ itinerary, onBack, onOpenLegacyEditor, onPlanSav
                         styles.poiCard,
                         selectedBlock?.blockId === block.blockId ? styles.poiCardActive : null,
                       ]}
-                      onPress={() => openBlockDetail(block, "list_card")}
+                      onPress={() => openBlockDetail(block)}
                     >
                       <View style={[styles.poiThumb, { backgroundColor: blockAccent(block.blockType) }]}>
                         <Text style={styles.poiThumbText}>{idx + 1}</Text>
@@ -1116,25 +904,7 @@ export function MapResultView({ itinerary, onBack, onOpenLegacyEditor, onPlanSav
         block={selectedBlock}
         onClose={() => setShowPoiDetail(false)}
         onNavigate={() => void handleNavigate()}
-        onToggleLock={handleToggleLock}
-        onRemoveBlock={handleRemoveBlock}
-        onAskAI={() => void handleAskAI()}
-        onPickAlternative={handlePickAlternative}
       />
-
-      <QuickOptimizeSheet
-        visible={showOptimize}
-        dayLabel={currentDay ? `${currentDay.date} ${groupDayLabel(currentDay.dayIndex)}` : "当前行程"}
-        onClose={() => setShowOptimize(false)}
-        onSubmit={(options) => void handleOptimize(options)}
-      />
-
-      {(isOptimizing || isAskingAI) ? (
-        <View style={styles.loadingPill}>
-          <ActivityIndicator size="small" color="#ffffff" />
-          <Text style={styles.loadingPillText}>{isOptimizing ? "AI 正在优化路线" : "AI 正在分析地点"}</Text>
-        </View>
-      ) : null}
 
       <View style={styles.statusBar}>
         <Text numberOfLines={2} style={styles.statusBarText}>
