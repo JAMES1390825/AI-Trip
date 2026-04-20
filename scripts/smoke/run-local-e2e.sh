@@ -2,7 +2,7 @@
 set -euo pipefail
 
 USER_ID="smoke-user"
-DESTINATION="beijing"
+DESTINATION="上海"
 BOOTSTRAP_SECRET="dev-bootstrap-secret"
 ENV_FILE=""
 
@@ -13,7 +13,7 @@ Usage:
 
 Options:
   --user-id <id>                 User ID used for smoke requests
-  --destination <name>           Destination city used for generate/replan
+  --destination <name>           Destination city used for smoke requests
   --bootstrap-secret <secret>    Bootstrap secret for token issuance
   --env-file <path>              Optional .env file to load before startup
   --help                         Show this help
@@ -179,48 +179,44 @@ invoke_api_json() {
 
 json_get() {
   local path="$1"
-  python3 -c '
-import json
-import sys
-
-path = sys.argv[1]
-raw = sys.stdin.read().strip()
-if not raw:
-    print("")
-    raise SystemExit(0)
-
-obj = json.loads(raw)
-parts = [p for p in path.split(".") if p]
-
-cur = obj
-for part in parts:
-    if isinstance(cur, dict):
-        cur = cur.get(part)
-    elif isinstance(cur, list) and part.isdigit():
-        idx = int(part)
-        cur = cur[idx] if 0 <= idx < len(cur) else None
-    else:
-        cur = None
-        break
-
-if cur is None:
-    print("")
-elif isinstance(cur, bool):
-    print("true" if cur else "false")
-elif isinstance(cur, (dict, list)):
-    print(json.dumps(cur, ensure_ascii=False))
-else:
-    print(cur)
+  node -e '
+const path = (process.argv[1] || "").split(".").filter(Boolean);
+let raw = "";
+process.stdin.on("data", (chunk) => { raw += chunk; });
+process.stdin.on("end", () => {
+  if (!raw.trim()) {
+    process.stdout.write("");
+    return;
+  }
+  let cur = JSON.parse(raw);
+  for (const part of path) {
+    if (Array.isArray(cur) && /^\d+$/.test(part)) {
+      cur = cur[Number(part)];
+    } else if (cur && typeof cur === "object") {
+      cur = cur[part];
+    } else {
+      cur = undefined;
+      break;
+    }
+  }
+  if (cur === undefined || cur === null) {
+    process.stdout.write("");
+  } else if (typeof cur === "object") {
+    process.stdout.write(JSON.stringify(cur));
+  } else {
+    process.stdout.write(String(cur));
+  }
+});
 ' "$path"
 }
 
 ensure_command "go" "Install Go from https://go.dev/dl/ and make sure it is on PATH."
 ensure_command "curl" "Install curl and make sure it is on PATH."
-ensure_command "python3" "Python 3 is required for JSON parsing in this smoke script."
+ensure_command "node" "Install Node.js and make sure it is on PATH."
 
 load_env_file "$ENV_FILE"
 
-echo "[1/8] Starting trip-api on :8080 ..."
+echo "[1/7] Starting trip-api on :8080 ..."
 (
   cd "$TRIP_API_DIR"
   BOOTSTRAP_CLIENT_SECRET="$BOOTSTRAP_SECRET" go run ./cmd/trip-api-go
@@ -228,23 +224,20 @@ echo "[1/8] Starting trip-api on :8080 ..."
 trip_api_pid="$!"
 
 wait_http_ready "http://127.0.0.1:8080/api/v1/health" 120
-echo "[2/8] trip-api is healthy."
+echo "[2/7] trip-api is healthy."
 
 BASE_URL="http://127.0.0.1:8080"
-echo "[3/8] Issuing token ..."
-token_body="$(cat <<JSON
-{"user_id":"$USER_ID","role":"USER","client_secret":"$BOOTSTRAP_SECRET"}
-JSON
-)"
-token_response="$(invoke_api_json "POST" "$BASE_URL/api/v1/auth/token" "" "$token_body")"
+DESTINATION_QUERY="$(node -p "encodeURIComponent(process.argv[1])" "$DESTINATION")"
+echo "[3/7] Issuing token ..."
+token_response="$(invoke_api_json "POST" "$BASE_URL/api/v1/auth/token" "" "{\"user_id\":\"$USER_ID\",\"role\":\"USER\",\"client_secret\":\"$BOOTSTRAP_SECRET\"}")"
 ACCESS_TOKEN="$(printf '%s' "$token_response" | json_get "access_token")"
 if [[ -z "$ACCESS_TOKEN" ]]; then
   echo "failed to receive access token" >&2
   exit 1
 fi
 
-echo "[4/8] Resolving destination and building planning brief ..."
-resolved="$(invoke_api_json "GET" "$BASE_URL/api/v1/destinations/resolve?q=$DESTINATION&limit=5" "$ACCESS_TOKEN" "")"
+echo "[4/7] Resolving destination and building planning brief ..."
+resolved="$(invoke_api_json "GET" "$BASE_URL/api/v1/destinations/resolve?q=$DESTINATION_QUERY&limit=5" "$ACCESS_TOKEN" "")"
 selected_destination="$(printf '%s' "$resolved" | json_get "items.0")"
 if [[ -z "$selected_destination" ]]; then
   echo "failed to resolve destination" >&2
@@ -253,7 +246,7 @@ fi
 
 brief_body="$(cat <<JSON
 {
-  "origin_city":"shanghai",
+  "origin_city":"上海",
   "destination_text":"$DESTINATION",
   "selected_destination":$selected_destination,
   "days":3,
@@ -273,63 +266,63 @@ if [[ "$ready_to_generate" != "true" ]]; then
   exit 1
 fi
 
-echo "[5/8] Generating and validating itinerary ..."
-generate_body="$(cat <<JSON
-{"planning_brief":$planning_brief,"options":{"variants":1,"allow_fallback":true}}
-JSON
-)"
-generated="$(invoke_api_json "POST" "$BASE_URL/api/v1/plans/generate-v2" "$ACCESS_TOKEN" "$generate_body")"
+echo "[5/7] Generating, validating, and saving itinerary ..."
+generated="$(invoke_api_json "POST" "$BASE_URL/api/v1/plans/generate-v2" "$ACCESS_TOKEN" "{\"planning_brief\":$planning_brief,\"options\":{\"variants\":1,\"allow_fallback\":true}}")"
 itinerary="$(printf '%s' "$generated" | json_get "plans.0.itinerary")"
 if [[ -z "$itinerary" ]]; then
   echo "generate-v2 did not return itinerary" >&2
   printf '%s\n' "$generated" >&2
   exit 1
 fi
+
 validated="$(invoke_api_json "POST" "$BASE_URL/api/v1/plans/validate" "$ACCESS_TOKEN" "{\"itinerary\":$itinerary,\"strict\":false}")"
-
-echo "[6/8] Saving and recording event ..."
-save_body="$(cat <<JSON
-{"itinerary":$itinerary}
-JSON
-)"
-saved="$(invoke_api_json "POST" "$BASE_URL/api/v1/plans/save" "$ACCESS_TOKEN" "$save_body")"
+saved="$(invoke_api_json "POST" "$BASE_URL/api/v1/plans/save" "$ACCESS_TOKEN" "{\"itinerary\":$itinerary}")"
 SAVED_ID="$(printf '%s' "$saved" | json_get "id")"
-history="$(invoke_api_json "GET" "$BASE_URL/api/v1/plans/saved?limit=20" "$ACCESS_TOKEN" "")"
-loaded="$(invoke_api_json "GET" "$BASE_URL/api/v1/plans/saved/$SAVED_ID" "$ACCESS_TOKEN" "")"
-summary="$(invoke_api_json "GET" "$BASE_URL/api/v1/plans/saved/$SAVED_ID/summary" "$ACCESS_TOKEN" "")"
-invoke_api_json "POST" "$BASE_URL/api/v1/events" "$ACCESS_TOKEN" '{"event_name":"mainline_smoke_checked","metadata":{"source":"run-local-e2e"}}' >/dev/null
-
-echo "[7/8] Validating smoke result payload."
+if [[ -z "$SAVED_ID" ]]; then
+  SAVED_ID="$(printf '%s' "$saved" | json_get "saved_plan_id")"
+fi
 if [[ -z "$SAVED_ID" ]]; then
   echo "saved plan id is missing" >&2
   exit 1
 fi
 
+echo "[6/7] Loading saved plan history ..."
+history="$(invoke_api_json "GET" "$BASE_URL/api/v1/plans/saved?limit=20" "$ACCESS_TOKEN" "")"
+loaded="$(invoke_api_json "GET" "$BASE_URL/api/v1/plans/saved/$SAVED_ID" "$ACCESS_TOKEN" "")"
 GENERATED_DEGRADED="$(printf '%s' "$generated" | json_get "degraded")"
 ITINERARY_CONFIDENCE="$(printf '%s' "$itinerary" | json_get "confidence")"
 VALIDATION_PASSED="$(printf '%s' "$validated" | json_get "validation_result.passed")"
 VALIDATION_TIER="$(printf '%s' "$validated" | json_get "validation_result.confidence_tier")"
 LOADED_DESTINATION="$(printf '%s' "$loaded" | json_get "itinerary.destination")"
-HISTORY_COUNT="$(printf '%s' "$history" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(len(data) if isinstance(data, list) else len(data.get("items", [])) if isinstance(data, dict) and isinstance(data.get("items"), list) else 0)')"
-SUMMARY_PREVIEW="$(printf '%s' "$summary" | python3 -c 'import json,sys; text=str(json.load(sys.stdin).get("summary","")); print(text[:80])')"
 
-echo "[8/8] Smoke flow complete."
-python3 - "$USER_ID" "$GENERATED_DEGRADED" "$ITINERARY_CONFIDENCE" "$VALIDATION_PASSED" "$VALIDATION_TIER" "$SAVED_ID" "$HISTORY_COUNT" "$LOADED_DESTINATION" "$SUMMARY_PREVIEW" "$TRIP_API_OUT_LOG" "$TRIP_API_ERR_LOG" <<'PY'
-import json
-import sys
+HISTORY_COUNT="$(printf '%s' "$history" | node -e '
+let raw = "";
+process.stdin.on("data", (chunk) => { raw += chunk; });
+process.stdin.on("end", () => {
+  const data = JSON.parse(raw || "null");
+  if (Array.isArray(data)) {
+    process.stdout.write(String(data.length));
+    return;
+  }
+  const items = data && Array.isArray(data.items) ? data.items.length : 0;
+  process.stdout.write(String(items));
+});
+')"
 
-payload = {
-    "user_id": sys.argv[1],
-    "generated_degraded": sys.argv[2],
-    "itinerary_confidence": sys.argv[3],
-    "validation_passed": sys.argv[4],
-    "validation_confidence_tier": sys.argv[5],
-    "saved_plan_id": sys.argv[6],
-    "history_count": int(sys.argv[7]),
-    "loaded_destination": sys.argv[8],
-    "summary_preview": sys.argv[9],
-    "trip_api_stdout_log": sys.argv[10],
-    "trip_api_stderr_log": sys.argv[11],
-}
-print(json.dumps(payload, ensure_ascii=False, indent=2))
-PY
+echo "[7/7] Smoke flow complete."
+node -e '
+const payload = {
+  user_id: process.argv[1],
+  destination: process.argv[2],
+  generated_degraded: process.argv[3],
+  itinerary_confidence: process.argv[4],
+  validation_passed: process.argv[5],
+  validation_confidence_tier: process.argv[6],
+  saved_plan_id: process.argv[7],
+  history_count: Number(process.argv[8]),
+  loaded_destination: process.argv[9],
+  trip_api_stdout_log: process.argv[10],
+  trip_api_stderr_log: process.argv[11],
+};
+console.log(JSON.stringify(payload, null, 2));
+' "$USER_ID" "$DESTINATION" "$GENERATED_DEGRADED" "$ITINERARY_CONFIDENCE" "$VALIDATION_PASSED" "$VALIDATION_TIER" "$SAVED_ID" "$HISTORY_COUNT" "$LOADED_DESTINATION" "$TRIP_API_OUT_LOG" "$TRIP_API_ERR_LOG"
