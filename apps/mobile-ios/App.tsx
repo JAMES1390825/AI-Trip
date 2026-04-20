@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { SafeAreaView, StatusBar, StyleSheet, Text, View, Pressable } from "react-native";
+import { Pressable, SafeAreaView, StatusBar, StyleSheet, Text, View } from "react-native";
 import { TripsScreen } from "./src/screens/TripsScreen";
 import { MapFlowScreen } from "./src/screens/map/MapFlowScreen";
 
@@ -7,7 +7,7 @@ type TabKey = "trips" | "plan";
 
 const tabs: Array<{ key: TabKey; label: string }> = [
   { key: "trips", label: "行程" },
-  { key: "plan", label: "AI规划" },
+  { key: "plan", label: "规划" },
 ];
 
 export default function App() {
@@ -15,8 +15,6 @@ export default function App() {
   const [preloadedItinerary, setPreloadedItinerary] = useState<Record<string, unknown> | null>(null);
   const [preloadedToken, setPreloadedToken] = useState(0);
   const [savedRefreshToken, setSavedRefreshToken] = useState(0);
-  const [communitySeed, setCommunitySeed] = useState<{ destination: string; postIds: string[] } | null>(null);
-  const [communitySeedToken, setCommunitySeedToken] = useState(0);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -26,11 +24,6 @@ export default function App() {
           <TripsScreen
             refreshToken={savedRefreshToken}
             onCreateTrip={() => setActiveTab("plan")}
-            onReferenceCommunityPost={(destination, postIds) => {
-              setCommunitySeed({ destination, postIds });
-              setCommunitySeedToken((prev) => prev + 1);
-              setActiveTab("plan");
-            }}
             onOpenSavedPlan={(nextItinerary) => {
               setPreloadedItinerary(nextItinerary);
               setPreloadedToken((prev) => prev + 1);
@@ -42,8 +35,6 @@ export default function App() {
           <MapFlowScreen
             preloadedItinerary={preloadedItinerary}
             preloadedToken={preloadedToken}
-            communitySeed={communitySeed}
-            communitySeedToken={communitySeedToken}
             onPlanSaved={() => setSavedRefreshToken((prev) => prev + 1)}
           />
         </View>

@@ -11,11 +11,10 @@ Usage:
 
 Tasks:
   help         Show this help
-  up-local     Print independent backend/admin start commands
-  ai-service-dev Start Python AI service (trip-ai-service)
+  up-local     Print backend + iOS startup commands
   backend-dev  Start Go backend (trip-api-go)
-  frontend-dev Install deps and start admin console (web-client)
-  smoke        Basic smoke check (health + auth token)
+  app-dev      Install deps and start iOS app (mobile-ios)
+  smoke        Run backend mainline smoke
 EOF
 }
 
@@ -29,7 +28,7 @@ while [[ $# -gt 0 ]]; do
       TASK="$2"
       shift 2
       ;;
-    help|up-local|ai-service-dev|backend-dev|frontend-dev|smoke)
+    help|up-local|backend-dev|app-dev|smoke)
       TASK="$1"
       shift
       ;;
@@ -43,8 +42,7 @@ done
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND_DIR="$ROOT/apps/trip-api-go"
-AI_SERVICE_DIR="$ROOT/apps/trip-ai-service"
-FRONTEND_DIR="$ROOT/apps/web-client"
+APP_DIR="$ROOT/apps/mobile-ios"
 
 step() {
   printf '\n==> %s\n' "$1"
@@ -80,68 +78,35 @@ case "$TASK" in
     ;;
   up-local)
     cat <<'EOF'
-Start AI service in terminal A:
-  cd apps/trip-ai-service
-  export BAILIAN_API_KEY=your-bailian-key
-  python3 main.py
-
-Start backend in terminal B:
+Start backend in terminal A:
   cd apps/trip-api-go
-  export AI_SERVICE_BASE_URL=http://127.0.0.1:8091
   go run ./cmd/trip-api-go
 
-Start admin console in terminal C:
-  cd apps/web-client
+Start iOS app in terminal B:
+  cd apps/mobile-ios
   npm install
-  npm run dev -- --host 127.0.0.1 --port 5500
+  npm run ios
 
-Open:
-  Admin:    http://127.0.0.1:5500
-  Trip API: http://127.0.0.1:8080/api/v1/health
+Health:
+  http://127.0.0.1:8080/api/v1/health
 EOF
-    ;;
-  ai-service-dev)
-    ensure_command "python3" "Install Python 3 from https://www.python.org/downloads/"
-    step "Starting trip-ai-service"
-    run_in_dir "$AI_SERVICE_DIR" python3 main.py
     ;;
   backend-dev)
     ensure_command "go" "Install Go from https://go.dev/dl/"
     step "Starting trip-api-go"
     run_in_dir "$BACKEND_DIR" go run ./cmd/trip-api-go
     ;;
-  frontend-dev)
+  app-dev)
     ensure_command "npm" "Install Node.js from https://nodejs.org/"
-    step "Installing admin console dependencies"
-    run_in_dir "$FRONTEND_DIR" npm install
-    step "Starting web-client"
-    run_in_dir "$FRONTEND_DIR" npm run dev -- --host 127.0.0.1 --port 5500
+    step "Installing iOS app dependencies"
+    run_in_dir "$APP_DIR" npm install
+    step "Starting mobile-ios"
+    run_in_dir "$APP_DIR" npm run ios
     ;;
   smoke)
-    ensure_command "curl" "Install curl and make it available in PATH."
-    step "Running basic smoke checks"
-
-    health="$(curl --silent --show-error --fail "http://127.0.0.1:8080/api/v1/health")"
-    printf 'health => %s\n' "$health"
-
-    tmp_response="$(mktemp)"
-    status="$(curl --silent --show-error \
-      --output "$tmp_response" \
-      --write-out '%{http_code}' \
-      --request POST \
-      --header "Content-Type: application/json" \
-      --data '{"user_id":"smoke-user","role":"USER","client_secret":"dev-bootstrap-secret"}' \
-      "http://127.0.0.1:8080/api/v1/auth/token")"
-
-    if [[ "$status" != "200" ]]; then
-      echo "auth/token failed with HTTP $status" >&2
-      cat "$tmp_response" >&2
-      rm -f "$tmp_response"
-      exit 1
-    fi
-
-    printf 'auth/token => %s\n' "$status"
-    rm -f "$tmp_response"
+    ensure_command "bash" "bash is required to run the smoke script."
+    step "Running backend mainline smoke"
+    run_in_dir "$ROOT" bash scripts/smoke/run-local-e2e.sh --user-id smoke-user --destination 上海
     ;;
   *)
     echo "Unknown task: $TASK" >&2

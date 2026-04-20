@@ -460,12 +460,6 @@ function findDiagnostics(raw: Record<string, unknown>): Array<Record<string, unk
   return asArray(raw.diagnostics).filter((item): item is Record<string, unknown> => isRecord(item));
 }
 
-function personalizationReasonLines(summary: Record<string, unknown> | null): string[] {
-  if (!summary) return [];
-  const items = summary.reasons;
-  return Array.isArray(items) ? items.map((item) => String(item || "").trim()).filter(Boolean) : [];
-}
-
 export function MapResultView({ itinerary, onBack, onOpenLegacyEditor, onPlanSaved }: MapResultViewProps) {
   const api = useMemo(() => new TripApiClient(() => RUNTIME_CONFIG), []);
   const [localItinerary, setLocalItinerary] = useState<Record<string, unknown>>(itinerary);
@@ -477,7 +471,6 @@ export function MapResultView({ itinerary, onBack, onOpenLegacyEditor, onPlanSav
   const [showPoiDetail, setShowPoiDetail] = useState(false);
   const [showOptimize, setShowOptimize] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [isAskingAI, setIsAskingAI] = useState(false);
   const [savedPlanId, setSavedPlanId] = useState("");
@@ -554,11 +547,6 @@ export function MapResultView({ itinerary, onBack, onOpenLegacyEditor, onPlanSav
   const selectedRisk = useMemo(() => riskMeta(selectedBlock?.riskLevel || "low"), [selectedBlock?.riskLevel]);
 
   const diagnostics = useMemo(() => findDiagnostics(localItinerary), [localItinerary]);
-  const personalizationSummary = itineraryView?.personalizationSummary || null;
-  const personalizationReasons = useMemo(
-    () => personalizationReasonLines(personalizationSummary),
-    [personalizationSummary],
-  );
   const summaryByDayIndex = useMemo(() => {
     const map = new Map<number, ItineraryView["daySummaries"][number]>();
     (itineraryView?.daySummaries || []).forEach((item) => map.set(item.dayIndex, item));
@@ -650,38 +638,6 @@ export function MapResultView({ itinerary, onBack, onOpenLegacyEditor, onPlanSav
       setSaveHint({ text: "保存失败", tone: "error" });
     } finally {
       setIsSaving(false);
-    }
-  }
-
-  async function handleShare() {
-    setIsSharing(true);
-    setStatus("生成分享链接中...");
-    try {
-      const id = await ensureSavedPlan();
-      if (!id) throw new Error("当前行程尚未保存成功");
-      const shared = await api.createPlanShare(id, 168);
-      const token = String(shared.token || "").trim();
-      const sharePath = String(shared.share_path || "").trim();
-      const base = String(RUNTIME_CONFIG.apiBase || "").replace(/\/+$/, "");
-      const shareUrl = token ? `${base}/api/v1/share/${token}` : sharePath ? `${base}${sharePath}` : "";
-      if (!shareUrl) {
-        setStatus("已生成分享，但链接为空");
-        return;
-      }
-      setStatus("分享链接已生成");
-      Alert.alert("分享链接已生成", shareUrl, [
-        { text: "关闭", style: "cancel" },
-        {
-          text: "打开",
-          onPress: () => {
-            void Linking.openURL(shareUrl);
-          },
-        },
-      ]);
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
-    } finally {
-      setIsSharing(false);
     }
   }
 
@@ -954,9 +910,6 @@ export function MapResultView({ itinerary, onBack, onOpenLegacyEditor, onPlanSav
             <Pressable style={styles.topActionGhost} onPress={() => setShowRecommended((prev) => !prev)}>
               <Text style={styles.topActionGhostText}>{showRecommended ? "推荐地点" : "只看路线"}</Text>
             </Pressable>
-            <Pressable style={styles.topActionGhost} onPress={() => void handleShare()}>
-              <Text style={styles.topActionGhostText}>{isSharing ? "分享中..." : "分享"}</Text>
-            </Pressable>
             <Pressable style={styles.topActionPrimary} onPress={() => void handleSave()} disabled={isSaving}>
               <Text style={styles.topActionPrimaryText}>{isSaving ? "保存中..." : "保存"}</Text>
             </Pressable>
@@ -1093,39 +1046,6 @@ export function MapResultView({ itinerary, onBack, onOpenLegacyEditor, onPlanSav
             </View>
           ) : null}
 
-          {personalizationSummary ? (
-            <View style={styles.learningCard}>
-              <Text style={styles.learningTitle}>个性化说明</Text>
-              {!Boolean(personalizationSummary.enabled) ? (
-                <Text style={styles.learningText}>
-                  {String(personalizationSummary.note || "").trim() || "你的私有学习当前处于暂停状态。"}
-                </Text>
-              ) : personalizationReasons.length ? (
-                <>
-                  {personalizationReasons.map((reason) => (
-                    <Text key={reason} style={styles.learningText}>
-                      {reason}
-                    </Text>
-                  ))}
-                  {asArray(personalizationSummary.top_tags).length ? (
-                    <Text style={styles.learningMeta}>
-                      最近更强的偏好标签：
-                      {asArray(personalizationSummary.top_tags)
-                        .map((item) => String(item || "").trim())
-                        .filter(Boolean)
-                        .slice(0, 4)
-                        .join(" / ")}
-                    </Text>
-                  ) : null}
-                </>
-              ) : (
-                <Text style={styles.learningText}>
-                  {String(personalizationSummary.note || "").trim() || "当前历史行为还不足以明显改变候选排序。"}
-                </Text>
-              )}
-            </View>
-          ) : null}
-
           <View style={styles.assetRow}>
             <View style={[styles.assetCard, styles.assetCardWarm]}>
               <Text style={styles.assetCardTitle}>便签</Text>
@@ -1156,7 +1076,6 @@ export function MapResultView({ itinerary, onBack, onOpenLegacyEditor, onPlanSav
                 {day.blocks.map((block, idx) => {
                   const risk = riskMeta(block.riskLevel);
                   const leg = itineraryView.legs.find((item) => item.dayIndex === day.dayIndex && item.toPoi === block.poi);
-                  const personalizationBasis = block.personalizationBasis;
                   return (
                     <Pressable
                       key={block.blockId}
@@ -1182,14 +1101,6 @@ export function MapResultView({ itinerary, onBack, onOpenLegacyEditor, onPlanSav
                         <Text style={styles.poiDesc}>{block.recommendReason || block.title || "已按动线安排"}</Text>
                         <Text style={styles.poiMeta}>{formatHourRange(block.startHour, block.endHour)}</Text>
                         {leg ? <Text style={styles.poiTransit}>步行/交通约 {leg.minutes} 分钟</Text> : null}
-                        {personalizationBasis && personalizationBasis.boost > 0 ? (
-                          <Text style={styles.poiBasisText}>
-                            个性化依据：
-                            {personalizationBasis.matchedTags.length
-                              ? personalizationBasis.matchedTags.join(" / ")
-                              : personalizationBasis.matchedCategories.join(" / ")}
-                          </Text>
-                        ) : null}
                       </View>
                     </Pressable>
                   );
