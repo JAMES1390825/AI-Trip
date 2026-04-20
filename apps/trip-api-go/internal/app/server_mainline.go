@@ -77,32 +77,11 @@ func (a *App) handleGeneratePlanV2(w http.ResponseWriter, r *http.Request, user 
 		allowFallback = asBool(options["allow_fallback"])
 	}
 
-	generateOptions := PlanGenerateOptions{
-		CommunityPostIDs: uniqueStrings(asStringSlice(options["community_post_ids"])),
-	}
-
-	response, appErr := a.buildGenerateV2PlansResponse(r.Context(), brief, user.UserID, variants, allowFallback, generateOptions)
+	response, appErr := a.buildGenerateV2PlansResponse(r.Context(), brief, user.UserID, variants, allowFallback, PlanGenerateOptions{})
 	if appErr != nil {
 		writeAppError(w, appErr)
 		return
 	}
-
-	planItems := asSlice(response["plans"])
-	normalizedPlans := make([]map[string]any, 0, len(planItems))
-	for _, item := range planItems {
-		normalizedPlans = append(normalizedPlans, asMap(item))
-	}
-
-	a.trackEvent("plan_generated_v2", user.UserID, map[string]any{
-		"destination_id":                brief.Destination.DestinationID,
-		"destination_label":             brief.Destination.DestinationLabel,
-		"days":                          brief.Days,
-		"variants":                      variants,
-		"degraded":                      asBool(response["degraded"]),
-		"community_reference_count":     len(generateOptions.CommunityPostIDs),
-		"community_post_ids":            uniqueStrings(append([]string{}, generateOptions.CommunityPostIDs...)),
-		"community_referenced_post_ids": extractCommunityReferencedPostIDsFromPlans(normalizedPlans),
-	})
 
 	writeJSON(w, http.StatusOK, response)
 }
@@ -142,14 +121,7 @@ func (a *App) handleDestinationResolve(w http.ResponseWriter, r *http.Request, u
 		limit = 10
 	}
 
-	response := a.resolveDestinationsWithProvider(r.Context(), query, limit)
-	a.trackEvent("destination_resolve", user.UserID, map[string]any{
-		"query":    query,
-		"count":    len(response.Items),
-		"degraded": response.Degraded,
-	})
-
-	writeJSON(w, http.StatusOK, response)
+	writeJSON(w, http.StatusOK, a.resolveDestinationsWithProvider(r.Context(), query, limit))
 }
 
 func (a *App) handlePlanningBrief(w http.ResponseWriter, r *http.Request, user *AuthUser) {
@@ -159,22 +131,7 @@ func (a *App) handlePlanningBrief(w http.ResponseWriter, r *http.Request, user *
 		return
 	}
 
-	response := a.buildPlanningBriefResponse(r.Context(), input, user.UserID)
-	a.trackEvent("planning_brief_created", user.UserID, map[string]any{
-		"ready_to_generate": response.PlanningBrief.ReadyToGenerate,
-		"missing_fields":    response.PlanningBrief.MissingFields,
-		"degraded":          response.Degraded,
-		"next_action":       response.NextAction,
-		"source_mode":       response.SourceMode,
-		"destination_id": func() string {
-			if response.PlanningBrief.Destination == nil {
-				return ""
-			}
-			return response.PlanningBrief.Destination.DestinationID
-		}(),
-	})
-
-	writeJSON(w, http.StatusOK, response)
+	writeJSON(w, http.StatusOK, a.buildPlanningBriefResponse(r.Context(), input, user.UserID))
 }
 
 func (a *App) handleValidatePlan(w http.ResponseWriter, r *http.Request, user *AuthUser) {
@@ -218,7 +175,6 @@ func (a *App) handleSavePlan(w http.ResponseWriter, r *http.Request, user *AuthU
 	latestPlans := a.store.ListSavedPlans(user.UserID, 1)
 	if len(latestPlans) > 0 && itinerarySignature(latestPlans[0].Itinerary) == itinerarySignature(itinerary) {
 		latest := latestPlans[0]
-		a.trackEvent("plan_save_deduped", user.UserID, map[string]any{"saved_plan_id": latest.ID})
 		writeJSON(w, http.StatusOK, map[string]any{
 			"id":            latest.ID,
 			"saved_plan_id": latest.ID,
@@ -244,9 +200,6 @@ func (a *App) handleSavePlan(w http.ResponseWriter, r *http.Request, user *AuthU
 		return
 	}
 
-	saveMetadata := buildPlanSavedEventMetadata(saved.Itinerary)
-	saveMetadata["saved_plan_id"] = saved.ID
-	a.trackEvent("plan_saved", user.UserID, saveMetadata)
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"id":            saved.ID,
 		"saved_plan_id": saved.ID,
@@ -256,24 +209,4 @@ func (a *App) handleSavePlan(w http.ResponseWriter, r *http.Request, user *AuthU
 		"updated_at":    toRFC3339(saved.SavedAt),
 		"deduped":       false,
 	})
-}
-
-func (a *App) handleTrackEvent(w http.ResponseWriter, r *http.Request, user *AuthUser) {
-	body := map[string]any{}
-	if err := decodeJSONBody(r, &body); err != nil {
-		writeAppError(w, err)
-		return
-	}
-	eventName := strings.TrimSpace(asString(body["event_name"]))
-	if eventName == "" {
-		writeAppError(w, appError(http.StatusBadRequest, "BAD_REQUEST", "event_name is required"))
-		return
-	}
-
-	metadata := asMap(body["metadata"])
-	if err := a.recordEvent(eventName, user.UserID, metadata); err != nil {
-		writeAppError(w, appError(http.StatusInternalServerError, "INTERNAL_ERROR", "failed to persist event"))
-		return
-	}
-	w.WriteHeader(http.StatusAccepted)
 }

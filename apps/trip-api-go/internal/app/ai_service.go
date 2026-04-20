@@ -214,18 +214,6 @@ func (a *App) buildPlanningBriefResponse(ctx context.Context, input planningBrie
 	return mergePlanningBriefEnhancement(response, enhancement)
 }
 
-func (a *App) nextChatResponsePayload(ctx context.Context, history []ChatTurn, draft map[string]any, userID string) map[string]any {
-	response := nextChatResponse(history, draft, userID)
-	if a == nil || a.ai == nil {
-		return response
-	}
-	enhancement, err := a.ai.EnhanceChatIntake(ctx, userID, history, draft, response)
-	if err != nil {
-		return response
-	}
-	return mergeChatEnhancement(response, enhancement)
-}
-
 func (a *App) buildV2VariantItinerary(ctx context.Context, brief PlanningBrief, userID, variant string) map[string]any {
 	return a.buildV2VariantItineraryWithOptions(ctx, brief, userID, variant, PlanGenerateOptions{})
 }
@@ -236,27 +224,8 @@ func (a *App) buildV2VariantItineraryWithOptions(ctx context.Context, brief Plan
 		itinerary = generateV2VariantItinerary(brief, userID, variant)
 	}
 	itinerary = a.groundV2Itinerary(ctx, brief, itinerary)
-	if a != nil && a.store != nil && brief.Destination != nil && len(asMap(itinerary["community_reference_summary"])) == 0 {
-		summary := a.store.BuildCommunityPlanningSummary(brief.Destination, brief.Destination.DestinationLabel, options.CommunityPostIDs, 8)
-		if summary.PublishedPostCount > 0 {
-			itinerary["community_reference_summary"] = communityPlanningSummaryMap(summary)
-			itinerary["community_signal_mode"] = communitySignalMode(summary)
-			requestSnapshot := asMap(itinerary["request_snapshot"])
-			requestSnapshot["community_reference_summary"] = communityPlanningSummaryMap(summary)
-			requestSnapshot["community_post_ids"] = uniqueStrings(append([]string{}, options.CommunityPostIDs...))
-			itinerary["request_snapshot"] = requestSnapshot
-		}
-	}
 	attachDataDiagnostics(itinerary)
 	attachMobileSummaryFields(itinerary)
-	if a != nil && a.store != nil {
-		settings := a.store.GetPersonalizationSettings(userID)
-		profile, _, ok := a.store.GetEffectivePrivateProfile(userID)
-		if !ok {
-			profile = UserPrivateProfile{}
-		}
-		attachPersonalizationSummary(itinerary, settings, profile)
-	}
 	if a == nil || a.ai == nil {
 		return itinerary
 	}

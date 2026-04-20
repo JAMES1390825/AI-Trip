@@ -19,11 +19,9 @@ type providerPlanningSlot struct {
 }
 
 type providerCandidate struct {
-	Query                string
-	POI                  amapPOI
-	Score                int
-	PersonalizationBoost int
-	PersonalizationBasis map[string]any
+	Query string
+	POI   amapPOI
+	Score int
 }
 
 var providerPlanningSlots = []providerPlanningSlot{
@@ -44,25 +42,6 @@ func (a *App) buildProviderV2VariantItineraryWithOptions(ctx context.Context, br
 
 	adjusted := variantAdjustedBrief(brief, variant)
 	requestSnapshot := buildProviderRequestSnapshot(adjusted, userID)
-	personalizationSettings := defaultUserPersonalizationSettings()
-	privateProfile := UserPrivateProfile{}
-	if a.store != nil {
-		personalizationSettings = a.store.GetPersonalizationSettings(userID)
-		if profile, settings, ok := a.store.GetEffectivePrivateProfile(userID); ok {
-			privateProfile = profile
-			personalizationSettings = settings
-		}
-	}
-	communitySummary := CommunityPlanningSummary{}
-	if a.store != nil {
-		communitySummary = a.store.BuildCommunityPlanningSummary(adjusted.Destination, adjusted.Destination.DestinationLabel, options.CommunityPostIDs, 8)
-		if communitySummary.PublishedPostCount > 0 {
-			requestSnapshot["community_reference_summary"] = communityPlanningSummaryMap(communitySummary)
-		}
-	}
-	if len(options.CommunityPostIDs) > 0 {
-		requestSnapshot["community_post_ids"] = uniqueStrings(append([]string{}, options.CommunityPostIDs...))
-	}
 	fallbackCatalog := selectCatalogByDestination(firstNonBlank(
 		adjusted.Destination.DestinationLabel,
 		adjusted.Destination.Region,
@@ -85,8 +64,8 @@ func (a *App) buildProviderV2VariantItineraryWithOptions(ctx context.Context, br
 		blocks := make([]map[string]any, 0, len(providerPlanningSlots))
 
 		for slotIndex, slot := range providerPlanningSlots {
-			if selection, ok := a.pickProviderSlotCandidate(ctx, adjusted, slot.Type, dayIndex, selectedIDs, selectedNames, queryCache, communitySummary, privateProfile); ok {
-				block := buildProviderBlockFromCandidate(slot, dayIndex, date, requestSnapshot, selection, communitySummary)
+			if selection, ok := a.pickProviderSlotCandidate(ctx, adjusted, slot.Type, dayIndex, selectedIDs, selectedNames, queryCache); ok {
+				block := buildProviderBlockFromCandidate(slot, dayIndex, date, requestSnapshot, selection)
 				blocks = append(blocks, block)
 				openingChecks = append(openingChecks, buildOpeningCheckFromBlock(block, date, "provider_candidate_pool"))
 				providerBlocks++
@@ -140,11 +119,6 @@ func (a *App) buildProviderV2VariantItineraryWithOptions(ctx context.Context, br
 		"changes":                   []map[string]any{},
 		"conflicts":                 []map[string]any{},
 	}
-	if communitySummary.PublishedPostCount > 0 {
-		itinerary["community_reference_summary"] = communityPlanningSummaryMap(communitySummary)
-		itinerary["community_signal_mode"] = communitySignalMode(communitySummary)
-	}
-	attachPersonalizationSummary(itinerary, personalizationSettings, privateProfile)
 
 	return itinerary, true
 }
@@ -174,14 +148,12 @@ func (a *App) pickProviderSlotCandidate(
 	selectedIDs map[string]bool,
 	selectedNames map[string]int,
 	cache map[string][]amapPOI,
-	communitySummary CommunityPlanningSummary,
-	privateProfile UserPrivateProfile,
 ) (providerCandidate, bool) {
 	if a == nil || a.amap == nil || brief.Destination == nil {
 		return providerCandidate{}, false
 	}
 
-	queries := providerSlotQueries(brief, slotType, dayIndex, selectedNames, communitySummary)
+	queries := providerSlotQueries(brief, slotType, dayIndex, selectedNames)
 	if len(queries) == 0 {
 		return providerCandidate{}, false
 	}
@@ -190,23 +162,19 @@ func (a *App) pickProviderSlotCandidate(
 	for _, query := range queries {
 		pois := a.searchProviderPOIsCached(ctx, brief.Destination, query, cache)
 		for _, poi := range pois {
-			score := scoreProviderCandidate(brief, slotType, query, poi, selectedIDs, selectedNames, communitySummary)
+			score := scoreProviderCandidate(brief, slotType, query, poi, selectedIDs, selectedNames)
 			if score < 0 {
 				continue
 			}
-			personalization := scorePrivateProfileCandidate(privateProfile, brief, slotType, poi)
-
 			key := firstNonBlank(strings.TrimSpace(poi.ID), normalizeGroundingText(poi.Name))
 			if key == "" {
 				continue
 			}
 
 			candidate := providerCandidate{
-				Query:                query,
-				POI:                  poi,
-				Score:                score + personalization.Boost,
-				PersonalizationBoost: personalization.Boost,
-				PersonalizationBasis: deepCloneMap(personalization.Basis),
+				Query: query,
+				POI:   poi,
+				Score: score,
 			}
 			if existing, ok := bestByKey[key]; !ok || candidate.Score > existing.Score {
 				bestByKey[key] = candidate
@@ -249,14 +217,13 @@ func (a *App) searchProviderPOIsCached(ctx context.Context, destination *Destina
 	return pois
 }
 
-func providerSlotQueries(brief PlanningBrief, slotType string, dayIndex int, selectedNames map[string]int, communitySummary CommunityPlanningSummary) []string {
+func providerSlotQueries(brief PlanningBrief, slotType string, dayIndex int, selectedNames map[string]int) []string {
 	queries := make([]string, 0, 16)
 	if slotType != "food" {
 		if mustGo := nextUnusedMustGo(brief.MustGo, selectedNames); mustGo != "" {
 			queries = append(queries, mustGo)
 		}
 	}
-	queries = append(queries, communityQueriesForSlot(communitySummary, slotType)...)
 
 	if slotType == "food" {
 		queries = append(queries, providerDiningQueries(brief.Constraints.DiningPreference)...)
@@ -378,7 +345,6 @@ func buildProviderBlockFromCandidate(
 	date string,
 	requestSnapshot map[string]any,
 	selection providerCandidate,
-	communitySummary CommunityPlanningSummary,
 ) map[string]any {
 	poi := selection.POI
 	tags := amapTags(poi.Type)
@@ -423,47 +389,6 @@ func buildProviderBlockFromCandidate(
 			},
 		},
 	}
-	if basis := communityBlockBasisForPOI(communitySummary, slot.Type, poi); basis != nil {
-		block["community_basis"] = map[string]any{
-			"matched_place":   basis.MatchedPlace,
-			"matched_tags":    append([]string{}, basis.MatchedTags...),
-			"source_post_ids": append([]string{}, basis.SourcePostIDs...),
-			"signal_score":    basis.SignalScore,
-			"referenced":      basis.Referenced,
-		}
-		evidence := asMap(block["evidence"])
-		scoreBreakdown := asMap(evidence["score_breakdown"])
-		scoreBreakdown["community_fit"] = basis.SignalScore
-		evidence["score_breakdown"] = scoreBreakdown
-		evidence["community_signal_score"] = basis.SignalScore
-		block["evidence"] = evidence
-		if basis.MatchedPlace != "" {
-			recommendReason = joinNonBlank("；", recommendReason, fmt.Sprintf("社区分享里多人提到 %s", basis.MatchedPlace))
-			block["recommend_reason"] = recommendReason
-			reason := asMap(block["reason"])
-			reason["note"] = recommendReason
-			block["reason"] = reason
-		}
-	}
-	if selection.PersonalizationBoost != 0 && len(selection.PersonalizationBasis) > 0 {
-		block["personalization_basis"] = deepCloneMap(selection.PersonalizationBasis)
-		evidence := asMap(block["evidence"])
-		scoreBreakdown := asMap(evidence["score_breakdown"])
-		scoreBreakdown["user_profile_score"] = selection.PersonalizationBoost
-		evidence["score_breakdown"] = scoreBreakdown
-		evidence["user_profile_score"] = selection.PersonalizationBoost
-		block["evidence"] = evidence
-		if selection.PersonalizationBoost > 0 {
-			if personalizationReason := buildPersonalizationRecommendReason(selection.PersonalizationBasis); personalizationReason != "" {
-				recommendReason = joinNonBlank("；", recommendReason, personalizationReason)
-				block["recommend_reason"] = recommendReason
-				reason := asMap(block["reason"])
-				reason["note"] = recommendReason
-				block["reason"] = reason
-			}
-		}
-	}
-
 	if address := firstNonBlank(poi.Address, joinNonBlank(" ", poi.Province, poi.City, poi.District)); address != "" {
 		block["poi_address"] = address
 	}
@@ -616,7 +541,6 @@ func scoreProviderCandidate(
 	poi amapPOI,
 	selectedIDs map[string]bool,
 	selectedNames map[string]int,
-	communitySummary CommunityPlanningSummary,
 ) int {
 	if shouldRejectProviderCandidate(brief, slotType, query, poi, selectedIDs, selectedNames) {
 		return -1000
@@ -706,8 +630,6 @@ func scoreProviderCandidate(
 			score += 8
 		}
 	}
-
-	score += communityScoreBoost(communitySummary, slotType, poi)
 
 	return score
 }
