@@ -127,8 +127,8 @@ func (a *App) handleMainlineAuthed(w http.ResponseWriter, r *http.Request, user 
 	case method == http.MethodPost && path == "/api/v1/plans/save":
 		a.handleSavePlan(w, r, user)
 		return true
-	case method == http.MethodPost && path == "/api/v1/events":
-		a.handleTrackEvent(w, r, user)
+	case method == http.MethodGet && path == "/api/v1/plans/saved":
+		a.handleListSavedPlans(w, r, user)
 		return true
 	default:
 		return false

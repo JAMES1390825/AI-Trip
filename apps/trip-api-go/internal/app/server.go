@@ -63,26 +63,14 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if r.Method == http.MethodGet {
-		if fileName, ok := parseCommunityMediaEntityRoute(r.URL.Path); ok {
-			a.handlePublicCommunityMediaRead(w, r, fileName)
-			return
-		}
-	}
-
 	if r.Method == http.MethodPost && r.URL.Path == "/api/v1/auth/token" {
 		a.handleIssueToken(w, r)
 		return
 	}
 
-	if r.Method == http.MethodGet {
-		if token, ok := parsePublicShareRoute(r.URL.Path); ok {
-			a.handlePublicShareRead(w, token)
-			return
-		}
-	}
-
-	if strings.HasPrefix(r.URL.Path, "/api/v1/") {
+	if strings.HasPrefix(r.URL.Path, "/api/v1/") &&
+		!strings.HasPrefix(r.URL.Path, "/api/v1/community/media/") &&
+		!strings.HasPrefix(r.URL.Path, "/api/v1/share/") {
 		user, err := a.authenticate(r)
 		if err != nil {
 			writeAppError(w, err)
@@ -184,124 +172,18 @@ func (a *App) handleAuthed(w http.ResponseWriter, r *http.Request, user *AuthUse
 	path := r.URL.Path
 	method := r.Method
 
-	switch {
-	case method == http.MethodPost && path == "/api/v1/chat/intake/next":
-		a.handleChatIntakeNext(w, r, user)
-	case method == http.MethodGet && path == "/api/v1/destinations/search":
-		a.handleDestinationSearch(w, r, user)
-	case method == http.MethodPost && path == "/api/v1/community/posts":
-		a.handleCreateCommunityPost(w, r, user)
-	case method == http.MethodGet && path == "/api/v1/community/posts":
-		a.handleListCommunityPosts(w, r, user)
-	case method == http.MethodPost && path == "/api/v1/community/media":
-		a.handleUploadCommunityMedia(w, r, user)
-	case method == http.MethodGet && path == "/api/v1/admin/community/posts":
-		a.handleAdminListCommunityPosts(w, r, user)
-	case method == http.MethodGet && path == "/api/v1/admin/community/reports":
-		a.handleAdminListCommunityReports(w, r, user)
-	case method == http.MethodPost && path == "/api/v1/plans/generate":
-		a.handleGeneratePlan(w, r, user)
-	case method == http.MethodPost && path == "/api/v1/plans/replan":
-		a.handleReplanPlan(w, r, user)
-	case method == http.MethodPost && path == "/api/v1/plans/revert":
-		a.handleRevertPlan(w, r, user)
-	case method == http.MethodGet && path == "/api/v1/plans/saved":
-		a.handleListSavedPlans(w, r, user)
-	case method == http.MethodGet && path == "/api/v1/profile/private-summary":
-		a.handlePrivateProfileSummary(w, user)
-	case method == http.MethodPut && path == "/api/v1/profile/private-settings":
-		a.handleUpdatePrivatePersonalizationSettings(w, r, user)
-	case method == http.MethodDelete && path == "/api/v1/profile/private-signals":
-		a.handleClearPrivateSignals(w, user)
-	case method == http.MethodGet && path == "/api/v1/events/summary":
-		a.handleEventSummary(w, user)
-	case method == http.MethodGet && path == "/api/v1/events/recent":
-		a.handleEventRecent(w, user)
-	default:
-		if id, ok := parseSavedPlanVersionsRoute(path); ok && method == http.MethodGet {
-			a.handleListSavedPlanVersions(w, r, user, id)
+	if id, ok := parseSavedPlanEntityRoute(path); ok {
+		switch method {
+		case http.MethodGet:
+			a.handleGetSavedPlan(w, user, id)
+			return
+		case http.MethodDelete:
+			a.handleDeleteSavedPlan(w, user, id)
 			return
 		}
-		if id, ok := parseSavedPlanTasksRoute(path); ok {
-			switch method {
-			case http.MethodGet:
-				a.handleGetPlanTasks(w, user, id)
-				return
-			case http.MethodPut:
-				a.handleReplacePlanTasks(w, r, user, id)
-				return
-			}
-		}
-		if id, ok := parseSavedPlanExecutionRoute(path); ok {
-			switch method {
-			case http.MethodGet:
-				a.handleGetPlanExecution(w, r, user, id)
-				return
-			case http.MethodPut:
-				a.handleReplacePlanExecution(w, r, user, id)
-				return
-			}
-		}
-		if id, ok := parseSavedPlanDiffRoute(path); ok && method == http.MethodGet {
-			a.handlePlanDiff(w, r, user, id)
-			return
-		}
-		if id, ok := parseSavedPlanShareRoute(path); ok && method == http.MethodPost {
-			a.handleCreatePlanShare(w, r, user, id)
-			return
-		}
-		if id, token, ok := parseSavedPlanShareTokenRoute(path); ok && method == http.MethodDelete {
-			a.handleClosePlanShare(w, user, id, token)
-			return
-		}
-		if id, ok := parseSavedPlanSummaryRoute(path); ok && method == http.MethodGet {
-			a.handleSavedPlanSummary(w, user, id)
-			return
-		}
-		if id, ok := parseSavedPlanCommunityDraftRoute(path); ok && method == http.MethodGet {
-			a.handleSavedPlanCommunityDraft(w, user, id)
-			return
-		}
-		if id, ok := parseSavedPlanEntityRoute(path); ok {
-			switch method {
-			case http.MethodGet:
-				a.handleGetSavedPlan(w, user, id)
-				return
-			case http.MethodDelete:
-				a.handleDeleteSavedPlan(w, user, id)
-				return
-			}
-		}
-		if provider, placeID, ok := parsePlaceDetailRoute(path); ok && method == http.MethodGet {
-			a.handlePlaceDetail(w, user, provider, placeID)
-			return
-		}
-		if id, ok := parseCommunityPostDetailRoute(path); ok && method == http.MethodGet {
-			a.handleGetCommunityPostDetail(w, user, id)
-			return
-		}
-		if authorUserID, ok := parseCommunityAuthorEntityRoute(path); ok && method == http.MethodGet {
-			a.handleGetCommunityAuthorProfile(w, user, authorUserID)
-			return
-		}
-		if id, ok := parseCommunityPostEntityRoute(path); ok && method == http.MethodGet {
-			a.handleGetCommunityPost(w, user, id)
-			return
-		}
-		if id, ok := parseCommunityPostReportRoute(path); ok && method == http.MethodPost {
-			a.handleReportCommunityPost(w, r, user, id)
-			return
-		}
-		if id, ok := parseCommunityPostVoteRoute(path); ok && method == http.MethodPost {
-			a.handleVoteCommunityPost(w, r, user, id)
-			return
-		}
-		if id, ok := parseAdminCommunityPostModerateRoute(path); ok && method == http.MethodPost {
-			a.handleAdminModerateCommunityPost(w, r, user, id)
-			return
-		}
-		writeAppError(w, appError(http.StatusNotFound, "NOT_FOUND", "route not found"))
 	}
+
+	writeAppError(w, appError(http.StatusNotFound, "NOT_FOUND", "route not found"))
 }
 
 func (a *App) handleChatIntakeNext(w http.ResponseWriter, r *http.Request, user *AuthUser) {
