@@ -56,7 +56,7 @@ Update the `scripts` block to:
   "start": "expo start",
   "ios": "expo start --ios",
   "typecheck": "tsc --noEmit",
-  "test": "rm -rf .tmp-tests && tsc -p tsconfig.test.json && node --test $(find .tmp-tests -name '*.test.js' -print)"
+  "test": "sh -c 'rm -rf .tmp-tests && tsc -p tsconfig.test.json && node --test $(find .tmp-tests -name \"*.test.js\" -print); status=$?; rm -rf .tmp-tests; exit $status'"
 }
 ```
 
