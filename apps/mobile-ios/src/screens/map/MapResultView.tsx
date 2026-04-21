@@ -14,6 +14,7 @@ import type { ItineraryBlock, ItineraryLeg, ItineraryView, ValidationResult } fr
 import { blockHasCoord, clamp, formatHourRange, groupDayLabel, toItineraryView } from "../../utils/itinerary";
 import { PoiDetailSheet } from "./PoiDetailSheet";
 import { buildResultExplainability } from "./result-explainability";
+import type { PlanVariantView } from "./result-variants";
 
 type GeoPoint = {
   latitude: number;
@@ -70,6 +71,7 @@ type DaySelection = "all" | number;
 
 type MapResultViewProps = {
   itinerary: Record<string, unknown>;
+  variants?: PlanVariantView[];
   onBack: () => void;
   onPlanSaved?: (savedPlanId: string, itinerary: Record<string, unknown>) => void;
 };
@@ -394,9 +396,10 @@ function findDiagnostics(raw: Record<string, unknown>): Array<Record<string, unk
   return asArray(raw.diagnostics).filter((item): item is Record<string, unknown> => isRecord(item));
 }
 
-export function MapResultView({ itinerary, onBack, onPlanSaved }: MapResultViewProps) {
+export function MapResultView({ itinerary, variants = [], onBack, onPlanSaved }: MapResultViewProps) {
   const api = useMemo(() => new TripApiClient(() => RUNTIME_CONFIG), []);
   const [localItinerary, setLocalItinerary] = useState<Record<string, unknown>>(itinerary);
+  const [activeVariantKey, setActiveVariantKey] = useState("");
   const [status, setStatus] = useState("已生成地图行程");
   const [selectedDay, setSelectedDay] = useState<DaySelection>("all");
   const [todayMode, setTodayMode] = useState(false);
@@ -419,6 +422,20 @@ export function MapResultView({ itinerary, onBack, onPlanSaved }: MapResultViewP
     setSavedPlanId("");
     setLastSavedFingerprint("");
   }, [itinerary]);
+
+  useEffect(() => {
+    setActiveVariantKey(variants[0]?.key || "");
+  }, [variants]);
+
+  const activeVariant = useMemo(() => {
+    if (!variants.length) return null;
+    return variants.find((item) => item.key === activeVariantKey) || variants[0];
+  }, [activeVariantKey, variants]);
+
+  useEffect(() => {
+    if (!activeVariant) return;
+    setLocalItinerary(activeVariant.itinerary);
+  }, [activeVariant]);
 
   const todayIndex = useMemo(() => {
     if (!itineraryView) return null;
@@ -782,6 +799,25 @@ export function MapResultView({ itinerary, onBack, onPlanSaved }: MapResultViewP
               );
             })}
           </View>
+
+          {variants.length > 1 ? (
+            <View style={styles.variantRow}>
+              {variants.map((item) => {
+                const active = item.key === (activeVariant?.key || "");
+                return (
+                  <Pressable
+                    key={item.key}
+                    style={[styles.variantChip, active ? styles.variantChipActive : null]}
+                    onPress={() => setActiveVariantKey(item.key)}
+                  >
+                    <Text style={[styles.variantChipText, active ? styles.variantChipTextActive : null]}>
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
 
           {itineraryView.todayHint ? (
             <View style={styles.todayHintCard}>
@@ -1177,6 +1213,27 @@ const styles = StyleSheet.create({
   tabRow: {
     flexDirection: "row",
     gap: 8,
+  },
+  variantRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  variantChip: {
+    borderRadius: 16,
+    backgroundColor: "#eef4fa",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  variantChipActive: {
+    backgroundColor: "#173051",
+  },
+  variantChipText: {
+    color: "#5b7186",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  variantChipTextActive: {
+    color: "#ffffff",
   },
   modeChip: {
     borderRadius: 16,

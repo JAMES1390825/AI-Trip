@@ -15,6 +15,7 @@ import { DestinationSearchView } from "./DestinationSearchView";
 import { GeneratingView } from "./GeneratingView";
 import { MapResultView } from "./MapResultView";
 import { PlanEntryView } from "./PlanEntryView";
+import { extractPlanVariants, type PlanVariantView } from "./result-variants";
 import {
   buildPlanEntryGuidance,
   interpretSuggestedOption,
@@ -71,6 +72,7 @@ export function MapFlowScreen({
   const [briefNextAction, setBriefNextAction] = useState("");
   const [briefMissingFields, setBriefMissingFields] = useState<string[]>([]);
   const [generatedItinerary, setGeneratedItinerary] = useState<Record<string, unknown> | null>(null);
+  const [generatedVariants, setGeneratedVariants] = useState<PlanVariantView[]>([]);
   const [generatingPhaseIndex, setGeneratingPhaseIndex] = useState(0);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -85,6 +87,7 @@ export function MapFlowScreen({
   useEffect(() => {
     if (!preloadedToken || !preloadedItinerary) return;
     setGeneratedItinerary(preloadedItinerary);
+    setGeneratedVariants([]);
     setEntryStatus("已载入保存行程，可继续查看和调整。");
     setBriefMissingFields([]);
     setClarificationQuestion("");
@@ -173,15 +176,17 @@ export function MapFlowScreen({
       setFlowMode("generating");
 
       const result = await api.generatePlanV2(brief, {
-        variants: 1,
+        variants: 2,
         allowFallback: true,
       });
       if (requestIdRef.current !== requestId) return;
-      const primary = extractPrimaryItinerary(result);
+      const variants = extractPlanVariants(result);
+      const primary = variants[0]?.itinerary || extractPrimaryItinerary(result);
       if (!primary || !Object.keys(primary).length) {
         throw new Error("generate-v2 没有返回可用行程");
       }
       setBriefMissingFields([]);
+      setGeneratedVariants(variants);
       setGeneratedItinerary(primary);
       setEntryStatus(formatSuccessText(primary));
       setClarificationQuestion("");
@@ -289,6 +294,7 @@ export function MapFlowScreen({
     return (
       <MapResultView
         itinerary={generatedItinerary}
+        variants={generatedVariants}
         onBack={() => setFlowMode("entry")}
         onPlanSaved={onPlanSaved}
       />
