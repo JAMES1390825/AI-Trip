@@ -15,6 +15,11 @@ import { DestinationSearchView } from "./DestinationSearchView";
 import { GeneratingView } from "./GeneratingView";
 import { MapResultView } from "./MapResultView";
 import { PlanEntryView } from "./PlanEntryView";
+import {
+  buildPlanEntryGuidance,
+  interpretSuggestedOption,
+  resolveMissingFieldsAfterSuggestion,
+} from "./plan-entry-guidance";
 
 type MapFlowScreenProps = {
   preloadedItinerary?: Record<string, unknown> | null;
@@ -64,6 +69,7 @@ export function MapFlowScreen({
   const [clarificationQuestion, setClarificationQuestion] = useState("");
   const [suggestedOptions, setSuggestedOptions] = useState<string[]>([]);
   const [briefNextAction, setBriefNextAction] = useState("");
+  const [briefMissingFields, setBriefMissingFields] = useState<string[]>([]);
   const [generatedItinerary, setGeneratedItinerary] = useState<Record<string, unknown> | null>(null);
   const [generatingPhaseIndex, setGeneratingPhaseIndex] = useState(0);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -80,11 +86,19 @@ export function MapFlowScreen({
     if (!preloadedToken || !preloadedItinerary) return;
     setGeneratedItinerary(preloadedItinerary);
     setEntryStatus("已载入保存行程，可继续查看和调整。");
+    setBriefMissingFields([]);
     setClarificationQuestion("");
     setSuggestedOptions([]);
     setBriefNextAction("");
     setFlowMode("result");
   }, [preloadedItinerary, preloadedToken]);
+
+  useEffect(() => {
+    if (briefMissingFields.length > 0) return;
+    setClarificationQuestion("");
+    setSuggestedOptions([]);
+    setBriefNextAction("");
+  }, [briefMissingFields.length]);
 
   function toggleStyle(style: string) {
     setTravelStyles((prev) => {
@@ -138,6 +152,11 @@ export function MapFlowScreen({
       setPace(brief.pace);
       setTravelStyles(brief.travel_styles);
       setMustGo(brief.must_go);
+      setBriefMissingFields(
+        Array.isArray(brief.missing_fields)
+          ? brief.missing_fields.map((item) => String(item || "").trim()).filter(Boolean)
+          : [],
+      );
       setClarificationQuestion(String(briefResponse.clarification_question || "").trim());
       setSuggestedOptions(Array.isArray(briefResponse.suggested_options) ? briefResponse.suggested_options.map((item) => String(item || "").trim()).filter(Boolean) : []);
       setBriefNextAction(String(briefResponse.next_action || "").trim());
@@ -162,6 +181,7 @@ export function MapFlowScreen({
       if (!primary || !Object.keys(primary).length) {
         throw new Error("generate-v2 没有返回可用行程");
       }
+      setBriefMissingFields([]);
       setGeneratedItinerary(primary);
       setEntryStatus(formatSuccessText(primary));
       setClarificationQuestion("");
@@ -175,6 +195,10 @@ export function MapFlowScreen({
     }
   }
 
+  function resolveSuggestionLocally(action: ReturnType<typeof interpretSuggestedOption>) {
+    setBriefMissingFields((prev) => resolveMissingFieldsAfterSuggestion(prev, action));
+  }
+
   function handleCancelGenerating() {
     requestIdRef.current += 1;
     setEntryStatus("已取消本次生成，刚才填写的内容还保留着。");
@@ -182,35 +206,34 @@ export function MapFlowScreen({
   }
 
   function handleApplySuggestedOption(option: string) {
-    const value = option.trim();
-    if (!value) return;
+    const action = interpretSuggestedOption(briefNextAction, option);
+    if (!action.value) return;
 
-    switch (briefNextAction) {
-      case "CONFIRM_DAYS": {
-        const match = value.match(/(\d+)/);
-        if (match) {
-          setDays(Number(match[1]));
-          setEntryStatus(`已采用建议天数：${match[1]} 天。`);
-        }
+    switch (action.kind) {
+      case "SET_DAYS":
+        setDays(action.days);
+        resolveSuggestionLocally(action);
+        setEntryStatus(`已采用建议天数：${action.days} 天。`);
         return;
-      }
-      case "CONFIRM_START_DATE":
-        if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-          setStartDate(value);
-          setEntryStatus(`已采用建议日期：${value}。`);
-        }
+      case "SET_START_DATE":
+        setStartDate(action.startDate);
+        resolveSuggestionLocally(action);
+        setShowDatePicker(true);
+        setEntryStatus(`已采用建议日期：${action.startDate}。`);
         return;
-      case "CONFIRM_DESTINATION":
-        setDestination(value);
+      case "SET_DESTINATION":
+        setDestination(action.value);
         setSelectedDestination(null);
-        setEntryStatus(`已填入建议目的地：${value}，请再从搜索结果里确认标准城市。`);
+        setEntryStatus(`已填入建议目的地：${action.value}，请再从搜索结果里确认标准城市。`);
         setFlowMode("search");
         return;
-      default:
-        if (!planningNote.includes(value)) {
-          setPlanningNote((prev) => (prev.trim() ? `${prev.trim()}；${value}` : value));
+      case "APPEND_NOTE":
+        if (!planningNote.includes(action.value)) {
+          setPlanningNote((prev) => (prev.trim() ? `${prev.trim()}；${action.value}` : action.value));
         }
-        setEntryStatus(`已记录补充偏好：${value}。`);
+        resolveSuggestionLocally(action);
+        setEntryStatus(`已记录补充偏好：${action.value}。`);
+        return;
     }
   }
 
@@ -226,6 +249,29 @@ export function MapFlowScreen({
     const location = [selectedDestination.country, selectedDestination.region].filter(Boolean).join(" · ");
     return location ? `已确认标准目的地 · ${location}` : "已确认标准目的地";
   }, [destination, selectedDestination]);
+
+  const entryGuidance = useMemo(
+    () =>
+      buildPlanEntryGuidance({
+        missingFields: briefMissingFields,
+        nextAction: briefNextAction,
+        clarificationQuestion,
+        suggestedOptions,
+      }),
+    [briefMissingFields, briefNextAction, clarificationQuestion, suggestedOptions],
+  );
+
+  function handleGuidancePrimaryAction() {
+    if (!entryGuidance.primaryAction) return;
+    switch (entryGuidance.primaryAction.kind) {
+      case "OPEN_DESTINATION_SEARCH":
+        setFlowMode("search");
+        return;
+      case "OPEN_DATE_PICKER":
+        setShowDatePicker(true);
+        return;
+    }
+  }
 
   if (flowMode === "generating") {
     return (
@@ -257,9 +303,12 @@ export function MapFlowScreen({
         onSelectDestination={(value) => {
           setSelectedDestination(value);
           setDestination(value.destination_label);
-          setClarificationQuestion("");
-          setSuggestedOptions([]);
-          setBriefNextAction("");
+          setBriefMissingFields((prev) =>
+            resolveMissingFieldsAfterSuggestion(prev, {
+              kind: "SET_DESTINATION",
+              value: value.destination_label,
+            }),
+          );
           if (value.match_type === "custom") {
             setEntryStatus(`已记录自定义目的地：${value.destination_label}。后续需要先确认标准城市或区域。`);
           } else {
@@ -285,7 +334,17 @@ export function MapFlowScreen({
         budget={budget}
         pace={pace}
         status={entryStatus}
-        onChangeDays={setDays}
+        onChangeDays={(value) => {
+          setDays(value);
+          setBriefMissingFields((prev) =>
+            resolveMissingFieldsAfterSuggestion(prev, {
+              kind: "SET_DAYS",
+              value: `${value} 天`,
+              days: value,
+            }),
+          );
+        }}
+        guidance={entryGuidance}
         onToggleStyle={toggleStyle}
         onSelectBudget={setBudget}
         onSelectPace={setPace}
@@ -295,6 +354,7 @@ export function MapFlowScreen({
         clarificationQuestion={clarificationQuestion}
         suggestedOptions={suggestedOptions}
         onApplySuggestedOption={handleApplySuggestedOption}
+        onPressGuidancePrimaryAction={handleGuidancePrimaryAction}
         onPressSmartGenerate={() => void handleSmartGenerate()}
       />
       <DatePickerSheet
@@ -307,8 +367,26 @@ export function MapFlowScreen({
           setShowDatePicker(false);
           setEntryStatus(`已更新日期：${startDate} · ${days} 天`);
         }}
-        onSelectStartDate={setStartDate}
-        onSelectDays={setDays}
+        onSelectStartDate={(value) => {
+          setStartDate(value);
+          setBriefMissingFields((prev) =>
+            resolveMissingFieldsAfterSuggestion(prev, {
+              kind: "SET_START_DATE",
+              value,
+              startDate: value,
+            }),
+          );
+        }}
+        onSelectDays={(value) => {
+          setDays(value);
+          setBriefMissingFields((prev) =>
+            resolveMissingFieldsAfterSuggestion(prev, {
+              kind: "SET_DAYS",
+              value: `${value} 天`,
+              days: value,
+            }),
+          );
+        }}
         onToggleFlexibleDays={() => setFlexibleDays((prev) => !prev)}
       />
     </View>

@@ -2,7 +2,7 @@
 
 - 日期：2026-04-22
 - 状态：Approved for implementation
-- 适用范围：`apps/mobile-ios/src/screens/map/MapFlowScreen.tsx`、`apps/mobile-ios/src/screens/map/PlanEntryView.tsx`、`apps/mobile-ios/src/screens/map/DatePickerSheet.tsx`、`apps/mobile-ios/package.json`
+- 适用范围：`apps/mobile-ios/src/screens/map/MapFlowScreen.tsx`、`apps/mobile-ios/src/screens/map/PlanEntryView.tsx`、`apps/mobile-ios/package.json`、`apps/mobile-ios/tsconfig.json`、`apps/mobile-ios/tsconfig.test.json`
 - 关联文档：
   - `docs/product/trip-core-planning-prd.md`
   - `docs/product/trip-core-planning-architecture.md`
@@ -267,7 +267,7 @@
 2. 不要求引入完整 RN 测试栈
 3. 能验证纯 TypeScript 逻辑
 
-允许为此新增最小脚本和最小 dev dependency，但目标是：
+允许为此新增最小脚本和最小测试配置，但目标是：
 
 `优先验证规则层，而不是搭一整套重测试框架`
 

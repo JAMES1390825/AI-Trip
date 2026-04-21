@@ -133,3 +133,21 @@ export function interpretSuggestedOption(nextAction: string, option: string): Gu
     value,
   };
 }
+
+export function resolveMissingFieldsAfterSuggestion(
+  missingFields: string[],
+  action: GuidanceSuggestionAction,
+): string[] {
+  const normalizedMissingFields = normalizeMissingFields(missingFields);
+
+  switch (action.kind) {
+    case "SET_DAYS":
+      return normalizedMissingFields.filter((item) => item !== "days");
+    case "SET_START_DATE":
+      return normalizedMissingFields.filter((item) => item !== "start_date");
+    case "SET_DESTINATION":
+      return normalizedMissingFields.filter((item) => item !== "destination");
+    case "APPEND_NOTE":
+      return normalizedMissingFields;
+  }
+}

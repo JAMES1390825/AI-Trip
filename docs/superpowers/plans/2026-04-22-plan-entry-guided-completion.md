@@ -6,7 +6,7 @@
 
 **Architecture:** Keep the backend API and overall screen flow unchanged, but extract the “what is missing / what should the user do next” rules into a pure TypeScript helper that can be unit-tested. `MapFlowScreen` stays the state coordinator, `PlanEntryView` stays the presentational form, and the new helper becomes the single source of truth for guidance text, highlights, and suggestion actions.
 
-**Tech Stack:** React Native + Expo, TypeScript, Node built-in test runner, `tsx` for TypeScript test execution, existing `trip-mobile-ios` typecheck pipeline
+**Tech Stack:** React Native + Expo, TypeScript, TypeScript compiler (`tsc`), Node built-in test runner, existing `trip-mobile-ios` typecheck pipeline
 
 ---
 
@@ -22,8 +22,8 @@ It does not touch the result screen, backend APIs, itinerary generation, or save
 
 - `apps/mobile-ios/package.json`
   Add a lightweight frontend test script so we can run pure TypeScript tests before wiring UI behavior.
-- `apps/mobile-ios/package-lock.json`
-  Lock the new lightweight test dependency.
+- `apps/mobile-ios/tsconfig.test.json`
+  Compile the lightweight pure-logic test files into a temporary Node-friendly output directory.
 - `apps/mobile-ios/src/screens/map/plan-entry-guidance.ts`
   New pure logic module for mapping brief gaps and suggested options into a view model and executable suggestion actions.
 - `apps/mobile-ios/src/screens/map/plan-entry-guidance.test.ts`
@@ -37,7 +37,8 @@ It does not touch the result screen, backend APIs, itinerary generation, or save
 
 **Files:**
 - Modify: `apps/mobile-ios/package.json`
-- Modify: `apps/mobile-ios/package-lock.json`
+- Modify: `apps/mobile-ios/tsconfig.json`
+- Create: `apps/mobile-ios/tsconfig.test.json`
 - Test: `apps/mobile-ios/package.json`
 
 - [ ] **Step 1: Confirm the mobile app does not have a test script yet**
@@ -46,13 +47,7 @@ Run: `cd apps/mobile-ios && npm run test`
 
 Expected: FAIL with “Missing script: test”.
 
-- [ ] **Step 2: Install the minimal TypeScript test runtime**
-
-Run: `cd apps/mobile-ios && npm install --save-dev tsx`
-
-Expected: `package.json` gains `tsx` under `devDependencies`, and `package-lock.json` updates.
-
-- [ ] **Step 3: Add the test script to `package.json`**
+- [ ] **Step 2: Add the lightweight test script to `package.json`**
 
 Update the `scripts` block to:
 
@@ -61,20 +56,46 @@ Update the `scripts` block to:
   "start": "expo start",
   "ios": "expo start --ios",
   "typecheck": "tsc --noEmit",
-  "test": "node --import tsx --test src/**/*.test.ts"
+  "test": "rm -rf .tmp-tests && tsc -p tsconfig.test.json && node --test $(find .tmp-tests -name '*.test.js' -print)"
 }
 ```
 
-- [ ] **Step 4: Verify the new test command runs and currently fails because no tests exist**
+- [ ] **Step 3: Add a dedicated test tsconfig and exclude test files from the app tsconfig**
+
+Create `apps/mobile-ios/tsconfig.test.json`:
+
+```json
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": ".tmp-tests",
+    "module": "node16",
+    "moduleResolution": "node16",
+    "target": "es2022",
+    "types": ["node"]
+  },
+  "include": ["src/**/*.test.ts", "src/**/*.ts"],
+  "exclude": []
+}
+```
+
+Update `apps/mobile-ios/tsconfig.json` to exclude test files:
+
+```json
+"exclude": ["src/**/*.test.ts"]
+```
+
+- [ ] **Step 4: Verify the new test command runs and currently fails because no test module exists**
 
 Run: `cd apps/mobile-ios && npm run test`
 
-Expected: FAIL with “Could not find” / “No test files found” or equivalent empty-suite failure from the new command.
+Expected: FAIL because the new test command can now compile the test file, but `./plan-entry-guidance` does not exist yet.
 
 - [ ] **Step 5: Commit the lightweight test entry point**
 
 ```bash
-git add apps/mobile-ios/package.json apps/mobile-ios/package-lock.json
+git add apps/mobile-ios/package.json apps/mobile-ios/tsconfig.json apps/mobile-ios/tsconfig.test.json
 git commit -m "test: add lightweight mobile unit test runner"
 ```
 
@@ -597,7 +618,7 @@ Expected: Go backend tests pass and iOS typecheck passes from the repo root.
 Commit:
 
 ```bash
-git add apps/mobile-ios/src/screens/map/PlanEntryView.tsx apps/mobile-ios/package.json apps/mobile-ios/package-lock.json apps/mobile-ios/src/screens/map/plan-entry-guidance.ts apps/mobile-ios/src/screens/map/plan-entry-guidance.test.ts
+git add apps/mobile-ios/src/screens/map/PlanEntryView.tsx apps/mobile-ios/package.json apps/mobile-ios/tsconfig.json apps/mobile-ios/tsconfig.test.json apps/mobile-ios/src/screens/map/plan-entry-guidance.ts apps/mobile-ios/src/screens/map/plan-entry-guidance.test.ts
 git commit -m "feat: add guided completion to plan entry"
 ```
 

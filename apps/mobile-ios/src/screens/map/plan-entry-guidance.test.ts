@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildPlanEntryGuidance, interpretSuggestedOption } from "./plan-entry-guidance";
+import {
+  buildPlanEntryGuidance,
+  interpretSuggestedOption,
+  resolveMissingFieldsAfterSuggestion,
+} from "./plan-entry-guidance";
 
 test("buildPlanEntryGuidance prefers destination search when destination is missing", () => {
   const guidance = buildPlanEntryGuidance({
@@ -55,4 +59,44 @@ test("interpretSuggestedOption falls back to note append when option is not dire
     kind: "APPEND_NOTE",
     value: "多一点本地餐馆",
   });
+});
+
+test("interpretSuggestedOption keeps destination text for destination confirmation", () => {
+  const action = interpretSuggestedOption("CONFIRM_DESTINATION", "杭州");
+
+  assert.deepEqual(action, {
+    kind: "SET_DESTINATION",
+    value: "杭州",
+  });
+});
+
+test("resolveMissingFieldsAfterSuggestion removes fulfilled schedule field", () => {
+  const next = resolveMissingFieldsAfterSuggestion(["days", "start_date"], {
+    kind: "SET_DAYS",
+    value: "玩 4 天",
+    days: 4,
+  });
+
+  assert.deepEqual(next, ["start_date"]);
+});
+
+test("resolveMissingFieldsAfterSuggestion removes destination once a destination is applied", () => {
+  const next = resolveMissingFieldsAfterSuggestion(["destination"], {
+    kind: "SET_DESTINATION",
+    value: "杭州",
+  });
+
+  assert.deepEqual(next, []);
+});
+
+test("buildPlanEntryGuidance hides completion UI when nothing is missing", () => {
+  const guidance = buildPlanEntryGuidance({
+    missingFields: [],
+    nextAction: "GENERATE",
+    clarificationQuestion: "",
+    suggestedOptions: [],
+  });
+
+  assert.equal(guidance.needsCompletion, false);
+  assert.equal(guidance.primaryAction, null);
 });

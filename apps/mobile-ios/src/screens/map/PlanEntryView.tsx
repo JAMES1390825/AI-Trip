@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import type { BudgetLevel, PaceLevel } from "../../types/plan";
+import type { PlanEntryGuidance } from "./plan-entry-guidance";
 
 const suggestedStyles = [
   "经典必玩",
@@ -38,6 +39,7 @@ type PlanEntryViewProps = {
   budget: BudgetLevel;
   pace: PaceLevel;
   status: string;
+  guidance: PlanEntryGuidance;
   clarificationQuestion?: string;
   suggestedOptions?: string[];
   onChangeDays: (value: number) => void;
@@ -48,6 +50,7 @@ type PlanEntryViewProps = {
   onOpenDatePicker: () => void;
   onChangePlanningNote: (value: string) => void;
   onApplySuggestedOption?: (value: string) => void;
+  onPressGuidancePrimaryAction?: () => void;
   onPressSmartGenerate: () => void;
 };
 
@@ -62,6 +65,7 @@ export function PlanEntryView({
   budget,
   pace,
   status,
+  guidance,
   clarificationQuestion = "",
   suggestedOptions = [],
   onChangeDays,
@@ -72,6 +76,7 @@ export function PlanEntryView({
   onOpenDatePicker,
   onChangePlanningNote,
   onApplySuggestedOption,
+  onPressGuidancePrimaryAction,
   onPressSmartGenerate,
 }: PlanEntryViewProps) {
   const selectedCount = selectedStyles.length;
@@ -89,7 +94,28 @@ export function PlanEntryView({
         <Text style={styles.heroSub}>目的地、日期和偏好都在这里一次填完，然后直接开始生成。</Text>
       </View>
 
-      <View style={styles.card}>
+      {guidance.needsCompletion ? (
+        <View style={styles.guidanceCard}>
+          <Text style={styles.guidanceEyebrow}>还差一点</Text>
+          <Text style={styles.guidanceTitle}>{guidance.message || "AI 还需要你补一点关键信息。"}</Text>
+          {guidance.primaryAction && onPressGuidancePrimaryAction ? (
+            <Pressable style={styles.guidancePrimaryButton} onPress={onPressGuidancePrimaryAction}>
+              <Text style={styles.guidancePrimaryButtonText}>{guidance.primaryAction.label}</Text>
+            </Pressable>
+          ) : null}
+          {suggestedOptions.length > 0 && onApplySuggestedOption ? (
+            <View style={styles.suggestionWrap}>
+              {suggestedOptions.map((item) => (
+                <Pressable key={item} style={styles.suggestionChip} onPress={() => onApplySuggestedOption(item)}>
+                  <Text style={styles.suggestionChipText}>{item}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      <View style={[styles.card, guidance.highlights.destination ? styles.cardHighlight : null]}>
         <Text style={styles.sectionTitle}>目的地</Text>
         <Pressable style={styles.inputButton} onPress={onOpenDestinationSearch}>
           <Text style={destination ? styles.inputValue : styles.inputPlaceholder}>
@@ -99,7 +125,7 @@ export function PlanEntryView({
         {destinationNote ? <Text style={styles.inputNote}>{destinationNote}</Text> : null}
       </View>
 
-      <View style={styles.card}>
+      <View style={[styles.card, guidance.highlights.schedule ? styles.cardHighlight : null]}>
         <Text style={styles.sectionTitle}>你想去多久？</Text>
         <Pressable style={styles.inputButton} onPress={onOpenDatePicker}>
           <Text style={startDate ? styles.inputValue : styles.inputPlaceholder}>
@@ -176,7 +202,7 @@ export function PlanEntryView({
         </View>
       </View>
 
-      <View style={styles.card}>
+      <View style={[styles.card, guidance.highlights.planningNote ? styles.cardHighlight : null]}>
         <Text style={styles.sectionTitle}>补充要求</Text>
         <Text style={styles.sectionSub}>可以直接告诉 AI 雨天偏好、想吃什么，或者住在哪里附近。</Text>
         <TextInput
@@ -198,15 +224,6 @@ export function PlanEntryView({
         <Text style={styles.statusLabel}>AI 规划状态</Text>
         <Text style={styles.statusText}>{status}</Text>
         {clarificationQuestion ? <Text style={styles.clarificationText}>{clarificationQuestion}</Text> : null}
-        {suggestedOptions.length > 0 && onApplySuggestedOption ? (
-          <View style={styles.suggestionWrap}>
-            {suggestedOptions.map((item) => (
-              <Pressable key={item} style={styles.suggestionChip} onPress={() => onApplySuggestedOption(item)}>
-                <Text style={styles.suggestionChipText}>{item}</Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
       </View>
     </ScrollView>
   );
@@ -256,6 +273,43 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 },
     elevation: 3,
+  },
+  guidanceCard: {
+    borderRadius: 28,
+    backgroundColor: "#fff7e8",
+    borderWidth: 1,
+    borderColor: "#ffd38a",
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    gap: 12,
+  },
+  guidanceEyebrow: {
+    color: "#9b5a00",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  guidanceTitle: {
+    color: "#2b1c00",
+    fontSize: 16,
+    fontWeight: "800",
+    lineHeight: 24,
+  },
+  guidancePrimaryButton: {
+    alignSelf: "flex-start",
+    borderRadius: 18,
+    backgroundColor: "#0d1218",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  guidancePrimaryButtonText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  cardHighlight: {
+    borderWidth: 1,
+    borderColor: "#ffbf47",
+    shadowColor: "#f0b64d",
   },
   sectionTitle: {
     color: "#08131f",
