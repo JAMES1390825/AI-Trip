@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { TripApiClient } from "../api/client";
 import { RUNTIME_CONFIG } from "../config/runtime";
 import type { SavedPlanListItem } from "../types/plan";
+import { filterSavedPlans, type SavedPlanFilterKey } from "./saved-plan-filters";
 
 type TripsScreenProps = {
   onCreateTrip: () => void;
@@ -28,10 +29,16 @@ function destinationLabel(item: SavedPlanListItem): string {
 export function TripsScreen({ onCreateTrip, onOpenSavedPlan, refreshToken = 0 }: TripsScreenProps) {
   const api = useMemo(() => new TripApiClient(() => RUNTIME_CONFIG), []);
   const [items, setItems] = useState<SavedPlanListItem[]>([]);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<SavedPlanFilterKey>("all");
   const [status, setStatus] = useState("加载中...");
   const [isLoading, setIsLoading] = useState(false);
   const [openingPlanId, setOpeningPlanId] = useState("");
   const [deletingPlanId, setDeletingPlanId] = useState("");
+  const filteredItems = useMemo(
+    () => filterSavedPlans(items, query, filter, new Date().toISOString().slice(0, 10)),
+    [items, query, filter],
+  );
 
   const loadSavedPlans = useCallback(async () => {
     setIsLoading(true);
@@ -117,9 +124,37 @@ export function TripsScreen({ onCreateTrip, onOpenSavedPlan, refreshToken = 0 }:
       </View>
       <Text style={styles.statusText}>{status}</Text>
 
-      {items.length ? (
+      <View style={styles.filterCard}>
+        <TextInput
+          style={styles.searchInput}
+          value={query}
+          onChangeText={setQuery}
+          placeholder="搜索目的地或日期"
+          placeholderTextColor="#8da0b5"
+        />
+        <View style={styles.filterRow}>
+          {[
+            { key: "all", label: "全部" },
+            { key: "upcoming", label: "即将出发" },
+            { key: "high_confidence", label: "高可信" },
+          ].map((item) => {
+            const active = filter === item.key;
+            return (
+              <Pressable
+                key={item.key}
+                style={[styles.filterChip, active ? styles.filterChipActive : null]}
+                onPress={() => setFilter(item.key as SavedPlanFilterKey)}
+              >
+                <Text style={[styles.filterChipText, active ? styles.filterChipTextActive : null]}>{item.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {filteredItems.length ? (
         <View style={styles.list}>
-          {items.map((item) => {
+          {filteredItems.map((item) => {
             const isOpening = openingPlanId === item.id;
             const isDeleting = deletingPlanId === item.id;
             return (
@@ -151,8 +186,10 @@ export function TripsScreen({ onCreateTrip, onOpenSavedPlan, refreshToken = 0 }:
         </View>
       ) : (
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>还没有可回看的行程</Text>
-          <Text style={styles.emptyText}>去“规划”页完成一次生成并保存后，这里会出现服务端保存的 itinerary。</Text>
+          <Text style={styles.emptyTitle}>{items.length ? "没有匹配结果" : "还没有可回看的行程"}</Text>
+          <Text style={styles.emptyText}>
+            {items.length ? "换个目的地关键词，或者切回“全部”看看。" : "去“规划”页完成一次生成并保存后，这里会出现服务端保存的 itinerary。"}
+          </Text>
         </View>
       )}
     </ScrollView>
@@ -236,6 +273,45 @@ const styles = StyleSheet.create({
   statusText: {
     color: "#5b6f8f",
     fontSize: 13,
+  },
+  filterCard: {
+    borderRadius: 18,
+    backgroundColor: "#ffffff",
+    padding: 14,
+    gap: 12,
+  },
+  searchInput: {
+    borderRadius: 14,
+    backgroundColor: "#f4f8fd",
+    borderWidth: 1,
+    borderColor: "#dbe7f2",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: "#173051",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  filterRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  filterChip: {
+    borderRadius: 14,
+    backgroundColor: "#eef4fb",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  filterChipActive: {
+    backgroundColor: "#173051",
+  },
+  filterChipText: {
+    color: "#5d728d",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  filterChipTextActive: {
+    color: "#ffffff",
   },
   list: {
     gap: 12,
