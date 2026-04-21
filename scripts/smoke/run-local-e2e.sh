@@ -286,9 +286,11 @@ if [[ -z "$SAVED_ID" ]]; then
   exit 1
 fi
 
-echo "[6/7] Loading saved plan history ..."
+echo "[6/7] Loading saved plan history and deleting saved plan ..."
 history="$(invoke_api_json "GET" "$BASE_URL/api/v1/plans/saved?limit=20" "$ACCESS_TOKEN" "")"
 loaded="$(invoke_api_json "GET" "$BASE_URL/api/v1/plans/saved/$SAVED_ID" "$ACCESS_TOKEN" "")"
+invoke_api_json "DELETE" "$BASE_URL/api/v1/plans/saved/$SAVED_ID" "$ACCESS_TOKEN" "" >/dev/null
+history_after_delete="$(invoke_api_json "GET" "$BASE_URL/api/v1/plans/saved?limit=20" "$ACCESS_TOKEN" "")"
 GENERATED_DEGRADED="$(printf '%s' "$generated" | json_get "degraded")"
 ITINERARY_CONFIDENCE="$(printf '%s' "$itinerary" | json_get "confidence")"
 VALIDATION_PASSED="$(printf '%s' "$validated" | json_get "validation_result.passed")"
@@ -309,6 +311,49 @@ process.stdin.on("end", () => {
 });
 ')"
 
+POST_DELETE_HISTORY_COUNT="$(printf '%s' "$history_after_delete" | node -e '
+let raw = "";
+process.stdin.on("data", (chunk) => { raw += chunk; });
+process.stdin.on("end", () => {
+  const data = JSON.parse(raw || "null");
+  if (Array.isArray(data)) {
+    process.stdout.write(String(data.length));
+    return;
+  }
+  const items = data && Array.isArray(data.items) ? data.items.length : 0;
+  process.stdout.write(String(items));
+});
+')"
+
+POST_DELETE_STILL_PRESENT="$(printf '%s' "$history_after_delete" | node -e '
+const savedId = process.argv[1];
+let raw = "";
+process.stdin.on("data", (chunk) => { raw += chunk; });
+process.stdin.on("end", () => {
+  const data = JSON.parse(raw || "null");
+  const items = Array.isArray(data) ? data : data && Array.isArray(data.items) ? data.items : [];
+  const present = items.some((item) => String((item && item.id) || "") === savedId);
+  process.stdout.write(present ? "true" : "false");
+});
+' "$SAVED_ID")"
+
+if [[ "$POST_DELETE_STILL_PRESENT" == "true" ]]; then
+  echo "saved plan still present in history after delete" >&2
+  exit 1
+fi
+
+deleted_detail_status="$(curl --silent --show-error \
+  --output /dev/null \
+  --write-out "%{http_code}" \
+  --request GET \
+  --header "Authorization: Bearer $ACCESS_TOKEN" \
+  "$BASE_URL/api/v1/plans/saved/$SAVED_ID")"
+
+if [[ "$deleted_detail_status" != "404" ]]; then
+  echo "deleted saved plan detail still accessible: HTTP $deleted_detail_status" >&2
+  exit 1
+fi
+
 echo "[7/7] Smoke flow complete."
 node -e '
 const payload = {
@@ -320,9 +365,10 @@ const payload = {
   validation_confidence_tier: process.argv[6],
   saved_plan_id: process.argv[7],
   history_count: Number(process.argv[8]),
-  loaded_destination: process.argv[9],
-  trip_api_stdout_log: process.argv[10],
-  trip_api_stderr_log: process.argv[11],
+  post_delete_history_count: Number(process.argv[9]),
+  loaded_destination: process.argv[10],
+  trip_api_stdout_log: process.argv[11],
+  trip_api_stderr_log: process.argv[12],
 };
 console.log(JSON.stringify(payload, null, 2));
-' "$USER_ID" "$DESTINATION" "$GENERATED_DEGRADED" "$ITINERARY_CONFIDENCE" "$VALIDATION_PASSED" "$VALIDATION_TIER" "$SAVED_ID" "$HISTORY_COUNT" "$LOADED_DESTINATION" "$TRIP_API_OUT_LOG" "$TRIP_API_ERR_LOG"
+' "$USER_ID" "$DESTINATION" "$GENERATED_DEGRADED" "$ITINERARY_CONFIDENCE" "$VALIDATION_PASSED" "$VALIDATION_TIER" "$SAVED_ID" "$HISTORY_COUNT" "$POST_DELETE_HISTORY_COUNT" "$LOADED_DESTINATION" "$TRIP_API_OUT_LOG" "$TRIP_API_ERR_LOG"

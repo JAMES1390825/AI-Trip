@@ -19,22 +19,6 @@ export type ValidationResult = {
   coverage: ValidationCoverage;
 };
 
-export type PlaceDetail = {
-  provider: string;
-  providerPlaceId: string;
-  name: string;
-  address: string;
-  lat: number;
-  lng: number;
-  rating: number;
-  priceLevel: number;
-  openingHoursText: string;
-  phone: string;
-  images: string[];
-  tags: string[];
-  sourceFetchedAt: string;
-};
-
 export type ItineraryAlternative = {
   poi: string;
   poiLat: number;

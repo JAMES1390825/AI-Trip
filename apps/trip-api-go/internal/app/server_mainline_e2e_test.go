@@ -46,11 +46,23 @@ func TestServeHTTPMainlineHappyPath(t *testing.T) {
 	}
 
 	saveResp := performJSONRequest(t, app, http.MethodPost, "/api/v1/plans/save", accessToken, `{"itinerary":`+mustJSON(t, itinerary)+`}`)
-	if asString(saveResp["saved_plan_id"]) == "" {
+	savedPlanID := asString(saveResp["saved_plan_id"])
+	if savedPlanID == "" {
 		t.Fatalf("expected saved_plan_id")
 	}
 
-	performStatusRequest(t, app, http.MethodPost, "/api/v1/events", accessToken, `{"event_name":"mainline_smoke_checked","metadata":{"source":"server_mainline_e2e_test"}}`, http.StatusAccepted)
+	savedListResp := performJSONListRequest(t, app, http.MethodGet, "/api/v1/plans/saved", accessToken)
+	savedItems := asSlice(savedListResp)
+	if len(savedItems) == 0 {
+		t.Fatalf("expected saved plans list to include saved plan")
+	}
+
+	savedDetailResp := performJSONRequest(t, app, http.MethodGet, "/api/v1/plans/saved/"+savedPlanID, accessToken, "")
+	if asString(savedDetailResp["id"]) != savedPlanID {
+		t.Fatalf("expected saved plan detail id %s, got %s", savedPlanID, asString(savedDetailResp["id"]))
+	}
+
+	performStatusRequest(t, app, http.MethodDelete, "/api/v1/plans/saved/"+savedPlanID, accessToken, "", http.StatusNoContent)
 }
 
 func performJSONRequest(t *testing.T, app *App, method, path, token, body string) map[string]any {
@@ -71,6 +83,31 @@ func performJSONRequest(t *testing.T, app *App, method, path, token, body string
 	}
 
 	out := map[string]any{}
+	if strings.TrimSpace(rr.Body.String()) == "" {
+		return out
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode %s %s response: %v", method, path, err)
+	}
+
+	return out
+}
+
+func performJSONListRequest(t *testing.T, app *App, method, path, token string) []any {
+	t.Helper()
+
+	req := httptest.NewRequest(method, path, nil)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	rr := httptest.NewRecorder()
+	app.ServeHTTP(rr, req)
+	if rr.Code < 200 || rr.Code >= 300 {
+		t.Fatalf("expected 2xx for %s %s, got %d with body %s", method, path, rr.Code, rr.Body.String())
+	}
+
+	out := []any{}
 	if strings.TrimSpace(rr.Body.String()) == "" {
 		return out
 	}

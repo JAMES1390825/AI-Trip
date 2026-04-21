@@ -6,12 +6,10 @@ import {
   type BudgetLevel,
   type DestinationEntity,
   type PaceLevel,
-  type PlanDraft,
   type PlanningBriefRequest,
 } from "../../types/plan";
 import { defaultStartDate } from "../../utils/date";
 import { extractPrimaryItinerary, toItineraryView } from "../../utils/itinerary";
-import { PlannerScreen } from "../PlannerScreen";
 import { DatePickerSheet } from "./DatePickerSheet";
 import { DestinationSearchView } from "./DestinationSearchView";
 import { GeneratingView } from "./GeneratingView";
@@ -24,7 +22,7 @@ type MapFlowScreenProps = {
   onPlanSaved?: (savedPlanId: string, itinerary: Record<string, unknown>) => void;
 };
 
-type FlowMode = "entry" | "search" | "generating" | "result" | "legacy-planner";
+type FlowMode = "entry" | "search" | "generating" | "result";
 
 const generatingPhases = [
   "正在确认目的地与规划 brief",
@@ -32,13 +30,6 @@ const generatingPhases = [
   "正在排布每日动线与时间窗口",
   "正在校验可信度与降级状态",
 ];
-
-function isSameDestinationText(left: string, right: string): boolean {
-  const a = left.trim();
-  const b = right.trim();
-  if (!a || !b) return false;
-  return a === b || a.includes(b) || b.includes(a);
-}
 
 function formatSuccessText(itinerary: Record<string, unknown> | null): string {
   const view = toItineraryView(itinerary);
@@ -74,10 +65,7 @@ export function MapFlowScreen({
   const [suggestedOptions, setSuggestedOptions] = useState<string[]>([]);
   const [briefNextAction, setBriefNextAction] = useState("");
   const [generatedItinerary, setGeneratedItinerary] = useState<Record<string, unknown> | null>(null);
-  const [generatedToken, setGeneratedToken] = useState(0);
   const [generatingPhaseIndex, setGeneratingPhaseIndex] = useState(0);
-  const [legacyEntryToken, setLegacyEntryToken] = useState(0);
-  const [legacyReturnMode, setLegacyReturnMode] = useState<"entry" | "result">("entry");
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
@@ -91,7 +79,6 @@ export function MapFlowScreen({
   useEffect(() => {
     if (!preloadedToken || !preloadedItinerary) return;
     setGeneratedItinerary(preloadedItinerary);
-    setGeneratedToken((prev) => prev + 1);
     setEntryStatus("已载入保存行程，可继续查看和调整。");
     setClarificationQuestion("");
     setSuggestedOptions([]);
@@ -162,16 +149,6 @@ export function MapFlowScreen({
         return;
       }
 
-      void api.trackEvent("preference_changed", {
-        destination: brief.destination?.destination_label || destination.trim(),
-        destination_adcode: brief.destination?.adcode || "",
-        budget_level: brief.budget_level,
-        pace: brief.pace,
-        travel_styles: brief.travel_styles,
-        weather_preference: brief.constraints.weather_preference || "",
-        dining_preference: brief.constraints.dining_preference || "",
-      }).catch(() => undefined);
-
       setGeneratingPhaseIndex(0);
       setEntryStatus(briefMessage || "已整理规划信息，开始生成路线。");
       setFlowMode("generating");
@@ -186,21 +163,11 @@ export function MapFlowScreen({
         throw new Error("generate-v2 没有返回可用行程");
       }
       setGeneratedItinerary(primary);
-      setGeneratedToken((prev) => prev + 1);
       setEntryStatus(formatSuccessText(primary));
       setClarificationQuestion("");
       setSuggestedOptions([]);
       setBriefNextAction("");
       setFlowMode("result");
-      void api.trackEvent("plan_generated", {
-        destination: brief.destination?.destination_label || destination.trim(),
-        destination_adcode: brief.destination?.adcode || "",
-        days: brief.days,
-        budget_level: brief.budget_level,
-        pace: brief.pace,
-        travel_styles: brief.travel_styles,
-        source_mode: String(primary.source_mode || ""),
-      }).catch(() => undefined);
     } catch (error) {
       if (requestIdRef.current !== requestId) return;
       setEntryStatus(error instanceof Error ? error.message : String(error));
@@ -247,29 +214,6 @@ export function MapFlowScreen({
     }
   }
 
-  function handleManualPlan() {
-    setLegacyReturnMode("entry");
-    setLegacyEntryToken((prev) => prev + 1);
-    setFlowMode("legacy-planner");
-  }
-
-  const legacyPreset = useMemo<Partial<PlanDraft>>(
-    () => ({
-      origin_city: "上海",
-      destination: destination.trim(),
-      destination_entity: selectedDestination,
-      days,
-      budget_level: budget,
-      companions: ["朋友"],
-      travel_styles: travelStyles,
-      must_go: mustGo,
-      avoid: [],
-      start_date: startDate.trim(),
-      pace,
-    }),
-    [budget, days, destination, mustGo, pace, selectedDestination, startDate, travelStyles],
-  );
-
   const destinationNote = useMemo(() => {
     if (!destination.trim()) return "";
     if (!selectedDestination) {
@@ -295,30 +239,11 @@ export function MapFlowScreen({
     );
   }
 
-  if (flowMode === "legacy-planner") {
-    return (
-      <PlannerScreen
-        preloadedItinerary={legacyReturnMode === "result" ? generatedItinerary : null}
-        preloadedToken={legacyReturnMode === "result" ? generatedToken : 0}
-        entryPreset={legacyPreset}
-        entryPresetToken={legacyEntryToken}
-        onBackFromResult={() => setFlowMode(legacyReturnMode)}
-        onPlanSaved={onPlanSaved}
-      />
-    );
-  }
-
   if (flowMode === "result" && generatedItinerary) {
     return (
       <MapResultView
         itinerary={generatedItinerary}
         onBack={() => setFlowMode("entry")}
-        onOpenLegacyEditor={(nextItinerary) => {
-          setLegacyReturnMode("result");
-          setGeneratedItinerary(nextItinerary);
-          setGeneratedToken((prev) => prev + 1);
-          setFlowMode("legacy-planner");
-        }}
         onPlanSaved={onPlanSaved}
       />
     );
@@ -371,7 +296,6 @@ export function MapFlowScreen({
         suggestedOptions={suggestedOptions}
         onApplySuggestedOption={handleApplySuggestedOption}
         onPressSmartGenerate={() => void handleSmartGenerate()}
-        onPressManualPlan={handleManualPlan}
       />
       <DatePickerSheet
         visible={showDatePicker}

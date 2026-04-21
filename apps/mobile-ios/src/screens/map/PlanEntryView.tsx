@@ -49,7 +49,6 @@ type PlanEntryViewProps = {
   onChangePlanningNote: (value: string) => void;
   onApplySuggestedOption?: (value: string) => void;
   onPressSmartGenerate: () => void;
-  onPressManualPlan: () => void;
 };
 
 export function PlanEntryView({
@@ -74,7 +73,6 @@ export function PlanEntryView({
   onChangePlanningNote,
   onApplySuggestedOption,
   onPressSmartGenerate,
-  onPressManualPlan,
 }: PlanEntryViewProps) {
   const selectedCount = selectedStyles.length;
   const helperText = useMemo(() => {
@@ -194,10 +192,6 @@ export function PlanEntryView({
 
       <Pressable style={styles.primaryButton} onPress={onPressSmartGenerate}>
         <Text style={styles.primaryButtonText}>发起 AI 行程</Text>
-      </Pressable>
-
-      <Pressable style={styles.secondaryButton} onPress={onPressManualPlan}>
-        <Text style={styles.secondaryButtonText}>进入自己规划</Text>
       </Pressable>
 
       <View style={styles.statusCard}>
@@ -386,23 +380,6 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: "#ffffff",
-    fontSize: 20,
-    fontWeight: "800",
-  },
-  secondaryButton: {
-    borderRadius: 24,
-    backgroundColor: "#ffffff",
-    paddingVertical: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#aab9c7",
-    shadowOpacity: 0.14,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 3,
-  },
-  secondaryButtonText: {
-    color: "#0f1722",
     fontSize: 20,
     fontWeight: "800",
   },

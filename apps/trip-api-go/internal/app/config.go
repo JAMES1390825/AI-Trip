@@ -22,8 +22,7 @@ func LoadConfig() Config {
 			BootstrapClientSecret: defaultString(os.Getenv("BOOTSTRAP_CLIENT_SECRET"), "dev-bootstrap-secret"),
 		},
 		Storage: StorageConfig{
-			DataFile:          defaultString(os.Getenv("DATA_FILE"), "tmp/data/trip-api-go-store.json"),
-			CommunityMediaDir: defaultString(os.Getenv("COMMUNITY_MEDIA_DIR"), "tmp/data/community-media"),
+			DataFile: defaultString(os.Getenv("DATA_FILE"), "tmp/data/trip-api-go-store.json"),
 		},
 		AI: AIServiceConfig{
 			BaseURL:   strings.TrimSpace(os.Getenv("AI_SERVICE_BASE_URL")),

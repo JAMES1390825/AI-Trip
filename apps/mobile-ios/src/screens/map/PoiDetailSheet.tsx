@@ -1,32 +1,13 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { TripApiClient } from "../../api/client";
-import { RUNTIME_CONFIG } from "../../config/runtime";
-import type { ItineraryAlternative, ItineraryBlock, PlaceDetail } from "../../types/itinerary";
+import React from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import type { ItineraryBlock } from "../../types/itinerary";
 
 type PoiDetailSheetProps = {
   visible: boolean;
   block: ItineraryBlock | null;
   onClose: () => void;
   onNavigate: () => void;
-  onToggleLock: () => void;
-  onRemoveBlock: () => void;
-  onAskAI: () => void;
-  onPickAlternative: (alternative: ItineraryAlternative) => void;
 };
-
-function blockTypeLabel(blockType: string): string {
-  switch (blockType) {
-    case "food":
-      return "餐馆";
-    case "experience":
-      return "体验";
-    case "night":
-      return "夜游";
-    default:
-      return "景点";
-  }
-}
 
 function detailIntro(block: ItineraryBlock): string {
   if (block.blockType === "food") {
@@ -78,44 +59,7 @@ export function PoiDetailSheet({
   block,
   onClose,
   onNavigate,
-  onToggleLock,
-  onRemoveBlock,
-  onAskAI,
-  onPickAlternative,
 }: PoiDetailSheetProps) {
-  const api = useMemo(() => new TripApiClient(() => RUNTIME_CONFIG), []);
-  const [placeDetail, setPlaceDetail] = useState<PlaceDetail | null>(null);
-  const [detailStatus, setDetailStatus] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!visible || !block?.provider || !block.providerPlaceId) {
-      setPlaceDetail(null);
-      setDetailStatus("");
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    setDetailStatus("加载点位详情中...");
-    void (async () => {
-      try {
-        const detail = await api.getPlaceDetail(block.provider, block.providerPlaceId);
-        if (cancelled) return;
-        setPlaceDetail(detail);
-        setDetailStatus("");
-      } catch {
-        if (cancelled) return;
-        setPlaceDetail(null);
-        setDetailStatus("暂时拿不到更多点位详情，先展示当前行程里的依据。");
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [api, block?.provider, block?.providerPlaceId, visible]);
-
   if (!visible || !block) return null;
 
   return (
@@ -135,13 +79,6 @@ export function PoiDetailSheet({
             {providerLabel(block.provider)} · {sourceLabel(block)} · {detailDuration(block)}
           </Text>
 
-          {detailStatus ? (
-            <View style={styles.detailStatusRow}>
-              <ActivityIndicator size="small" color="#12bfd8" />
-              <Text style={styles.detailStatusText}>{detailStatus}</Text>
-            </View>
-          ) : null}
-
           <View style={styles.imageRow}>
             <View style={[styles.imageCard, styles.imagePrimary]}>
               <Text style={styles.imageCardText}>主图</Text>
@@ -158,9 +95,8 @@ export function PoiDetailSheet({
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>地点介绍</Text>
-            <Text style={styles.sectionText}>{placeDetail?.address || detailIntro(block)}</Text>
-            {placeDetail?.openingHoursText ? <Text style={styles.sectionText}>开放信息：{placeDetail.openingHoursText}</Text> : null}
-            {placeDetail?.tags?.length ? <Text style={styles.sectionText}>标签：{placeDetail.tags.join(" / ")}</Text> : null}
+            <Text style={styles.sectionText}>{block.poiAddress || detailIntro(block)}</Text>
+            {block.poiTags.length ? <Text style={styles.sectionText}>标签：{block.poiTags.join(" / ")}</Text> : null}
           </View>
 
           <View style={styles.section}>
@@ -192,35 +128,11 @@ export function PoiDetailSheet({
             <Text style={styles.sectionTitle}>风险提醒</Text>
             <Text style={styles.sectionText}>{block.weatherRisk || "当前没有明显风险，可按原计划前往。"}</Text>
           </View>
-
-          {block.alternatives.length ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>替代建议</Text>
-              <View style={styles.altWrap}>
-                {block.alternatives.map((alternative) => (
-                  <Pressable
-                    key={`${block.blockId}-${alternative.poi}`}
-                    style={styles.altCard}
-                    onPress={() => onPickAlternative(alternative)}
-                  >
-                    <Text style={styles.altTitle}>{alternative.poi}</Text>
-                    <Text style={styles.altText}>{alternative.note || "同区域备选"}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          ) : null}
         </ScrollView>
 
         <View style={styles.actionRow}>
-          <Pressable style={styles.secondaryButton} onPress={onToggleLock}>
-            <Text style={styles.secondaryButtonText}>{block.locked ? "取消锁定" : "锁定这一站"}</Text>
-          </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={onRemoveBlock}>
-            <Text style={styles.secondaryButtonText}>移除这站</Text>
-          </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={onAskAI}>
-            <Text style={styles.secondaryButtonText}>问 AI</Text>
+          <Pressable style={styles.secondaryButton} onPress={onClose}>
+            <Text style={styles.secondaryButtonText}>收起</Text>
           </Pressable>
           <Pressable style={styles.primaryButton} onPress={onNavigate}>
             <Text style={styles.primaryButtonText}>导航</Text>
@@ -320,38 +232,6 @@ const styles = StyleSheet.create({
     color: "#5d7182",
     fontSize: 14,
     lineHeight: 22,
-  },
-  detailStatusRow: {
-    marginTop: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  detailStatusText: {
-    color: "#5e7486",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  altWrap: {
-    marginTop: 10,
-    gap: 10,
-  },
-  altCard: {
-    borderRadius: 18,
-    backgroundColor: "#f6fbff",
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-  },
-  altTitle: {
-    color: "#0b1723",
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  altText: {
-    marginTop: 6,
-    color: "#698092",
-    fontSize: 13,
-    lineHeight: 19,
   },
   actionRow: {
     marginTop: 18,

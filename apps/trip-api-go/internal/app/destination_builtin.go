@@ -29,28 +29,6 @@ var destinationCandidates = []destinationCandidate{
 	{ID: "builtin:cn-xian", Name: "西安市", DisplayName: "中国陕西省西安市", Country: "中国", Region: "陕西", Adcode: "610100", CityCode: "029", Lat: 34.3416, Lng: 108.9398, Provider: "builtin", ProviderPlaceID: "cn-xian", MatchType: "city", Keywords: []string{"xian", "xi'an"}},
 	{ID: "builtin:cn-guangzhou", Name: "广州市", DisplayName: "中国广东省广州市", Country: "中国", Region: "广东", Adcode: "440100", CityCode: "020", Lat: 23.1291, Lng: 113.2644, Provider: "builtin", ProviderPlaceID: "cn-guangzhou", MatchType: "city", Keywords: []string{"guangzhou"}},
 	{ID: "builtin:cn-shenzhen", Name: "深圳市", DisplayName: "中国广东省深圳市", Country: "中国", Region: "广东", Adcode: "440300", CityCode: "0755", Lat: 22.5431, Lng: 114.0579, Provider: "builtin", ProviderPlaceID: "cn-shenzhen", MatchType: "city", Keywords: []string{"shenzhen"}},
-	{ID: "builtin:jp-tokyo", Name: "东京都", DisplayName: "日本东京都", Country: "日本", Region: "东京都", Adcode: "jp-13", CityCode: "03", Lat: 35.6762, Lng: 139.6503, Provider: "builtin", ProviderPlaceID: "jp-tokyo", MatchType: "city", Keywords: []string{"tokyo"}},
-	{ID: "builtin:jp-kyoto", Name: "京都市", DisplayName: "日本京都府京都市", Country: "日本", Region: "京都府", Adcode: "jp-26", CityCode: "075", Lat: 35.0116, Lng: 135.7681, Provider: "builtin", ProviderPlaceID: "jp-kyoto", MatchType: "city", Keywords: []string{"kyoto"}},
-	{ID: "builtin:jp-osaka", Name: "大阪市", DisplayName: "日本大阪府大阪市", Country: "日本", Region: "大阪府", Adcode: "jp-27", CityCode: "06", Lat: 34.6937, Lng: 135.5023, Provider: "builtin", ProviderPlaceID: "jp-osaka", MatchType: "city", Keywords: []string{"osaka"}},
-	{ID: "builtin:kr-seoul", Name: "首尔", DisplayName: "韩国首尔特别市", Country: "韩国", Region: "首尔", Adcode: "kr-11", CityCode: "02", Lat: 37.5665, Lng: 126.9780, Provider: "builtin", ProviderPlaceID: "kr-seoul", MatchType: "city", Keywords: []string{"seoul"}},
-}
-
-func searchDestinations(query string, limit int) []map[string]any {
-	items, _ := matchDestinationCandidates(query, limit)
-	out := make([]map[string]any, 0, len(items))
-	for _, item := range items {
-		out = append(out, map[string]any{
-			"id":           item.ID,
-			"name":         item.Name,
-			"display_name": item.DisplayName,
-			"country":      item.Country,
-			"region":       item.Region,
-			"city_code":    item.CityCode,
-			"lat":          item.Lat,
-			"lng":          item.Lng,
-		})
-	}
-	return out
 }
 
 func resolveDestinations(query string, limit int) DestinationResolveResponse {
@@ -115,16 +93,9 @@ func matchDestinationCandidates(query string, limit int) ([]destinationCandidate
 			ID:              "custom:" + trimmedQuery,
 			Name:            trimmedQuery,
 			DisplayName:     trimmedQuery,
-			Country:         "",
-			Region:          "",
-			Adcode:          "",
-			CityCode:        "",
-			Lat:             0,
-			Lng:             0,
 			Provider:        "custom",
-			ProviderPlaceID: "",
 			MatchType:       "custom",
-			Keywords:        nil,
+			ProviderPlaceID: "",
 		})
 		return out, true
 	}
