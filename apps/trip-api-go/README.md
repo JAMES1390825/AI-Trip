@@ -1,6 +1,6 @@
 # trip-api-go
 
-Go backend for Trip Planner web client.
+Go backend for the Trip Planner core line (Go backend + iOS app).
 
 ## Tech Stack
 
@@ -11,7 +11,6 @@ Go backend for Trip Planner web client.
 ## Run
 
 ```bash
-export AI_SERVICE_BASE_URL=http://127.0.0.1:8091
 cd apps/trip-api-go
 go run ./cmd/trip-api-go
 ```
@@ -35,45 +34,29 @@ Server listens on `http://127.0.0.1:8080` by default.
 - `CORS_ALLOWED_ORIGIN_1` (default: `http://localhost:5500`)
 - `CORS_ALLOWED_ORIGIN_2` (default: `http://127.0.0.1:5500`)
 - `DATA_FILE` (default: `tmp/data/trip-api-go-store.json`)
-- `COMMUNITY_MEDIA_DIR` (default: `tmp/data/community-media`)
 - `AMAP_API_KEY` (optional but recommended for real POI / route / weather)
 - `AMAP_BASE_URL` (default: `https://restapi.amap.com`)
 - `AMAP_TIMEOUT_MS` (default: `3500`)
 - `AI_SERVICE_BASE_URL` (optional, e.g. `http://127.0.0.1:8091`)
-- `AI_SERVICE_API_KEY` / `AI_SERVICE_INTERNAL_TOKEN` (optional shared secret)
+- `AI_SERVICE_API_KEY` / `AI_SERVICE_INTERNAL_TOKEN` / `BAILIAN_API_KEY` (optional token)
+- `AI_SERVICE_MODEL_NAME` / `BAILIAN_MODEL_NAME` (optional model override)
 - `AI_SERVICE_TIMEOUT_MS` (default: `4000`)
 
-社区图片上传当前是本地开发 MVP：
+运行 purified backend 前，请先清理旧产品线遗留的本地 store 文件，默认路径是 `tmp/data/trip-api-go-store.json`：
 
-- `POST /api/v1/community/media` 接收认证后的 `multipart/form-data`
-- `GET /api/v1/community/media/{filename}` 公开读取图片
-- 文件默认落到 `COMMUNITY_MEDIA_DIR`
-- 当前未接对象存储、缩略图和异步媒体处理链路
+```bash
+rm -f tmp/data/trip-api-go-store.json
+```
 
 ## API Surface
 
 - `GET /api/v1/health`
 - `POST /api/v1/auth/token`
-- `POST /api/v1/chat/intake/next`
 - `GET /api/v1/destinations/resolve`
 - `POST /api/v1/plans/brief`
 - `POST /api/v1/plans/generate-v2`
 - `POST /api/v1/plans/validate`
-- `GET /api/v1/places/:provider/:place_id`
-- `POST /api/v1/plans/generate`
-- `POST /api/v1/plans/replan`
 - `POST /api/v1/plans/save`
 - `GET /api/v1/plans/saved`
 - `GET /api/v1/plans/saved/:id`
-- `GET /api/v1/plans/saved/:id/summary`
 - `DELETE /api/v1/plans/saved/:id`
-- `POST /api/v1/community/media`
-- `GET /api/v1/community/media/:filename`
-- `POST /api/v1/community/posts`
-- `GET /api/v1/community/posts`
-- `GET /api/v1/community/posts/:id`
-- `POST /api/v1/community/posts/:id/vote`
-- `POST /api/v1/community/posts/:id/report`
-- `POST /api/v1/events`
-- `GET /api/v1/events/summary` (ADMIN)
-- `GET /api/v1/events/recent` (ADMIN)

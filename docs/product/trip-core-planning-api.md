@@ -13,6 +13,7 @@
 - `POST /api/v1/plans/save`
 - `GET /api/v1/plans/saved`
 - `GET /api/v1/plans/saved/:id`
+- `DELETE /api/v1/plans/saved/:id`
 
 ## Contract notes
 
@@ -47,6 +48,10 @@
 ### `GET /api/v1/plans/saved/:id`
 
 返回单个已保存 itinerary 的完整详情，供回看页面直接消费。
+
+### `DELETE /api/v1/plans/saved/:id`
+
+删除指定 saved itinerary；删除成功返回 `204 No Content`。
 
 ## Out of scope
 
