@@ -13,6 +13,7 @@ import { RUNTIME_CONFIG } from "../../config/runtime";
 import type { ItineraryBlock, ItineraryLeg, ItineraryView, ValidationResult } from "../../types/itinerary";
 import { blockHasCoord, clamp, formatHourRange, groupDayLabel, toItineraryView } from "../../utils/itinerary";
 import { PoiDetailSheet } from "./PoiDetailSheet";
+import { buildResultExplainability } from "./result-explainability";
 
 type GeoPoint = {
   latitude: number;
@@ -407,6 +408,7 @@ export function MapResultView({ itinerary, onBack, onPlanSaved }: MapResultViewP
   const [lastSavedFingerprint, setLastSavedFingerprint] = useState("");
   const [saveHint, setSaveHint] = useState<{ text: string; tone: SaveHintTone } | null>(null);
   const itineraryView = useMemo(() => toItineraryView(localItinerary), [localItinerary]);
+  const explainability = useMemo(() => buildResultExplainability(itineraryView), [itineraryView]);
   const mapRef = useRef<any>(null);
   const mapZoomRef = useRef(12.8);
   const mapRegionRef = useRef<NativeMapRegion>(defaultMapRegion);
@@ -807,6 +809,45 @@ export function MapResultView({ itinerary, onBack, onPlanSaved }: MapResultViewP
                 ? `${currentSummary?.transitMinutes ?? dayTransitMinutes(itineraryView.legs, currentDay.dayIndex)} 分钟`
                 : "多日"}
             </Text>
+          </View>
+
+          <View style={styles.explainCard}>
+            <View style={styles.explainHeader}>
+              <Text style={styles.explainTitle}>可信度与校验</Text>
+              <View
+                style={[
+                  styles.explainBadge,
+                  explainability.validation.tone === "success"
+                    ? styles.explainBadgeSuccess
+                    : explainability.validation.tone === "warn"
+                      ? styles.explainBadgeWarn
+                      : styles.explainBadgeNeutral,
+                ]}
+              >
+                <Text style={styles.explainBadgeText}>{explainability.validation.label}</Text>
+              </View>
+            </View>
+            <Text style={styles.explainConfidence}>可信度 {explainability.confidenceText}</Text>
+            <Text style={styles.explainDetail}>{explainability.validation.detail}</Text>
+            <Text style={styles.explainDetail}>数据来源：{explainability.sourceModeText}</Text>
+            {explainability.degradedMessage ? (
+              <Text style={styles.explainDegraded}>{explainability.degradedMessage}</Text>
+            ) : null}
+            {explainability.coverageItems.length ? (
+              <View style={styles.explainMetricWrap}>
+                {explainability.coverageItems.map((item) => (
+                  <View key={item.label} style={styles.explainMetricChip}>
+                    <Text style={styles.explainMetricLabel}>{item.label}</Text>
+                    <Text style={styles.explainMetricValue}>{item.value}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            {explainability.issuePreview.map((item) => (
+              <Text key={item} style={styles.explainIssue}>
+                {item}
+              </Text>
+            ))}
           </View>
 
           {diagnostics.length ? (
@@ -1212,6 +1253,89 @@ const styles = StyleSheet.create({
     color: "#7a8d9e",
     fontSize: 13,
     fontWeight: "700",
+  },
+  explainCard: {
+    borderRadius: 22,
+    backgroundColor: "#fffdf7",
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: "#efe3b2",
+    gap: 8,
+  },
+  explainHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+  },
+  explainTitle: {
+    color: "#14202c",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  explainBadge: {
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  explainBadgeSuccess: {
+    backgroundColor: "#ddf7ea",
+  },
+  explainBadgeWarn: {
+    backgroundColor: "#ffe7da",
+  },
+  explainBadgeNeutral: {
+    backgroundColor: "#edf3fa",
+  },
+  explainBadgeText: {
+    color: "#203246",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  explainConfidence: {
+    color: "#0a1320",
+    fontSize: 24,
+    fontWeight: "800",
+  },
+  explainDetail: {
+    color: "#5b6d7f",
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  explainDegraded: {
+    color: "#9a4d14",
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: "700",
+  },
+  explainMetricWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  explainMetricChip: {
+    minWidth: 92,
+    borderRadius: 16,
+    backgroundColor: "#f6f8fb",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  explainMetricLabel: {
+    color: "#6c7f91",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  explainMetricValue: {
+    marginTop: 4,
+    color: "#112133",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  explainIssue: {
+    color: "#7f4820",
+    fontSize: 13,
+    lineHeight: 20,
   },
   diagnosticCard: {
     borderRadius: 22,
