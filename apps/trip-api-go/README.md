@@ -73,13 +73,13 @@ rm -f tmp/data/trip-api-go-store.json
 
 ## API Surface
 
-- `GET /api/v1/health`
-- `POST /api/v1/auth/token`
-- `GET /api/v1/destinations/resolve`
-- `POST /api/v1/plans/brief`
-- `POST /api/v1/plans/generate-v2`
-- `POST /api/v1/plans/validate`
-- `POST /api/v1/plans/save`
-- `GET /api/v1/plans/saved`
-- `GET /api/v1/plans/saved/:id`
-- `DELETE /api/v1/plans/saved/:id`
+- `/api/v1/health`（GET）
+- `/api/v1/auth/token`（POST）
+- `/api/v1/destinations/resolve`（GET）
+- `/api/v1/plans/brief`（POST）
+- `/api/v1/plans/generate-v2`（POST）
+- `/api/v1/plans/validate`（POST）
+- `/api/v1/plans/save`（POST）
+- `/api/v1/plans/saved`（GET）
+- `/api/v1/plans/saved/:id`（GET）
+- `/api/v1/plans/saved/:id`（DELETE）
