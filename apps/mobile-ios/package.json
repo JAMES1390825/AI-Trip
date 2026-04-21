@@ -7,7 +7,7 @@
     "start": "expo start",
     "ios": "expo start --ios",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test src/**/*.test.ts"
+    "test": "rm -rf .tmp-tests && tsc -p tsconfig.test.json && node --test $(find .tmp-tests -name '*.test.js' -print)"
   },
   "dependencies": {
     "expo": "~53.0.20",
