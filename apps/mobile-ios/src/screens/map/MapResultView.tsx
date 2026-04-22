@@ -13,6 +13,8 @@ import { RUNTIME_CONFIG } from "../../config/runtime";
 import type { ItineraryBlock, ItineraryLeg, ItineraryView, ValidationResult } from "../../types/itinerary";
 import { blockHasCoord, clamp, formatHourRange, groupDayLabel, toItineraryView } from "../../utils/itinerary";
 import { PoiDetailSheet } from "./PoiDetailSheet";
+import { buildResultExplainability } from "./result-explainability";
+import type { PlanVariantView } from "./result-variants";
 
 type GeoPoint = {
   latitude: number;
@@ -69,6 +71,7 @@ type DaySelection = "all" | number;
 
 type MapResultViewProps = {
   itinerary: Record<string, unknown>;
+  variants?: PlanVariantView[];
   onBack: () => void;
   onPlanSaved?: (savedPlanId: string, itinerary: Record<string, unknown>) => void;
 };
@@ -393,9 +396,10 @@ function findDiagnostics(raw: Record<string, unknown>): Array<Record<string, unk
   return asArray(raw.diagnostics).filter((item): item is Record<string, unknown> => isRecord(item));
 }
 
-export function MapResultView({ itinerary, onBack, onPlanSaved }: MapResultViewProps) {
+export function MapResultView({ itinerary, variants = [], onBack, onPlanSaved }: MapResultViewProps) {
   const api = useMemo(() => new TripApiClient(() => RUNTIME_CONFIG), []);
   const [localItinerary, setLocalItinerary] = useState<Record<string, unknown>>(itinerary);
+  const [activeVariantKey, setActiveVariantKey] = useState("");
   const [status, setStatus] = useState("已生成地图行程");
   const [selectedDay, setSelectedDay] = useState<DaySelection>("all");
   const [todayMode, setTodayMode] = useState(false);
@@ -407,6 +411,7 @@ export function MapResultView({ itinerary, onBack, onPlanSaved }: MapResultViewP
   const [lastSavedFingerprint, setLastSavedFingerprint] = useState("");
   const [saveHint, setSaveHint] = useState<{ text: string; tone: SaveHintTone } | null>(null);
   const itineraryView = useMemo(() => toItineraryView(localItinerary), [localItinerary]);
+  const explainability = useMemo(() => buildResultExplainability(itineraryView), [itineraryView]);
   const mapRef = useRef<any>(null);
   const mapZoomRef = useRef(12.8);
   const mapRegionRef = useRef<NativeMapRegion>(defaultMapRegion);
@@ -417,6 +422,20 @@ export function MapResultView({ itinerary, onBack, onPlanSaved }: MapResultViewP
     setSavedPlanId("");
     setLastSavedFingerprint("");
   }, [itinerary]);
+
+  useEffect(() => {
+    setActiveVariantKey(variants[0]?.key || "");
+  }, [variants]);
+
+  const activeVariant = useMemo(() => {
+    if (!variants.length) return null;
+    return variants.find((item) => item.key === activeVariantKey) || variants[0];
+  }, [activeVariantKey, variants]);
+
+  useEffect(() => {
+    if (!activeVariant) return;
+    setLocalItinerary(activeVariant.itinerary);
+  }, [activeVariant]);
 
   const todayIndex = useMemo(() => {
     if (!itineraryView) return null;
@@ -781,6 +800,25 @@ export function MapResultView({ itinerary, onBack, onPlanSaved }: MapResultViewP
             })}
           </View>
 
+          {variants.length > 1 ? (
+            <View style={styles.variantRow}>
+              {variants.map((item) => {
+                const active = item.key === (activeVariant?.key || "");
+                return (
+                  <Pressable
+                    key={item.key}
+                    style={[styles.variantChip, active ? styles.variantChipActive : null]}
+                    onPress={() => setActiveVariantKey(item.key)}
+                  >
+                    <Text style={[styles.variantChipText, active ? styles.variantChipTextActive : null]}>
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+
           {itineraryView.todayHint ? (
             <View style={styles.todayHintCard}>
               <Text style={styles.todayHintLabel}>今天建议</Text>
@@ -807,6 +845,45 @@ export function MapResultView({ itinerary, onBack, onPlanSaved }: MapResultViewP
                 ? `${currentSummary?.transitMinutes ?? dayTransitMinutes(itineraryView.legs, currentDay.dayIndex)} 分钟`
                 : "多日"}
             </Text>
+          </View>
+
+          <View style={styles.explainCard}>
+            <View style={styles.explainHeader}>
+              <Text style={styles.explainTitle}>可信度与校验</Text>
+              <View
+                style={[
+                  styles.explainBadge,
+                  explainability.validation.tone === "success"
+                    ? styles.explainBadgeSuccess
+                    : explainability.validation.tone === "warn"
+                      ? styles.explainBadgeWarn
+                      : styles.explainBadgeNeutral,
+                ]}
+              >
+                <Text style={styles.explainBadgeText}>{explainability.validation.label}</Text>
+              </View>
+            </View>
+            <Text style={styles.explainConfidence}>可信度 {explainability.confidenceText}</Text>
+            <Text style={styles.explainDetail}>{explainability.validation.detail}</Text>
+            <Text style={styles.explainDetail}>数据来源：{explainability.sourceModeText}</Text>
+            {explainability.degradedMessage ? (
+              <Text style={styles.explainDegraded}>{explainability.degradedMessage}</Text>
+            ) : null}
+            {explainability.coverageItems.length ? (
+              <View style={styles.explainMetricWrap}>
+                {explainability.coverageItems.map((item) => (
+                  <View key={item.label} style={styles.explainMetricChip}>
+                    <Text style={styles.explainMetricLabel}>{item.label}</Text>
+                    <Text style={styles.explainMetricValue}>{item.value}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            {explainability.issuePreview.map((item) => (
+              <Text key={item} style={styles.explainIssue}>
+                {item}
+              </Text>
+            ))}
           </View>
 
           {diagnostics.length ? (
@@ -1137,6 +1214,27 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
   },
+  variantRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  variantChip: {
+    borderRadius: 16,
+    backgroundColor: "#eef4fa",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  variantChipActive: {
+    backgroundColor: "#173051",
+  },
+  variantChipText: {
+    color: "#5b7186",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  variantChipTextActive: {
+    color: "#ffffff",
+  },
   modeChip: {
     borderRadius: 16,
     backgroundColor: "#f1f5f8",
@@ -1212,6 +1310,89 @@ const styles = StyleSheet.create({
     color: "#7a8d9e",
     fontSize: 13,
     fontWeight: "700",
+  },
+  explainCard: {
+    borderRadius: 22,
+    backgroundColor: "#fffdf7",
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: "#efe3b2",
+    gap: 8,
+  },
+  explainHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+  },
+  explainTitle: {
+    color: "#14202c",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  explainBadge: {
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  explainBadgeSuccess: {
+    backgroundColor: "#ddf7ea",
+  },
+  explainBadgeWarn: {
+    backgroundColor: "#ffe7da",
+  },
+  explainBadgeNeutral: {
+    backgroundColor: "#edf3fa",
+  },
+  explainBadgeText: {
+    color: "#203246",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  explainConfidence: {
+    color: "#0a1320",
+    fontSize: 24,
+    fontWeight: "800",
+  },
+  explainDetail: {
+    color: "#5b6d7f",
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  explainDegraded: {
+    color: "#9a4d14",
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: "700",
+  },
+  explainMetricWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  explainMetricChip: {
+    minWidth: 92,
+    borderRadius: 16,
+    backgroundColor: "#f6f8fb",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  explainMetricLabel: {
+    color: "#6c7f91",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  explainMetricValue: {
+    marginTop: 4,
+    color: "#112133",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  explainIssue: {
+    color: "#7f4820",
+    fontSize: 13,
+    lineHeight: 20,
   },
   diagnosticCard: {
     borderRadius: 22,
