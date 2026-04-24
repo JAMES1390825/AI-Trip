@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import MapView, { Marker } from "react-native-maps";
 import { StyleSheet, Text, View } from "react-native";
 import { TripApiClient } from "../../api/client";
 import { RUNTIME_CONFIG } from "../../config/runtime";
@@ -33,11 +34,6 @@ type GeoRegion = {
   longitudeDelta: number;
 };
 
-type MapLibraryModule = {
-  default?: React.ComponentType<any>;
-  Marker?: React.ComponentType<any>;
-};
-
 const generatingPhases = [
   "正在确认目的地与规划 brief",
   "正在组装候选点位与路线证据",
@@ -51,18 +47,6 @@ const defaultRegion: GeoRegion = {
   latitudeDelta: 0.22,
   longitudeDelta: 0.22,
 };
-
-function loadMapLibrary(): MapLibraryModule {
-  try {
-    return require("react-native-maps") as MapLibraryModule;
-  } catch {
-    return {};
-  }
-}
-
-const mapLibrary = loadMapLibrary();
-const NativeMapView = mapLibrary.default || null;
-const NativeMarker = mapLibrary.Marker || null;
 
 function endDateFromRange(startDate: string, totalDays: number): string {
   const parsed = Date.parse(startDate || "");
@@ -362,26 +346,17 @@ export function MapFlowScreen({
   return (
     <View style={styles.screen}>
       <View style={styles.mapWrap}>
-        {NativeMapView ? (
-          <NativeMapView style={styles.nativeMap} region={mapRegion}>
-            {NativeMarker && selectedDestination ? (
-              <NativeMarker
-                coordinate={{
-                  latitude: selectedDestination.center_lat,
-                  longitude: selectedDestination.center_lng,
-                }}
-                title={selectedDestination.destination_label}
-              />
-            ) : null}
-          </NativeMapView>
-        ) : (
-          <View style={styles.mapFallback}>
-            <View style={styles.mapGrid} />
-            <View style={[styles.mapPin, { left: "24%", top: "26%" }]} />
-            <View style={[styles.mapPin, styles.mapPinAlt, { left: "58%", top: "42%" }]} />
-            <View style={[styles.mapPin, styles.mapPinWarm, { left: "42%", top: "64%" }]} />
-          </View>
-        )}
+        <MapView style={styles.nativeMap} region={mapRegion}>
+          {selectedDestination ? (
+            <Marker
+              coordinate={{
+                latitude: selectedDestination.center_lat,
+                longitude: selectedDestination.center_lng,
+              }}
+              title={selectedDestination.destination_label}
+            />
+          ) : null}
+        </MapView>
 
         <View style={styles.topChrome}>
           <View style={styles.chromeButton}>
@@ -465,31 +440,6 @@ const styles = StyleSheet.create({
   },
   nativeMap: {
     ...StyleSheet.absoluteFillObject,
-  },
-  mapFallback: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#d9e7f0",
-  },
-  mapGrid: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "transparent",
-    borderColor: "rgba(255,255,255,0.12)",
-    borderWidth: 0,
-  },
-  mapPin: {
-    position: "absolute",
-    width: 16,
-    height: 16,
-    borderRadius: 999,
-    backgroundColor: "#1d4ed8",
-    borderWidth: 3,
-    borderColor: "#ffffff",
-  },
-  mapPinAlt: {
-    backgroundColor: "#0f766e",
-  },
-  mapPinWarm: {
-    backgroundColor: "#ea580c",
   },
   topChrome: {
     position: "absolute",
