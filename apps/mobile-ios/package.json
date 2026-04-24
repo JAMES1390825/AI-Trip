@@ -5,11 +5,13 @@
   "main": "expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
-    "ios": "expo start --ios",
+    "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
-    "test": "sh -c 'rm -rf .tmp-tests && tsc -p tsconfig.test.json && node --test $(find .tmp-tests -name \"*.test.js\" -print); status=$?; rm -rf .tmp-tests; exit $status'"
+    "test": "sh -c 'rm -rf .tmp-tests && tsc -p tsconfig.test.json && node --test $(find .tmp-tests -name \"*.test.js\" -print); status=$?; rm -rf .tmp-tests; exit $status'",
+    "android": "expo run:android"
   },
   "dependencies": {
+    "@spatacus/react-native-amap-sdk": "^2.0.6",
     "expo": "~53.0.20",
     "expo-image-picker": "^55.0.14",
     "expo-location": "~18.1.6",

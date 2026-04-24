@@ -3,6 +3,7 @@ node_modules
 .expo-shared
 .expo-export
 .expo-export-ios
+ios
 dist
 npm-debug.*
 yarn-debug.*
