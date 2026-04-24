@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import MapView, { Marker } from "react-native-maps";
+import { MapView as AMapView, Marker as AMapMarker } from "@spatacus/react-native-amap-sdk";
 import { StyleSheet, Text, View } from "react-native";
 import { TripApiClient } from "../../api/client";
 import { RUNTIME_CONFIG } from "../../config/runtime";
@@ -346,9 +346,21 @@ export function MapFlowScreen({
   return (
     <View style={styles.screen}>
       <View style={styles.mapWrap}>
-        <MapView style={styles.nativeMap} region={mapRegion}>
+        <AMapView
+          style={styles.nativeMap}
+          coordinate={{ latitude: mapRegion.latitude, longitude: mapRegion.longitude }}
+          zoomLevel={12.5}
+          zoomEnabled
+          scrollEnabled
+          rotateEnabled={false}
+          tiltEnabled={false}
+          showsCompass={false}
+          showsScale={false}
+          showsIndoorMap={false}
+          showsTraffic={false}
+        >
           {selectedDestination ? (
-            <Marker
+            <AMapMarker
               coordinate={{
                 latitude: selectedDestination.center_lat,
                 longitude: selectedDestination.center_lng,
@@ -356,7 +368,7 @@ export function MapFlowScreen({
               title={selectedDestination.destination_label}
             />
           ) : null}
-        </MapView>
+        </AMapView>
 
         <View style={styles.topChrome}>
           <View style={styles.chromeButton}>

@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import { MapView as AMapView, Marker as AMapMarker } from "@spatacus/react-native-amap-sdk";
 import { TripApiClient } from "../../api/client";
 import { RUNTIME_CONFIG } from "../../config/runtime";
 import type { ItineraryBlock, ItineraryLeg, ItineraryView, ValidationResult } from "../../types/itinerary";
@@ -484,10 +484,6 @@ export function MapResultView({ itinerary, variants = [], onBack, onPlanSaved }:
     return map;
   }, [itineraryView?.daySummaries]);
 
-  const mapProjection = useMemo(
-    () => buildMapProjection(mapBlocks, visibleLegs, mapSize.width, mapSize.height),
-    [mapBlocks, mapSize.height, mapSize.width, visibleLegs],
-  );
   const nativeMapData = useMemo(() => buildNativeMapData(mapBlocks, visibleLegs), [mapBlocks, visibleLegs]);
   const nativeMapRegion = useMemo(
     () => buildNativeMapRegion(nativeMapData.markers, nativeMapData.routes),
@@ -495,8 +491,17 @@ export function MapResultView({ itinerary, variants = [], onBack, onPlanSaved }:
   );
 
   useEffect(() => {
-    if (!nativeMapRegion || !mapRef.current?.animateToRegion) return;
-    mapRef.current.animateToRegion(nativeMapRegion, 280);
+    if (!nativeMapRegion || !mapRef.current?.animateTo) return;
+    mapRef.current.animateTo(
+      {
+        coordinate: {
+          latitude: nativeMapRegion.latitude,
+          longitude: nativeMapRegion.longitude,
+        },
+        zoomLevel: 12.8,
+      },
+      280,
+    );
     mapZoomRef.current = approxZoomFromRegion(nativeMapRegion);
     mapRegionRef.current = nativeMapRegion;
   }, [
@@ -513,16 +518,15 @@ export function MapResultView({ itinerary, variants = [], onBack, onPlanSaved }:
     const mapInst = mapRef.current as any;
     const nextZoom = clamp(mapZoomRef.current, 6, 18.5);
 
-    if (Platform.OS !== "ios" && typeof mapInst.animateCamera === "function") {
-      mapInst.animateCamera({ center: marker.coordinate, zoom: nextZoom }, { duration: 260 });
+    if (typeof mapInst.animateTo === "function") {
+      mapInst.animateTo(
+        {
+          coordinate: marker.coordinate,
+          zoomLevel: nextZoom,
+        },
+        260,
+      );
       return;
-    }
-
-    if (typeof mapInst.animateToRegion === "function") {
-      const nextRegion = regionFromZoom(marker.coordinate, nextZoom);
-      mapRegionRef.current = nextRegion;
-      mapZoomRef.current = approxZoomFromRegion(nextRegion);
-      mapInst.animateToRegion(nextRegion, 260);
     }
   }, [nativeMapData.markers, selectedBlock]);
 
@@ -617,34 +621,25 @@ export function MapResultView({ itinerary, variants = [], onBack, onPlanSaved }:
           );
         }}
       >
-        <MapView
+        <AMapView
             ref={mapRef}
             style={styles.nativeMap}
-            initialRegion={nativeMapRegion || defaultMapRegion}
+            coordinate={{
+              latitude: (nativeMapRegion || defaultMapRegion).latitude,
+              longitude: (nativeMapRegion || defaultMapRegion).longitude,
+            }}
+            zoomLevel={12.8}
             zoomEnabled
             scrollEnabled
             showsCompass={false}
             showsScale={false}
-            toolbarEnabled={false}
-            pitchEnabled={false}
+            tiltEnabled={false}
             rotateEnabled={false}
-            loadingEnabled
-            moveOnMarkerPress={false}
-            onRegionChangeComplete={(region: NativeMapRegion) => {
-              mapRegionRef.current = region;
-              mapZoomRef.current = approxZoomFromRegion(region);
-            }}
+            showsIndoorMap={false}
+            showsTraffic={false}
           >
-            {nativeMapData.routes.map((route) => (
-              <Polyline
-                key={route.key}
-                coordinates={route.coordinates}
-                strokeColor="rgba(20,195,220,0.72)"
-                strokeWidth={5}
-              />
-            ))}
             {nativeMapData.markers.map((item) => (
-              <Marker
+              <AMapMarker
                 key={item.key}
                 coordinate={item.coordinate}
                 title={item.poi || "待确认地点"}
@@ -660,7 +655,7 @@ export function MapResultView({ itinerary, variants = [], onBack, onPlanSaved }:
                 }}
               />
             ))}
-          </MapView>
+          </AMapView>
 
         <View style={styles.topBar}>
           <Pressable style={styles.topButton} onPress={onBack}>

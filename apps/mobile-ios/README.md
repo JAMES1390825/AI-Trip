@@ -34,6 +34,13 @@ npm install
 npm run ios
 ```
 
+说明：
+
+1. `npm run ios` 现在走的是 `expo run:ios`
+2. 这是因为当前 iOS 端已经开始依赖原生地图 SDK，不能再只用 Expo Go
+3. 首次运行前会执行 Expo prebuild，并生成本地 `ios/` 工程
+4. 如果本机没有 `CocoaPods`，需要先安装后再运行
+
 也可以在仓库根目录先查看统一入口：
 
 ```bash
@@ -41,11 +48,11 @@ bash scripts/dev.sh help
 bash scripts/dev.sh up-local
 ```
 
-如需确保地图依赖与 Expo 版本完全匹配，可执行：
+如需重新生成 iOS 原生工程，可执行：
 
 ```bash
 cd apps/mobile-ios
-npm exec expo install react-native-maps
+npx expo prebuild --platform ios --clean
 ```
 
 ## 验证
@@ -79,9 +86,10 @@ bash scripts/dev.sh ios-typecheck
 - `EXPO_PUBLIC_API_BASE`（默认 `http://127.0.0.1:8080`）
 - `EXPO_PUBLIC_BOOTSTRAP_SECRET`（默认 `dev-bootstrap-secret`）
 - `EXPO_PUBLIC_USER_ID`（默认自动生成）
+- `AMAP_API_KEY`（iOS 高德原生地图 SDK 使用）
 
 可在启动前临时指定，例如：
 
 ```bash
-EXPO_PUBLIC_API_BASE=http://127.0.0.1:8080 npm run ios
+EXPO_PUBLIC_API_BASE=http://127.0.0.1:8080 AMAP_API_KEY=your-amap-key npm run ios
 ```
