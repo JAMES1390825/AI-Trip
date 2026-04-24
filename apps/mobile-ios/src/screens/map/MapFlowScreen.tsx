@@ -1,26 +1,21 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { TripApiClient } from "../../api/client";
 import { RUNTIME_CONFIG } from "../../config/runtime";
-import {
-  type BudgetLevel,
-  type DestinationEntity,
-  type PaceLevel,
-  type PlanningBriefRequest,
-} from "../../types/plan";
+import { type DestinationEntity, type PlanningBriefRequest } from "../../types/plan";
 import { defaultStartDate } from "../../utils/date";
 import { extractPrimaryItinerary, toItineraryView } from "../../utils/itinerary";
-import { DatePickerSheet } from "./DatePickerSheet";
-import { DestinationSearchView } from "./DestinationSearchView";
 import { GeneratingView } from "./GeneratingView";
 import { MapResultView } from "./MapResultView";
 import { PlanEntryView } from "./PlanEntryView";
-import { extractPlanVariants, type PlanVariantView } from "./result-variants";
 import {
-  buildPlanEntryGuidance,
-  interpretSuggestedOption,
-  resolveMissingFieldsAfterSuggestion,
-} from "./plan-entry-guidance";
+  applyDateRangeSelection,
+  buildCalendarMonth,
+  buildPlanningEntryFeedback,
+  deriveDaysFromRange,
+  isPlanningEntryReady,
+} from "./planning-page-default-state";
+import { extractPlanVariants, type PlanVariantView } from "./result-variants";
 
 type MapFlowScreenProps = {
   preloadedItinerary?: Record<string, unknown> | null;
@@ -28,7 +23,19 @@ type MapFlowScreenProps = {
   onPlanSaved?: (savedPlanId: string, itinerary: Record<string, unknown>) => void;
 };
 
-type FlowMode = "entry" | "search" | "generating" | "result";
+type FlowMode = "entry" | "generating" | "result";
+
+type GeoRegion = {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+};
+
+type MapLibraryModule = {
+  default?: React.ComponentType<any>;
+  Marker?: React.ComponentType<any>;
+};
 
 const generatingPhases = [
   "正在确认目的地与规划 brief",
@@ -36,6 +43,46 @@ const generatingPhases = [
   "正在排布每日动线与时间窗口",
   "正在校验可信度与降级状态",
 ];
+
+const defaultRegion: GeoRegion = {
+  latitude: 31.2304,
+  longitude: 121.4737,
+  latitudeDelta: 0.22,
+  longitudeDelta: 0.22,
+};
+
+function loadMapLibrary(): MapLibraryModule {
+  try {
+    return require("react-native-maps") as MapLibraryModule;
+  } catch {
+    return {};
+  }
+}
+
+const mapLibrary = loadMapLibrary();
+const NativeMapView = mapLibrary.default || null;
+const NativeMarker = mapLibrary.Marker || null;
+
+function endDateFromRange(startDate: string, totalDays: number): string {
+  const parsed = Date.parse(startDate || "");
+  if (!Number.isFinite(parsed) || totalDays <= 0) return "";
+  const date = new Date(parsed);
+  date.setDate(date.getDate() + totalDays - 1);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function mapRegionForDestination(destination: DestinationEntity | null): GeoRegion {
+  if (!destination) return defaultRegion;
+  if (!Number.isFinite(destination.center_lat) || !Number.isFinite(destination.center_lng)) return defaultRegion;
+  return {
+    latitude: destination.center_lat,
+    longitude: destination.center_lng,
+    latitudeDelta: 0.16,
+    longitudeDelta: 0.16,
+  };
+}
 
 function formatSuccessText(itinerary: Record<string, unknown> | null): string {
   const view = toItineraryView(itinerary);
@@ -55,26 +102,28 @@ export function MapFlowScreen({
 }: MapFlowScreenProps) {
   const api = useMemo(() => new TripApiClient(() => RUNTIME_CONFIG), []);
   const requestIdRef = useRef(0);
+  const focusTriggerRef = useRef(0);
   const [flowMode, setFlowMode] = useState<FlowMode>("entry");
   const [destination, setDestination] = useState("");
   const [selectedDestination, setSelectedDestination] = useState<DestinationEntity | null>(null);
-  const [startDate, setStartDate] = useState(defaultStartDate(15));
-  const [days, setDays] = useState(3);
-  const [flexibleDays, setFlexibleDays] = useState(false);
+  const [destinationSearchOpen, setDestinationSearchOpen] = useState(false);
+  const [destinationResults, setDestinationResults] = useState<DestinationEntity[]>([]);
+  const [destinationSearchStatus, setDestinationSearchStatus] = useState("");
+  const [destinationSearchLoading, setDestinationSearchLoading] = useState(false);
+  const [calendarAnchorDate, setCalendarAnchorDate] = useState(defaultStartDate(15));
+  const [dateRangeOpen, setDateRangeOpen] = useState(false);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [days, setDays] = useState(0);
   const [travelStyles, setTravelStyles] = useState<string[]>([]);
-  const [budget, setBudget] = useState<BudgetLevel>("medium");
-  const [pace, setPace] = useState<PaceLevel>("relaxed");
-  const [mustGo, setMustGo] = useState<string[]>([]);
   const [planningNote, setPlanningNote] = useState("");
-  const [entryStatus, setEntryStatus] = useState("填好目的地、日期和偏好，就能开始 AI 规划。");
-  const [clarificationQuestion, setClarificationQuestion] = useState("");
-  const [suggestedOptions, setSuggestedOptions] = useState<string[]>([]);
-  const [briefNextAction, setBriefNextAction] = useState("");
-  const [briefMissingFields, setBriefMissingFields] = useState<string[]>([]);
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [entryStatus, setEntryStatus] = useState("先选目的地和日期，就能开始生成。");
+  const [focusField, setFocusField] = useState<"destination" | "date_range" | null>(null);
+  const [focusTrigger, setFocusTrigger] = useState(0);
   const [generatedItinerary, setGeneratedItinerary] = useState<Record<string, unknown> | null>(null);
   const [generatedVariants, setGeneratedVariants] = useState<PlanVariantView[]>([]);
   const [generatingPhaseIndex, setGeneratingPhaseIndex] = useState(0);
-  const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
     if (flowMode !== "generating") return;
@@ -85,23 +134,71 @@ export function MapFlowScreen({
   }, [flowMode]);
 
   useEffect(() => {
+    const nextDays = deriveDaysFromRange(startDate, endDate);
+    if (nextDays !== days) {
+      setDays(nextDays);
+    }
+  }, [days, endDate, startDate]);
+
+  useEffect(() => {
+    if (!destinationSearchOpen) {
+      setDestinationResults([]);
+      setDestinationSearchLoading(false);
+      setDestinationSearchStatus("");
+      return;
+    }
+
+    let cancelled = false;
+    const query = destination.trim();
+
+    if (!query) {
+      setDestinationResults([]);
+      setDestinationSearchStatus("输入城市或目的地关键词");
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const timer = setTimeout(() => {
+      void (async () => {
+        setDestinationSearchLoading(true);
+        try {
+          const response = await api.resolveDestinations(query, 8);
+          if (cancelled) return;
+          const items = response.items.filter((item) => Boolean(item.destination_label?.trim()));
+          setDestinationResults(items);
+          if (response.degraded && items.length) {
+            setDestinationSearchStatus("当前结果来自降级匹配，建议继续确认标准城市。");
+          } else if (!items.length) {
+            setDestinationSearchStatus("没有更匹配的结果，换个关键词试试。");
+          } else {
+            setDestinationSearchStatus("");
+          }
+        } catch {
+          if (cancelled) return;
+          setDestinationResults([]);
+          setDestinationSearchStatus("搜索暂不可用，请稍后再试。");
+        } finally {
+          if (!cancelled) {
+            setDestinationSearchLoading(false);
+          }
+        }
+      })();
+    }, 220);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [api, destination, destinationSearchOpen]);
+
+  useEffect(() => {
     if (!preloadedToken || !preloadedItinerary) return;
     setGeneratedItinerary(preloadedItinerary);
     setGeneratedVariants([]);
     setEntryStatus("已载入保存行程，可继续查看和调整。");
-    setBriefMissingFields([]);
-    setClarificationQuestion("");
-    setSuggestedOptions([]);
-    setBriefNextAction("");
     setFlowMode("result");
   }, [preloadedItinerary, preloadedToken]);
-
-  useEffect(() => {
-    if (briefMissingFields.length > 0) return;
-    setClarificationQuestion("");
-    setSuggestedOptions([]);
-    setBriefNextAction("");
-  }, [briefMissingFields.length]);
 
   function toggleStyle(style: string) {
     setTravelStyles((prev) => {
@@ -119,22 +216,69 @@ export function MapFlowScreen({
       selected_destination: selectedDestination,
       days,
       start_date: startDate.trim(),
-      budget_level: budget,
-      pace,
+      budget_level: "medium",
+      pace: "relaxed",
       travel_styles: travelStyles,
-      must_go: mustGo,
+      must_go: [],
       avoid: [],
       free_text: planningNote.trim(),
     };
   }
 
+  const entryFeedback = useMemo(
+    () =>
+      buildPlanningEntryFeedback({
+        destination,
+        startDate,
+        endDate,
+      }),
+    [destination, endDate, startDate],
+  );
+
+  const calendarMonth = useMemo(() => buildCalendarMonth(calendarAnchorDate), [calendarAnchorDate]);
+  const mapRegion = useMemo(() => mapRegionForDestination(selectedDestination), [selectedDestination]);
+
+  function focusFieldInSheet(nextField: "destination" | "date_range" | null) {
+    setFocusField(nextField);
+    focusTriggerRef.current += 1;
+    setFocusTrigger(focusTriggerRef.current);
+  }
+
+  function handleCalendarDatePress(date: string) {
+    const nextRange = applyDateRangeSelection(startDate, endDate, date);
+    setStartDate(nextRange.startDate);
+    setEndDate(nextRange.endDate);
+    setCalendarAnchorDate(nextRange.startDate || date || defaultStartDate(15));
+
+    if (nextRange.startDate && nextRange.endDate) {
+      setDateRangeOpen(false);
+      setEntryStatus(`已选择 ${nextRange.startDate} - ${nextRange.endDate}`);
+      setFocusField(null);
+      return;
+    }
+
+    setEntryStatus("请选择结束日期");
+  }
+
   async function handleSmartGenerate() {
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
+
+    if (!isPlanningEntryReady({ destination, startDate, endDate })) {
+      setEntryStatus(entryFeedback.message);
+      if (entryFeedback.focusField === "destination") {
+        setDestinationSearchOpen(true);
+        focusFieldInSheet("destination");
+      }
+      if (entryFeedback.focusField === "date_range") {
+        setDateRangeOpen(true);
+        focusFieldInSheet("date_range");
+      }
+      return;
+    }
+
     setEntryStatus("正在整理你的规划条件...");
-    setClarificationQuestion("");
-    setSuggestedOptions([]);
-    setBriefNextAction("");
+    setFocusField(null);
 
     try {
       const briefResponse = await api.createPlanningBrief(buildPlanningBriefRequest());
@@ -145,28 +289,17 @@ export function MapFlowScreen({
         setSelectedDestination(brief.destination);
         setDestination(brief.destination.destination_label);
       }
-      if (brief.days > 0) {
-        setDays(brief.days);
-      }
       if (brief.start_date.trim()) {
         setStartDate(brief.start_date);
       }
-      setBudget(brief.budget_level);
-      setPace(brief.pace);
+      if (brief.days > 0 && brief.start_date.trim()) {
+        setEndDate(endDateFromRange(brief.start_date, brief.days));
+      }
       setTravelStyles(brief.travel_styles);
-      setMustGo(brief.must_go);
-      setBriefMissingFields(
-        Array.isArray(brief.missing_fields)
-          ? brief.missing_fields.map((item) => String(item || "").trim()).filter(Boolean)
-          : [],
-      );
-      setClarificationQuestion(String(briefResponse.clarification_question || "").trim());
-      setSuggestedOptions(Array.isArray(briefResponse.suggested_options) ? briefResponse.suggested_options.map((item) => String(item || "").trim()).filter(Boolean) : []);
-      setBriefNextAction(String(briefResponse.next_action || "").trim());
 
       const briefMessage = briefResponse.assistant_message?.trim() || "";
       if (!brief.ready_to_generate) {
-        setEntryStatus(briefMessage || "信息还不完整，暂时还不能开始生成。");
+        setEntryStatus(briefMessage || entryFeedback.message || "信息还不完整，暂时还不能开始生成。");
         setFlowMode("entry");
         return;
       }
@@ -185,13 +318,9 @@ export function MapFlowScreen({
       if (!primary || !Object.keys(primary).length) {
         throw new Error("generate-v2 没有返回可用行程");
       }
-      setBriefMissingFields([]);
       setGeneratedVariants(variants);
       setGeneratedItinerary(primary);
       setEntryStatus(formatSuccessText(primary));
-      setClarificationQuestion("");
-      setSuggestedOptions([]);
-      setBriefNextAction("");
       setFlowMode("result");
     } catch (error) {
       if (requestIdRef.current !== requestId) return;
@@ -200,89 +329,17 @@ export function MapFlowScreen({
     }
   }
 
-  function resolveSuggestionLocally(action: ReturnType<typeof interpretSuggestedOption>) {
-    setBriefMissingFields((prev) => resolveMissingFieldsAfterSuggestion(prev, action));
-  }
-
   function handleCancelGenerating() {
     requestIdRef.current += 1;
     setEntryStatus("已取消本次生成，刚才填写的内容还保留着。");
     setFlowMode("entry");
   }
 
-  function handleApplySuggestedOption(option: string) {
-    const action = interpretSuggestedOption(briefNextAction, option);
-    if (!action.value) return;
-
-    switch (action.kind) {
-      case "SET_DAYS":
-        setDays(action.days);
-        resolveSuggestionLocally(action);
-        setEntryStatus(`已采用建议天数：${action.days} 天。`);
-        return;
-      case "SET_START_DATE":
-        setStartDate(action.startDate);
-        resolveSuggestionLocally(action);
-        setShowDatePicker(true);
-        setEntryStatus(`已采用建议日期：${action.startDate}。`);
-        return;
-      case "SET_DESTINATION":
-        setDestination(action.value);
-        setSelectedDestination(null);
-        setEntryStatus(`已填入建议目的地：${action.value}，请再从搜索结果里确认标准城市。`);
-        setFlowMode("search");
-        return;
-      case "APPEND_NOTE":
-        if (!planningNote.includes(action.value)) {
-          setPlanningNote((prev) => (prev.trim() ? `${prev.trim()}；${action.value}` : action.value));
-        }
-        resolveSuggestionLocally(action);
-        setEntryStatus(`已记录补充偏好：${action.value}。`);
-        return;
-    }
-  }
-
-  const destinationNote = useMemo(() => {
-    if (!destination.trim()) return "";
-    if (!selectedDestination) {
-      return "建议从搜索结果里确认一个标准目的地，避免后续规划只靠字符串猜测。";
-    }
-    if (selectedDestination.match_type === "custom") {
-      return "当前是自定义目的地描述，正式 AI 规划前还需要先确认到具体城市或区域。";
-    }
-
-    const location = [selectedDestination.country, selectedDestination.region].filter(Boolean).join(" · ");
-    return location ? `已确认标准目的地 · ${location}` : "已确认标准目的地";
-  }, [destination, selectedDestination]);
-
-  const entryGuidance = useMemo(
-    () =>
-      buildPlanEntryGuidance({
-        missingFields: briefMissingFields,
-        nextAction: briefNextAction,
-        clarificationQuestion,
-        suggestedOptions,
-      }),
-    [briefMissingFields, briefNextAction, clarificationQuestion, suggestedOptions],
-  );
-
-  function handleGuidancePrimaryAction() {
-    if (!entryGuidance.primaryAction) return;
-    switch (entryGuidance.primaryAction.kind) {
-      case "OPEN_DESTINATION_SEARCH":
-        setFlowMode("search");
-        return;
-      case "OPEN_DATE_PICKER":
-        setShowDatePicker(true);
-        return;
-    }
-  }
-
   if (flowMode === "generating") {
     return (
       <GeneratingView
         destination={destination.trim()}
-        days={days}
+        days={days || 1}
         phases={generatingPhases}
         currentPhaseIndex={generatingPhaseIndex}
         onCancel={handleCancelGenerating}
@@ -301,100 +358,174 @@ export function MapFlowScreen({
     );
   }
 
-  if (flowMode === "search") {
-    return (
-      <DestinationSearchView
-        initialQuery={destination}
-        onBack={() => setFlowMode("entry")}
-        onSelectDestination={(value) => {
-          setSelectedDestination(value);
-          setDestination(value.destination_label);
-          setBriefMissingFields((prev) =>
-            resolveMissingFieldsAfterSuggestion(prev, {
-              kind: "SET_DESTINATION",
-              value: value.destination_label,
-            }),
-          );
-          if (value.match_type === "custom") {
-            setEntryStatus(`已记录自定义目的地：${value.destination_label}。后续需要先确认标准城市或区域。`);
-          } else {
-            const suffix = [value.country, value.region].filter(Boolean).join(" · ");
-            setEntryStatus(suffix ? `已确认目的地：${value.destination_label} · ${suffix}` : `已确认目的地：${value.destination_label}`);
-          }
-          setFlowMode("entry");
-        }}
-      />
-    );
-  }
-
   return (
-    <View style={{ flex: 1 }}>
-      <PlanEntryView
-        destination={destination}
-        planningNote={planningNote}
-        startDate={startDate}
-        days={days}
-        flexibleDays={flexibleDays}
-        selectedStyles={travelStyles}
-        destinationNote={destinationNote}
-        budget={budget}
-        pace={pace}
-        status={entryStatus}
-        onChangeDays={(value) => {
-          setDays(value);
-          setBriefMissingFields((prev) =>
-            resolveMissingFieldsAfterSuggestion(prev, {
-              kind: "SET_DAYS",
-              value: `${value} 天`,
-              days: value,
-            }),
-          );
-        }}
-        guidance={entryGuidance}
-        onToggleStyle={toggleStyle}
-        onSelectBudget={setBudget}
-        onSelectPace={setPace}
-        onOpenDestinationSearch={() => setFlowMode("search")}
-        onOpenDatePicker={() => setShowDatePicker(true)}
-        onChangePlanningNote={setPlanningNote}
-        clarificationQuestion={clarificationQuestion}
-        suggestedOptions={suggestedOptions}
-        onApplySuggestedOption={handleApplySuggestedOption}
-        onPressGuidancePrimaryAction={handleGuidancePrimaryAction}
-        onPressSmartGenerate={() => void handleSmartGenerate()}
-      />
-      <DatePickerSheet
-        visible={showDatePicker}
-        startDate={startDate}
-        days={days}
-        flexibleDays={flexibleDays}
-        onClose={() => setShowDatePicker(false)}
-        onConfirm={() => {
-          setShowDatePicker(false);
-          setEntryStatus(`已更新日期：${startDate} · ${days} 天`);
-        }}
-        onSelectStartDate={(value) => {
-          setStartDate(value);
-          setBriefMissingFields((prev) =>
-            resolveMissingFieldsAfterSuggestion(prev, {
-              kind: "SET_START_DATE",
-              value,
-              startDate: value,
-            }),
-          );
-        }}
-        onSelectDays={(value) => {
-          setDays(value);
-          setBriefMissingFields((prev) =>
-            resolveMissingFieldsAfterSuggestion(prev, {
-              kind: "SET_DAYS",
-              value: `${value} 天`,
-              days: value,
-            }),
-          );
-        }}
-        onToggleFlexibleDays={() => setFlexibleDays((prev) => !prev)}
-      />
+    <View style={styles.screen}>
+      <View style={styles.mapWrap}>
+        {NativeMapView ? (
+          <NativeMapView style={styles.nativeMap} region={mapRegion}>
+            {NativeMarker && selectedDestination ? (
+              <NativeMarker
+                coordinate={{
+                  latitude: selectedDestination.center_lat,
+                  longitude: selectedDestination.center_lng,
+                }}
+                title={selectedDestination.destination_label}
+              />
+            ) : null}
+          </NativeMapView>
+        ) : (
+          <View style={styles.mapFallback}>
+            <View style={styles.mapGrid} />
+            <View style={[styles.mapPin, { left: "24%", top: "26%" }]} />
+            <View style={[styles.mapPin, styles.mapPinAlt, { left: "58%", top: "42%" }]} />
+            <View style={[styles.mapPin, styles.mapPinWarm, { left: "42%", top: "64%" }]} />
+          </View>
+        )}
+
+        <View style={styles.topChrome}>
+          <View style={styles.chromeButton}>
+            <Text style={styles.chromeButtonText}>返回</Text>
+          </View>
+          <View style={styles.chromeActions}>
+            <View style={styles.chromeButton}>
+              <Text style={styles.chromeButtonText}>搜索</Text>
+            </View>
+            <View style={[styles.chromeButton, styles.chromeButtonPrimary]}>
+              <Text style={styles.chromeButtonPrimaryText}>AI 行程</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.sheetWrap}>
+        <PlanEntryView
+          destination={destination}
+          destinationSearchOpen={destinationSearchOpen}
+          destinationResults={destinationResults}
+          destinationSearchStatus={destinationSearchStatus}
+          destinationSearchLoading={destinationSearchLoading}
+          dateRangeOpen={dateRangeOpen}
+          startDate={startDate}
+          endDate={endDate}
+          days={days}
+          selectedStyles={travelStyles}
+          planningNote={planningNote}
+          noteOpen={noteOpen}
+          topHint={entryStatus}
+          focusField={focusField}
+          focusTrigger={focusTrigger}
+          calendarMonth={calendarMonth}
+          onChangeDestination={(value) => {
+            setDestination(value);
+            setSelectedDestination(null);
+            setDestinationSearchOpen(true);
+          }}
+          onToggleDestinationSearch={() => setDestinationSearchOpen((prev) => !prev)}
+          onSelectDestination={(value) => {
+            setSelectedDestination(value);
+            setDestination(value.destination_label);
+            setDestinationSearchOpen(false);
+            setEntryStatus(`已选择 ${value.destination_label}`);
+            setFocusField(null);
+          }}
+          onToggleDateRange={() => setDateRangeOpen((prev) => !prev)}
+          onPressCalendarDate={handleCalendarDatePress}
+          onPreviousMonth={() => {
+            const parsed = Date.parse(calendarAnchorDate || defaultStartDate(15));
+            const date = Number.isFinite(parsed) ? new Date(parsed) : new Date();
+            date.setMonth(date.getMonth() - 1);
+            const month = String(date.getMonth() + 1).padStart(2, "0");
+            setCalendarAnchorDate(`${date.getFullYear()}-${month}-01`);
+          }}
+          onNextMonth={() => {
+            const parsed = Date.parse(calendarAnchorDate || defaultStartDate(15));
+            const date = Number.isFinite(parsed) ? new Date(parsed) : new Date();
+            date.setMonth(date.getMonth() + 1);
+            const month = String(date.getMonth() + 1).padStart(2, "0");
+            setCalendarAnchorDate(`${date.getFullYear()}-${month}-01`);
+          }}
+          onToggleStyle={toggleStyle}
+          onToggleNote={() => setNoteOpen((prev) => !prev)}
+          onChangePlanningNote={setPlanningNote}
+          onPressGenerate={() => void handleSmartGenerate()}
+        />
+      </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#dce7ef",
+  },
+  mapWrap: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  nativeMap: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  mapFallback: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#d9e7f0",
+  },
+  mapGrid: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "transparent",
+    borderColor: "rgba(255,255,255,0.12)",
+    borderWidth: 0,
+  },
+  mapPin: {
+    position: "absolute",
+    width: 16,
+    height: 16,
+    borderRadius: 999,
+    backgroundColor: "#1d4ed8",
+    borderWidth: 3,
+    borderColor: "#ffffff",
+  },
+  mapPinAlt: {
+    backgroundColor: "#0f766e",
+  },
+  mapPinWarm: {
+    backgroundColor: "#ea580c",
+  },
+  topChrome: {
+    position: "absolute",
+    top: 18,
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  chromeActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  chromeButton: {
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.94)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  chromeButtonPrimary: {
+    backgroundColor: "rgba(17,24,39,0.88)",
+  },
+  chromeButtonText: {
+    color: "#1f3347",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  chromeButtonPrimaryText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  sheetWrap: {
+    flex: 1,
+    justifyContent: "flex-end",
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+  },
+});
