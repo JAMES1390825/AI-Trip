@@ -1,485 +1,542 @@
-import React, { useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import type { BudgetLevel, PaceLevel } from "../../types/plan";
-import type { PlanEntryGuidance } from "./plan-entry-guidance";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import type { DestinationEntity } from "../../types/plan";
+import type { CalendarMonth } from "./planning-page-default-state";
 
-const suggestedStyles = [
-  "经典必玩",
-  "吃吃喝喝",
-  "小众探索",
-  "拍照出片",
-  "逛街购物",
-  "citywalk",
-  "自然风光",
-  "文艺展览",
-  "历史古建",
-];
-
-const suggestedDays = [2, 3, 4, 5];
-
-const budgetOptions: Array<{ value: BudgetLevel; label: string }> = [
-  { value: "low", label: "低预算" },
-  { value: "medium", label: "中预算" },
-  { value: "high", label: "高体验" },
-];
-
-const paceOptions: Array<{ value: PaceLevel; label: string }> = [
-  { value: "relaxed", label: "轻松" },
-  { value: "compact", label: "紧凑" },
-];
+const styleTags = ["citywalk", "美食", "轻松", "小众", "拍照", "历史"];
+const weekdayLabels = ["一", "二", "三", "四", "五", "六", "日"];
 
 type PlanEntryViewProps = {
   destination: string;
-  destinationNote?: string;
-  planningNote: string;
+  destinationSearchOpen: boolean;
+  destinationResults: DestinationEntity[];
+  destinationSearchStatus: string;
+  destinationSearchLoading: boolean;
+  dateRangeOpen: boolean;
   startDate: string;
+  endDate: string;
   days: number;
-  flexibleDays: boolean;
   selectedStyles: string[];
-  budget: BudgetLevel;
-  pace: PaceLevel;
-  status: string;
-  guidance: PlanEntryGuidance;
-  clarificationQuestion?: string;
-  suggestedOptions?: string[];
-  onChangeDays: (value: number) => void;
+  planningNote: string;
+  noteOpen: boolean;
+  topHint: string;
+  focusField: "destination" | "date_range" | null;
+  focusTrigger: number;
+  calendarMonth: CalendarMonth;
+  onChangeDestination: (value: string) => void;
+  onToggleDestinationSearch: () => void;
+  onSelectDestination: (value: DestinationEntity) => void;
+  onToggleDateRange: () => void;
+  onPressCalendarDate: (date: string) => void;
+  onPreviousMonth: () => void;
+  onNextMonth: () => void;
   onToggleStyle: (value: string) => void;
-  onSelectBudget: (value: BudgetLevel) => void;
-  onSelectPace: (value: PaceLevel) => void;
-  onOpenDestinationSearch: () => void;
-  onOpenDatePicker: () => void;
+  onToggleNote: () => void;
   onChangePlanningNote: (value: string) => void;
-  onApplySuggestedOption?: (value: string) => void;
-  onPressGuidancePrimaryAction?: () => void;
-  onPressSmartGenerate: () => void;
+  onPressGenerate: () => void;
 };
+
+function formatDateLabel(value: string): string {
+  const parsed = Date.parse(value || "");
+  if (!Number.isFinite(parsed)) return value || "";
+  const date = new Date(parsed);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${month}.${day}`;
+}
+
+function rangeSummary(startDate: string, endDate: string, days: number): string {
+  if (!startDate || !endDate || days <= 0) return "日期";
+  return `${formatDateLabel(startDate)} - ${formatDateLabel(endDate)} · ${days} 天`;
+}
+
+function inRange(date: string, startDate: string, endDate: string): boolean {
+  if (!startDate || !endDate) return false;
+  return date > startDate && date < endDate;
+}
 
 export function PlanEntryView({
   destination,
-  destinationNote = "",
-  planningNote,
+  destinationSearchOpen,
+  destinationResults,
+  destinationSearchStatus,
+  destinationSearchLoading,
+  dateRangeOpen,
   startDate,
+  endDate,
   days,
-  flexibleDays,
   selectedStyles,
-  budget,
-  pace,
-  status,
-  guidance,
-  clarificationQuestion = "",
-  suggestedOptions = [],
-  onChangeDays,
+  planningNote,
+  noteOpen,
+  topHint,
+  focusField,
+  focusTrigger,
+  calendarMonth,
+  onChangeDestination,
+  onToggleDestinationSearch,
+  onSelectDestination,
+  onToggleDateRange,
+  onPressCalendarDate,
+  onPreviousMonth,
+  onNextMonth,
   onToggleStyle,
-  onSelectBudget,
-  onSelectPace,
-  onOpenDestinationSearch,
-  onOpenDatePicker,
+  onToggleNote,
   onChangePlanningNote,
-  onApplySuggestedOption,
-  onPressGuidancePrimaryAction,
-  onPressSmartGenerate,
+  onPressGenerate,
 }: PlanEntryViewProps) {
+  const scrollRef = useRef<ScrollView>(null);
+  const [destinationY, setDestinationY] = useState(0);
+  const [dateRangeY, setDateRangeY] = useState(0);
   const selectedCount = selectedStyles.length;
-  const helperText = useMemo(() => {
-    if (selectedCount > 0) return `已选 ${selectedCount} 个偏好`;
-    return "在这里直接告诉 AI 你偏好的玩法";
-  }, [selectedCount]);
+
+  useEffect(() => {
+    if (!focusTrigger) return;
+    const target = focusField === "destination" ? destinationY : focusField === "date_range" ? dateRangeY : 0;
+    scrollRef.current?.scrollTo({ y: Math.max(0, target - 24), animated: true });
+  }, [dateRangeY, destinationY, focusField, focusTrigger]);
+
+  const hintText = useMemo(() => {
+    if (topHint.trim()) return topHint.trim();
+    return "先确定目的地、日期和风格";
+  }, [topHint]);
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <View style={styles.hero}>
-        <Text style={styles.backText}>AI 规划</Text>
-        <View style={styles.heroSpacer} />
-        <Text style={styles.heroTitle}>发起你的 AI 行程</Text>
-        <Text style={styles.heroSub}>目的地、日期和偏好都在这里一次填完，然后直接开始生成。</Text>
-      </View>
+    <View style={styles.sheetShell}>
+      <View style={styles.sheetCard}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <View style={styles.handle} />
 
-      {guidance.needsCompletion ? (
-        <View style={styles.guidanceCard}>
-          <Text style={styles.guidanceEyebrow}>还差一点</Text>
-          <Text style={styles.guidanceTitle}>{guidance.message || "AI 还需要你补一点关键信息。"}</Text>
-          {guidance.primaryAction && onPressGuidancePrimaryAction ? (
-            <Pressable style={styles.guidancePrimaryButton} onPress={onPressGuidancePrimaryAction}>
-              <Text style={styles.guidancePrimaryButtonText}>{guidance.primaryAction.label}</Text>
-            </Pressable>
-          ) : null}
-          {suggestedOptions.length > 0 && onApplySuggestedOption ? (
-            <View style={styles.suggestionWrap}>
-              {suggestedOptions.map((item) => (
-                <Pressable key={item} style={styles.suggestionChip} onPress={() => onApplySuggestedOption(item)}>
-                  <Text style={styles.suggestionChipText}>{item}</Text>
-                </Pressable>
-              ))}
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.title}>开始规划</Text>
+              <Text style={styles.subtitle}>先确定目的地、日期和风格</Text>
             </View>
-          ) : null}
-        </View>
-      ) : null}
+            <Text style={styles.meta}>约 20 秒</Text>
+          </View>
 
-      <View style={[styles.card, guidance.highlights.destination ? styles.cardHighlight : null]}>
-        <Text style={styles.sectionTitle}>目的地</Text>
-        <Pressable style={styles.inputButton} onPress={onOpenDestinationSearch}>
-          <Text style={destination ? styles.inputValue : styles.inputPlaceholder}>
-            {destination || "搜索目的地 / 城市 / 景点关键词"}
-          </Text>
-        </Pressable>
-        {destinationNote ? <Text style={styles.inputNote}>{destinationNote}</Text> : null}
+          <View style={styles.topHintWrap}>
+            <Text style={styles.topHintText}>{hintText}</Text>
+          </View>
+
+          <View
+            style={[styles.inputCard, focusField === "destination" ? styles.inputCardFocus : null]}
+            onLayout={(event) => setDestinationY(event.nativeEvent.layout.y)}
+          >
+            <Pressable style={styles.rowButton} onPress={onToggleDestinationSearch}>
+              <Text style={destination ? styles.rowValue : styles.rowPlaceholder}>{destination || "目的地"}</Text>
+            </Pressable>
+            {destinationSearchOpen ? (
+              <View style={styles.inlinePanel}>
+                <TextInput
+                  style={styles.searchInput}
+                  value={destination}
+                  onChangeText={onChangeDestination}
+                  placeholder="搜索城市、目的地或景点"
+                  placeholderTextColor="#8ea1b5"
+                  autoFocus
+                />
+                {destinationSearchLoading ? (
+                  <View style={styles.searchStatusRow}>
+                    <ActivityIndicator size="small" color="#165dff" />
+                    <Text style={styles.searchStatusText}>正在搜索...</Text>
+                  </View>
+                ) : null}
+                {destinationResults.map((item) => (
+                  <Pressable
+                    key={item.destination_id}
+                    style={styles.searchResult}
+                    onPress={() => onSelectDestination(item)}
+                  >
+                    <Text style={styles.searchResultTitle}>{item.destination_label}</Text>
+                    <Text style={styles.searchResultMeta}>
+                      {[item.country, item.region].filter(Boolean).join(" · ")}
+                    </Text>
+                  </Pressable>
+                ))}
+                {destinationSearchStatus ? <Text style={styles.searchStatusText}>{destinationSearchStatus}</Text> : null}
+              </View>
+            ) : null}
+          </View>
+
+          <View
+            style={[styles.inputCard, focusField === "date_range" ? styles.inputCardFocus : null]}
+            onLayout={(event) => setDateRangeY(event.nativeEvent.layout.y)}
+          >
+            <Pressable style={styles.rowButton} onPress={onToggleDateRange}>
+              <Text style={startDate && endDate ? styles.rowValue : styles.rowPlaceholder}>
+                {rangeSummary(startDate, endDate, days)}
+              </Text>
+            </Pressable>
+            {dateRangeOpen ? (
+              <View style={styles.inlinePanel}>
+                <View style={styles.calendarHeader}>
+                  <Pressable style={styles.calendarNavButton} onPress={onPreviousMonth}>
+                    <Text style={styles.calendarNavText}>上月</Text>
+                  </Pressable>
+                  <Text style={styles.calendarTitle}>{calendarMonth.title}</Text>
+                  <Pressable style={styles.calendarNavButton} onPress={onNextMonth}>
+                    <Text style={styles.calendarNavText}>下月</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.weekdayRow}>
+                  {weekdayLabels.map((item) => (
+                    <Text key={item} style={styles.weekdayText}>
+                      {item}
+                    </Text>
+                  ))}
+                </View>
+                <View style={styles.calendarGrid}>
+                  {calendarMonth.days.map((day) => {
+                    const selectedStart = day.date === startDate;
+                    const selectedEnd = day.date === endDate;
+                    const between = inRange(day.date, startDate, endDate);
+                    return (
+                      <Pressable
+                        key={day.date}
+                        style={[
+                          styles.calendarDay,
+                          !day.inCurrentMonth ? styles.calendarDayOutside : null,
+                          between ? styles.calendarDayInRange : null,
+                          selectedStart || selectedEnd ? styles.calendarDaySelected : null,
+                        ]}
+                        onPress={() => onPressCalendarDate(day.date)}
+                      >
+                        <Text
+                          style={[
+                            styles.calendarDayText,
+                            !day.inCurrentMonth ? styles.calendarDayTextOutside : null,
+                            selectedStart || selectedEnd ? styles.calendarDayTextSelected : null,
+                          ]}
+                        >
+                          {day.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.tagsCard}>
+            <View style={styles.tagHeader}>
+              <Text style={styles.tagTitle}>旅行风格</Text>
+              <Text style={styles.tagMeta}>{selectedCount > 0 ? `已选 ${selectedCount}` : "可直接点选"}</Text>
+            </View>
+            <View style={styles.tagWrap}>
+              {styleTags.map((item) => {
+                const active = selectedStyles.includes(item);
+                return (
+                  <Pressable
+                    key={item}
+                    style={[styles.tagChip, active ? styles.tagChipActive : null]}
+                    onPress={() => onToggleStyle(item)}
+                  >
+                    <Text style={[styles.tagChipText, active ? styles.tagChipTextActive : null]}>{item}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={styles.inputCard}>
+            <Pressable style={styles.rowButton} onPress={onToggleNote}>
+              <Text style={planningNote ? styles.rowValue : styles.rowPlaceholder}>
+                {planningNote ? "补充要求已填写" : "补充要求（可选）"}
+              </Text>
+            </Pressable>
+            {noteOpen ? (
+              <View style={styles.inlinePanel}>
+                <TextInput
+                  style={styles.noteInput}
+                  value={planningNote}
+                  onChangeText={onChangePlanningNote}
+                  multiline
+                  placeholder="例如：雨天也能玩，多一点本地餐馆"
+                  placeholderTextColor="#93a5b3"
+                  textAlignVertical="top"
+                />
+              </View>
+            ) : null}
+          </View>
+
+          <Pressable style={styles.primaryButton} onPress={onPressGenerate}>
+            <Text style={styles.primaryButtonText}>开始生成</Text>
+          </Pressable>
+        </ScrollView>
       </View>
-
-      <View style={[styles.card, guidance.highlights.schedule ? styles.cardHighlight : null]}>
-        <Text style={styles.sectionTitle}>你想去多久？</Text>
-        <Pressable style={styles.inputButton} onPress={onOpenDatePicker}>
-          <Text style={startDate ? styles.inputValue : styles.inputPlaceholder}>
-            {flexibleDays ? `${days} 天左右（灵活天数）` : startDate ? `${startDate} · ${days} 天` : "开始日期 - 结束日期"}
-          </Text>
-        </Pressable>
-        <View style={styles.optionRow}>
-          {suggestedDays.map((item) => {
-            const active = item === days;
-            return (
-              <Pressable
-                key={`days-${item}`}
-                style={[styles.dayChip, active ? styles.dayChipActive : null]}
-                onPress={() => onChangeDays(item)}
-              >
-                <Text style={[styles.dayChipText, active ? styles.dayChipTextActive : null]}>{item} 天</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>旅行偏好</Text>
-        <Text style={styles.sectionSub}>{helperText}</Text>
-        <View style={styles.styleWrap}>
-          {suggestedStyles.map((item) => {
-            const active = selectedStyles.includes(item);
-            return (
-              <Pressable
-                key={item}
-                style={[styles.styleChip, active ? styles.styleChipActive : null]}
-                onPress={() => onToggleStyle(item)}
-              >
-                <Text style={[styles.styleChipText, active ? styles.styleChipTextActive : null]}>{item}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>规划偏好</Text>
-        <Text style={styles.sectionSub}>这些设置会直接影响路线节奏和消费水平。</Text>
-        <Text style={styles.preferenceLabel}>预算</Text>
-        <View style={styles.optionRow}>
-          {budgetOptions.map((item) => {
-            const active = item.value === budget;
-            return (
-              <Pressable
-                key={item.value}
-                style={[styles.dayChip, active ? styles.dayChipActive : null]}
-                onPress={() => onSelectBudget(item.value)}
-              >
-                <Text style={[styles.dayChipText, active ? styles.dayChipTextActive : null]}>{item.label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        <Text style={[styles.preferenceLabel, styles.preferenceLabelSpacing]}>节奏</Text>
-        <View style={styles.optionRow}>
-          {paceOptions.map((item) => {
-            const active = item.value === pace;
-            return (
-              <Pressable
-                key={item.value}
-                style={[styles.dayChip, active ? styles.dayChipActive : null]}
-                onPress={() => onSelectPace(item.value)}
-              >
-                <Text style={[styles.dayChipText, active ? styles.dayChipTextActive : null]}>{item.label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
-      <View style={[styles.card, guidance.highlights.planningNote ? styles.cardHighlight : null]}>
-        <Text style={styles.sectionTitle}>补充要求</Text>
-        <Text style={styles.sectionSub}>可以直接告诉 AI 雨天偏好、想吃什么，或者住在哪里附近。</Text>
-        <TextInput
-          style={styles.noteInput}
-          value={planningNote}
-          onChangeText={onChangePlanningNote}
-          multiline
-          placeholder="例如：雨天也能玩，多一点本地餐馆，住在地铁方便的位置"
-          placeholderTextColor="#93a5b3"
-          textAlignVertical="top"
-        />
-      </View>
-
-      <Pressable style={styles.primaryButton} onPress={onPressSmartGenerate}>
-        <Text style={styles.primaryButtonText}>发起 AI 行程</Text>
-      </Pressable>
-
-      <View style={styles.statusCard}>
-        <Text style={styles.statusLabel}>AI 规划状态</Text>
-        <Text style={styles.statusText}>{status}</Text>
-        {clarificationQuestion ? <Text style={styles.clarificationText}>{clarificationQuestion}</Text> : null}
-      </View>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  sheetShell: {
     flex: 1,
-    backgroundColor: "#eef9ff",
+    justifyContent: "flex-end",
+  },
+  sheetCard: {
+    maxHeight: "66%",
+    minHeight: "50%",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    backgroundColor: "rgba(250,252,255,0.97)",
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.82)",
+    shadowColor: "#0f172a",
+    shadowOpacity: 0.14,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: -10 },
   },
   content: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 28,
-    gap: 16,
+    gap: 10,
+    paddingBottom: 10,
   },
-  hero: {
-    paddingTop: 8,
-    paddingBottom: 12,
+  handle: {
+    alignSelf: "center",
+    width: 46,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#d6dee8",
+    marginBottom: 6,
   },
-  backText: {
-    color: "#12273d",
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  heroSpacer: {
-    height: 48,
-  },
-  heroTitle: {
-    color: "#08131f",
-    fontSize: 26,
-    fontWeight: "800",
-  },
-  heroSub: {
-    marginTop: 8,
-    color: "#52677a",
-    fontSize: 14,
-    lineHeight: 21,
-  },
-  card: {
-    borderRadius: 28,
-    backgroundColor: "#ffffff",
-    paddingHorizontal: 18,
-    paddingVertical: 18,
-    shadowColor: "#9db3c8",
-    shadowOpacity: 0.12,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 3,
-  },
-  guidanceCard: {
-    borderRadius: 28,
-    backgroundColor: "#fff7e8",
-    borderWidth: 1,
-    borderColor: "#ffd38a",
-    paddingHorizontal: 18,
-    paddingVertical: 18,
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     gap: 12,
   },
-  guidanceEyebrow: {
-    color: "#9b5a00",
+  title: {
+    color: "#122235",
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  subtitle: {
+    marginTop: 4,
+    color: "#76889a",
     fontSize: 12,
-    fontWeight: "800",
+    lineHeight: 18,
   },
-  guidanceTitle: {
-    color: "#2b1c00",
-    fontSize: 16,
-    fontWeight: "800",
-    lineHeight: 24,
+  meta: {
+    color: "#7b8ca0",
+    fontSize: 11,
+    fontWeight: "700",
   },
-  guidancePrimaryButton: {
-    alignSelf: "flex-start",
-    borderRadius: 18,
-    backgroundColor: "#0d1218",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  guidancePrimaryButtonText: {
-    color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  cardHighlight: {
-    borderWidth: 1,
-    borderColor: "#ffbf47",
-    shadowColor: "#f0b64d",
-  },
-  sectionTitle: {
-    color: "#08131f",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  sectionSub: {
-    marginTop: 6,
-    color: "#6c8193",
-    fontSize: 13,
-  },
-  inputButton: {
-    marginTop: 14,
-    borderRadius: 22,
-    backgroundColor: "#f7fbff",
-    borderWidth: 1,
-    borderColor: "#deebf4",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  inputNote: {
-    marginTop: 10,
-    color: "#607789",
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  inputValue: {
-    color: "#102033",
-    fontSize: 17,
-    fontWeight: "600",
-  },
-  inputPlaceholder: {
-    color: "#93a5b3",
-    fontSize: 17,
-    fontWeight: "600",
-  },
-  optionRow: {
-    marginTop: 14,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  dayChip: {
-    minWidth: 68,
-    alignItems: "center",
-    borderRadius: 18,
-    backgroundColor: "#f4f7fb",
-    paddingHorizontal: 14,
+  topHintWrap: {
+    borderRadius: 16,
+    backgroundColor: "#edf4fb",
+    paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  dayChipActive: {
-    backgroundColor: "#0d1218",
-  },
-  dayChipText: {
-    color: "#43576a",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  dayChipTextActive: {
-    color: "#ffffff",
-  },
-  styleWrap: {
-    marginTop: 14,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  styleChip: {
-    borderRadius: 20,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#e0ebf4",
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    shadowColor: "#aab9c7",
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 2,
-  },
-  styleChipActive: {
-    backgroundColor: "#0d1218",
-    borderColor: "#0d1218",
-  },
-  styleChipText: {
-    color: "#27394a",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  styleChipTextActive: {
-    color: "#ffffff",
-  },
-  preferenceLabel: {
-    marginTop: 16,
-    color: "#0f1722",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  preferenceLabelSpacing: {
-    marginTop: 18,
-  },
-  noteInput: {
-    minHeight: 110,
-    marginTop: 14,
-    borderRadius: 22,
-    backgroundColor: "#f7fbff",
-    borderWidth: 1,
-    borderColor: "#deebf4",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    color: "#102033",
-    fontSize: 15,
-    fontWeight: "600",
-    lineHeight: 22,
-  },
-  primaryButton: {
-    borderRadius: 24,
-    backgroundColor: "#0b0f14",
-    paddingVertical: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontSize: 20,
-    fontWeight: "800",
-  },
-  statusCard: {
-    borderRadius: 24,
-    backgroundColor: "rgba(255,255,255,0.82)",
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-  },
-  statusLabel: {
-    color: "#6a7b89",
+  topHintText: {
+    color: "#50657b",
     fontSize: 12,
     fontWeight: "700",
-    letterSpacing: 0.6,
   },
-  statusText: {
-    marginTop: 8,
-    color: "#102033",
+  inputCard: {
+    borderRadius: 18,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2ebf3",
+    overflow: "hidden",
+  },
+  inputCardFocus: {
+    borderColor: "#165dff",
+  },
+  rowButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  rowValue: {
+    color: "#1c3348",
     fontSize: 14,
-    lineHeight: 21,
-    fontWeight: "600",
-  },
-  clarificationText: {
-    marginTop: 10,
-    color: "#36536a",
-    fontSize: 13,
-    lineHeight: 20,
     fontWeight: "700",
   },
-  suggestionWrap: {
-    marginTop: 12,
+  rowPlaceholder: {
+    color: "#93a4b6",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  inlinePanel: {
+    borderTopWidth: 1,
+    borderTopColor: "#e7edf4",
+    padding: 12,
+    gap: 10,
+  },
+  searchInput: {
+    borderRadius: 14,
+    backgroundColor: "#f4f8fd",
+    borderWidth: 1,
+    borderColor: "#dbe7f2",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: "#173051",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  searchStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  searchStatusText: {
+    color: "#6a7f95",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  searchResult: {
+    borderRadius: 14,
+    backgroundColor: "#f8fbff",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "#e5edf5",
+  },
+  searchResultTitle: {
+    color: "#173051",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  searchResultMeta: {
+    marginTop: 4,
+    color: "#72869a",
+    fontSize: 12,
+  },
+  calendarHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  calendarNavButton: {
+    borderRadius: 12,
+    backgroundColor: "#eef4fb",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  calendarNavText: {
+    color: "#51667b",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  calendarTitle: {
+    color: "#152739",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  weekdayRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 2,
+  },
+  weekdayText: {
+    width: `${100 / 7}%`,
+    textAlign: "center",
+    color: "#8a9bad",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  calendarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  calendarDay: {
+    width: `${100 / 7}%`,
+    aspectRatio: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+  },
+  calendarDayOutside: {
+    opacity: 0.45,
+  },
+  calendarDayInRange: {
+    backgroundColor: "#e8f0ff",
+  },
+  calendarDaySelected: {
+    backgroundColor: "#111827",
+  },
+  calendarDayText: {
+    color: "#203246",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  calendarDayTextOutside: {
+    color: "#90a0b2",
+  },
+  calendarDayTextSelected: {
+    color: "#ffffff",
+  },
+  tagsCard: {
+    borderRadius: 18,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2ebf3",
+    padding: 14,
+    gap: 10,
+  },
+  tagHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  tagTitle: {
+    color: "#152739",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  tagMeta: {
+    color: "#7a8c9f",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  tagWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
   },
-  suggestionChip: {
-    borderRadius: 16,
-    backgroundColor: "#f2f8fd",
-    borderWidth: 1,
-    borderColor: "#d3e5f1",
+  tagChip: {
+    borderRadius: 999,
+    backgroundColor: "#eef4fb",
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingVertical: 8,
   },
-  suggestionChipText: {
-    color: "#16324a",
-    fontSize: 13,
+  tagChipActive: {
+    backgroundColor: "#111827",
+  },
+  tagChipText: {
+    color: "#50657b",
+    fontSize: 12,
     fontWeight: "700",
+  },
+  tagChipTextActive: {
+    color: "#ffffff",
+  },
+  noteInput: {
+    minHeight: 96,
+    borderRadius: 14,
+    backgroundColor: "#f4f8fd",
+    borderWidth: 1,
+    borderColor: "#dbe7f2",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: "#173051",
+    fontSize: 14,
+    lineHeight: 20,
+    textAlignVertical: "top",
+  },
+  primaryButton: {
+    borderRadius: 18,
+    backgroundColor: "#111827",
+    paddingVertical: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  primaryButtonText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "800",
   },
 });
