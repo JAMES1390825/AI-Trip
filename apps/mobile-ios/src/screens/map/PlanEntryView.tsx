@@ -241,9 +241,7 @@ export function PlanEntryView({
 
           <View style={styles.inputCard}>
             <Pressable style={styles.rowButton} onPress={onToggleNote}>
-              <Text style={planningNote ? styles.rowValue : styles.rowPlaceholder}>
-                {planningNote ? "补充要求已填写" : "补充要求（可选）"}
-              </Text>
+              <Text style={planningNote ? styles.rowValue : styles.rowPlaceholder}>补充要求（可选）</Text>
             </Pressable>
             {noteOpen ? (
               <View style={styles.inlinePanel}>

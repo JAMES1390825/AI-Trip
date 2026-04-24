@@ -6,6 +6,7 @@ import {
   buildPlanningEntryFeedback,
   deriveDaysFromRange,
   isPlanningEntryReady,
+  planningDaysForRequest,
 } from "./planning-page-default-state";
 
 test("isPlanningEntryReady requires destination and date range only", () => {
@@ -91,4 +92,9 @@ test("buildCalendarMonth returns a visible month grid including outside-month da
   assert.equal(month.days.length, 35);
   assert.equal(month.days.some((item) => item.date === "2026-05-01"), true);
   assert.equal(month.days.some((item) => item.inCurrentMonth === false), true);
+});
+
+test("planningDaysForRequest prefers derived range days over stale state", () => {
+  assert.equal(planningDaysForRequest("2026-05-01", "2026-05-03", 0), 3);
+  assert.equal(planningDaysForRequest("2026-05-01", "2026-05-01", 0), 1);
 });

@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
+import MapView, { Marker, Polyline } from "react-native-maps";
 import { TripApiClient } from "../../api/client";
 import { RUNTIME_CONFIG } from "../../config/runtime";
 import type { ItineraryBlock, ItineraryLeg, ItineraryView, ValidationResult } from "../../types/itinerary";
@@ -59,12 +60,6 @@ type MapLeg = {
   y2: number;
 };
 
-type MapLibraryModule = {
-  default?: React.ComponentType<any>;
-  Marker?: React.ComponentType<any>;
-  Polyline?: React.ComponentType<any>;
-};
-
 type SaveHintTone = "success" | "info" | "error";
 
 type DaySelection = "all" | number;
@@ -75,19 +70,6 @@ type MapResultViewProps = {
   onBack: () => void;
   onPlanSaved?: (savedPlanId: string, itinerary: Record<string, unknown>) => void;
 };
-
-function loadMapLibrary(): MapLibraryModule {
-  try {
-    return require("react-native-maps") as MapLibraryModule;
-  } catch {
-    return {};
-  }
-}
-
-const mapLib = loadMapLibrary();
-const NativeMapView = mapLib.default || null;
-const NativeMarker = mapLib.Marker || null;
-const NativePolyline = mapLib.Polyline || null;
 
 const defaultMapRegion: NativeMapRegion = {
   latitude: 31.2304,
@@ -513,7 +495,7 @@ export function MapResultView({ itinerary, variants = [], onBack, onPlanSaved }:
   );
 
   useEffect(() => {
-    if (!NativeMapView || !nativeMapRegion || !mapRef.current?.animateToRegion) return;
+    if (!nativeMapRegion || !mapRef.current?.animateToRegion) return;
     mapRef.current.animateToRegion(nativeMapRegion, 280);
     mapZoomRef.current = approxZoomFromRegion(nativeMapRegion);
     mapRegionRef.current = nativeMapRegion;
@@ -525,7 +507,7 @@ export function MapResultView({ itinerary, variants = [], onBack, onPlanSaved }:
   ]);
 
   useEffect(() => {
-    if (!NativeMapView || !selectedBlock || !mapRef.current) return;
+    if (!selectedBlock || !mapRef.current) return;
     const marker = nativeMapData.markers.find((item) => item.key === selectedBlock.blockId);
     if (!marker) return;
     const mapInst = mapRef.current as any;
@@ -635,8 +617,7 @@ export function MapResultView({ itinerary, variants = [], onBack, onPlanSaved }:
           );
         }}
       >
-        {NativeMapView && NativeMarker && NativePolyline ? (
-          <NativeMapView
+        <MapView
             ref={mapRef}
             style={styles.nativeMap}
             initialRegion={nativeMapRegion || defaultMapRegion}
@@ -655,7 +636,7 @@ export function MapResultView({ itinerary, variants = [], onBack, onPlanSaved }:
             }}
           >
             {nativeMapData.routes.map((route) => (
-              <NativePolyline
+              <Polyline
                 key={route.key}
                 coordinates={route.coordinates}
                 strokeColor="rgba(20,195,220,0.72)"
@@ -663,7 +644,7 @@ export function MapResultView({ itinerary, variants = [], onBack, onPlanSaved }:
               />
             ))}
             {nativeMapData.markers.map((item) => (
-              <NativeMarker
+              <Marker
                 key={item.key}
                 coordinate={item.coordinate}
                 title={item.poi || "待确认地点"}
@@ -679,38 +660,7 @@ export function MapResultView({ itinerary, variants = [], onBack, onPlanSaved }:
                 }}
               />
             ))}
-          </NativeMapView>
-        ) : (
-          <>
-            <View style={styles.mapGridLineHorizontal} />
-            <View style={styles.mapGridLineVertical} />
-            {mapProjection.routes.map((route) => (
-              <View key={route.key} style={[styles.routeLine, buildLineStyle(route)]} />
-            ))}
-            {mapProjection.points.map((point) => (
-              <Pressable
-                key={point.key}
-                style={[styles.markerWrap, { left: point.x - 11, top: point.y - 11 }]}
-                onPress={() => {
-                  const block = blockById.get(point.key);
-                  if (block) {
-                    openBlockDetail(block);
-                    return;
-                  }
-                  setSelectedBlockId(point.key);
-                }}
-              >
-                <View
-                  style={[
-                    styles.markerDot,
-                    { backgroundColor: blockAccent(point.blockType) },
-                    point.key === selectedBlock?.blockId ? styles.markerDotActive : null,
-                  ]}
-                />
-              </Pressable>
-            ))}
-          </>
-        )}
+          </MapView>
 
         <View style={styles.topBar}>
           <Pressable style={styles.topButton} onPress={onBack}>
@@ -1035,41 +985,6 @@ const styles = StyleSheet.create({
   },
   nativeMap: {
     ...StyleSheet.absoluteFillObject,
-  },
-  mapGridLineHorizontal: {
-    position: "absolute",
-    left: 20,
-    right: 20,
-    top: "50%",
-    height: 1,
-    backgroundColor: "rgba(17,37,58,0.08)",
-  },
-  mapGridLineVertical: {
-    position: "absolute",
-    top: 28,
-    bottom: 28,
-    left: "50%",
-    width: 1,
-    backgroundColor: "rgba(17,37,58,0.08)",
-  },
-  routeLine: {
-    position: "absolute",
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: "rgba(20,195,220,0.72)",
-  },
-  markerWrap: {
-    position: "absolute",
-  },
-  markerDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 999,
-    borderWidth: 3,
-    borderColor: "#ffffff",
-  },
-  markerDotActive: {
-    transform: [{ scale: 1.18 }],
   },
   topBar: {
     position: "absolute",
