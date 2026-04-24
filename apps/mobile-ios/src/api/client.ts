@@ -49,6 +49,20 @@ function getErrorDetail(payload: unknown): string {
   return String(payload);
 }
 
+export function formatApiFailureMessage(status: number, detail: string): string {
+  const normalizedDetail = String(detail || "").trim();
+  if (normalizedDetail) return normalizedDetail;
+  return `请求失败（${status}），请稍后再试`;
+}
+
+export function formatApiTimeoutMessage(): string {
+  return "请求超时，请稍后再试";
+}
+
+export function formatApiNetworkMessage(): string {
+  return "当前无法连接服务，请稍后再试";
+}
+
 export class TripApiClient {
   private accessToken = "";
   private expiresAt = "";
@@ -102,16 +116,16 @@ export class TripApiClient {
           this.expiresAt = "";
         }
         const detail = getErrorDetail(payload);
-        throw new Error(`${method} ${path} failed (${response.status})${detail ? `: ${detail}` : ""}`);
+        throw new Error(formatApiFailureMessage(response.status, detail));
       }
 
       return payload as T;
     } catch (error) {
       if (error && typeof error === "object" && "name" in error && (error as { name?: string }).name === "AbortError") {
-        throw new Error(`${method} ${path} timeout (${timeoutMs}ms)`);
+        throw new Error(formatApiTimeoutMessage());
       }
       if (error instanceof TypeError || String(error).toLowerCase().includes("network request failed")) {
-        throw new Error("Cannot connect to trip-api. Check API base and backend status.");
+        throw new Error(formatApiNetworkMessage());
       }
       throw error;
     } finally {

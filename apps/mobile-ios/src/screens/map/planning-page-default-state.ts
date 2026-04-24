@@ -43,6 +43,12 @@ export function deriveDaysFromRange(startDate: string, endDate: string): number 
   return Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1;
 }
 
+export function planningDaysForRequest(startDate: string, endDate: string, currentDays: number): number {
+  const derived = deriveDaysFromRange(startDate, endDate);
+  if (derived > 0) return derived;
+  return currentDays > 0 ? currentDays : 0;
+}
+
 export function isPlanningEntryReady(state: PlanningEntryState): boolean {
   return Boolean(normalize(state.destination)) && deriveDaysFromRange(state.startDate, state.endDate) > 0;
 }

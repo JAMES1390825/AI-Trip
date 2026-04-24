@@ -14,6 +14,7 @@ import {
   buildPlanningEntryFeedback,
   deriveDaysFromRange,
   isPlanningEntryReady,
+  planningDaysForRequest,
 } from "./planning-page-default-state";
 import { extractPlanVariants, type PlanVariantView } from "./result-variants";
 
@@ -214,7 +215,7 @@ export function MapFlowScreen({
       origin_city: "上海",
       destination_text: destination.trim(),
       selected_destination: selectedDestination,
-      days,
+      days: planningDaysForRequest(startDate, endDate, days),
       start_date: startDate.trim(),
       budget_level: "medium",
       pace: "relaxed",
