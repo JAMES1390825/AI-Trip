@@ -17,7 +17,7 @@ The product promise is:
 Primary user:
 
 - Young users planning weekend citywalks or light trips.
-- They value vibe, photography, cafes, food, exhibitions, night views, and shareability.
+- They value vibe, photography, walkable streets, food, exhibitions, night views, and shareability.
 - They do not want to read dozens of guides before deciding where to go.
 - They still need the route to be executable, not just visually attractive.
 
@@ -69,21 +69,21 @@ The story wrapper turns a route into an emotional share image. It emphasizes:
 
 The first version should ship with six themes:
 
-1. Rain-friendly citywalk.
-2. Coffee slow walk.
-3. Film/photo route.
-4. Night-view ending route.
-5. Low-budget food route.
-6. Exhibition and art route.
+1. Classic first-time route.
+2. Easy citywalk.
+3. Rain-friendly backup route.
+4. Food-linked route.
+5. Night-view half-day route.
+6. Low-budget route.
 
-These are intentionally narrow. The product should not launch with a large generic tag marketplace. More themes can be added after measuring generation, save, and share behavior.
+These are intentionally narrow and planning-oriented. Lifestyle interests such as coffee, film photography, exhibitions, bookstores, riverside walks, and local snacks should be treated as style tags or user notes under these themes, not as top-level product categories. The product should not launch with a large generic tag marketplace. More themes can be added after measuring generation, save, and share behavior.
 
 ## MVP User Flow
 
 1. User chooses or searches a city.
 2. User chooses one of the six themes.
 3. User chooses date and duration, initially one day or two days.
-4. User optionally adds a short note, such as "less walking", "with friends", "rainy day", or "more cafes".
+4. User optionally adds a short note, such as "less walking", "with friends", "rainy day", "more cafes", "more photo spots", or "local snacks".
 5. System generates the B route-first card.
 6. User reviews timeline, map, reasons, risk and confidence.
 7. User saves the route.
