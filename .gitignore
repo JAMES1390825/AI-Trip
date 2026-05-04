@@ -16,3 +16,4 @@ __pycache__/
 apps/trip-api-go/tmp/
 tmp/
 .worktrees/
+.superpowers/
