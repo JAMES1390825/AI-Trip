@@ -10,6 +10,8 @@ export type SourceMode = "fallback" | "provider" | "mixed";
 
 export type ConfidenceTier = "high" | "medium" | "needs_confirmation";
 
+export type PlanningMode = "ai_amap" | "rule_amap" | "fallback_seed";
+
 export type RouteTheme = {
   id: RouteThemeId;
   label: string;
@@ -44,7 +46,11 @@ export type RouteStop = {
   id: string;
   time: string;
   poiId: string;
+  providerPoiId?: string;
   poi: string;
+  address?: string;
+  providerType?: string;
+  day?: 1 | 2;
   tags: string[];
   lat: number;
   lng: number;
@@ -58,6 +64,7 @@ export type RouteLeg = {
   fromPoi: string;
   toPoi: string;
   minutes: number;
+  degraded?: boolean;
   sourceMode: SourceMode;
 };
 
@@ -79,6 +86,13 @@ export type RouteCard = {
   fitFor: string;
   riskTips: string[];
   sourceLabel: string;
+  planningMode?: PlanningMode;
+  intentSummary?: string;
+  blueprintSummary?: string;
+  arrangementReason?: string;
+  skipSuggestion?: string;
+  weatherAlternative?: string;
+  providerWarnings?: string[];
   startDate: string;
   durationDays: 1 | 2;
   estimatedCostCny: number;
