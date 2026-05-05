@@ -30,8 +30,9 @@ The real planner is server-side only.
 4. `route-ai-client` selects the configured AI provider.
 5. `openai-route-client` uses OpenAI Responses structured output when `AI_PROVIDER=openai`.
 6. `deepseek-route-client` uses DeepSeek Chat Completions JSON Output when `AI_PROVIDER=deepseek`.
-7. `route-arrangement` validates that AI selected only candidate IDs from Amap.
-8. `real-route-planner` assembles a route card or falls back to the local seed planner.
+7. `bailian-route-client` uses Alibaba Cloud Bailian OpenAI-compatible JSON Output when `AI_PROVIDER=bailian`.
+8. `route-arrangement` validates that AI selected only candidate IDs from Amap.
+9. `real-route-planner` assembles a route card or falls back to the local seed planner.
 
 AI providers are never allowed to invent POI facts. Amap coordinates, addresses, and provider IDs remain the source of truth.
 

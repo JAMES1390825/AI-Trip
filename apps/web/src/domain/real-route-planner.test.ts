@@ -98,3 +98,46 @@ test("generateRealRouteCard can arrange with configured DeepSeek provider", asyn
     globalThis.fetch = originalFetch;
   }
 });
+
+test("generateRealRouteCard can arrange with configured Bailian provider", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalBailianKey = process.env.BAILIAN_API_KEY;
+  const originalFetch = globalThis.fetch;
+  process.env.AI_PROVIDER = "bailian";
+  process.env.BAILIAN_API_KEY = "test-bailian-key";
+  globalThis.fetch = (async () =>
+    Response.json({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              selectedStops: [
+                { candidateId: "a", day: 1, reason: "先安排低负担步行，快速进入城市状态。" },
+                { candidateId: "c", day: 1, reason: "中段用城市景观提升记忆点。" },
+                { candidateId: "b", day: 1, reason: "最后用本地小吃收束体验。" }
+              ],
+              arrangementReason: "按轻松进入、景观记忆、餐食收束排列。",
+              skipSuggestion: "太累就跳过城市阳台。",
+              weatherAlternative: "下雨优先改去室内展馆。"
+            })
+          }
+        }
+      ]
+    })) as typeof fetch;
+
+  try {
+    const card = await generateRealRouteCard(request, {
+      amapClient: { searchPois: async () => realCandidates, estimateWalkingMinutes: async () => 10 }
+    });
+
+    assert.equal(card.planningMode, "ai_amap");
+    assert.equal(card.stops[0].poi, "湖滨步行街");
+    assert.equal(card.arrangementReason, "按轻松进入、景观记忆、餐食收束排列。");
+  } finally {
+    if (originalProvider === undefined) delete process.env.AI_PROVIDER;
+    else process.env.AI_PROVIDER = originalProvider;
+    if (originalBailianKey === undefined) delete process.env.BAILIAN_API_KEY;
+    else process.env.BAILIAN_API_KEY = originalBailianKey;
+    globalThis.fetch = originalFetch;
+  }
+});

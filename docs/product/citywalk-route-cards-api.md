@@ -6,6 +6,7 @@ Generation mode is environment-driven:
 
 - `AMAP_WEB_SERVICE_KEY` + `AI_PROVIDER=openai` + `OPENAI_API_KEY`: uses Amap real POIs, OpenAI candidate-only arrangement, and Amap walking time.
 - `AMAP_WEB_SERVICE_KEY` + `AI_PROVIDER=deepseek` + `DEEPSEEK_API_KEY`: uses Amap real POIs, DeepSeek candidate-only arrangement, and Amap walking time.
+- `AMAP_WEB_SERVICE_KEY` + `AI_PROVIDER=bailian` + `BAILIAN_API_KEY`: uses Amap real POIs, Alibaba Cloud Bailian candidate-only arrangement, and Amap walking time.
 - `AMAP_WEB_SERVICE_KEY` only: uses Amap real POIs with deterministic rule arrangement.
 - No provider keys or provider failure: falls back to local seed data.
 
