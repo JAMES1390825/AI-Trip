@@ -188,6 +188,76 @@ textarea {
   line-height: 1.6;
 }
 
+.revision-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+  border: 1px solid rgba(18, 107, 67, 0.16);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 179, 64, 0.22), transparent 35%),
+    rgba(231, 255, 240, 0.54);
+  padding: 16px;
+}
+
+.revision-panel h3 {
+  margin: 4px 0 0;
+  font-size: 24px;
+  letter-spacing: -0.04em;
+}
+
+.revision-panel p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.section-kicker {
+  color: var(--green) !important;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.revision-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.revision-quick-actions button,
+.revision-submit {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.revision-submit {
+  width: fit-content;
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+}
+
+.revision-submit:disabled {
+  cursor: not-allowed;
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.68);
+  color: var(--muted);
+}
+
+.revision-summary {
+  border-radius: 16px;
+  background: #fff;
+  padding: 10px 12px;
+  font-weight: 800;
+}
+
 .saved-list {
   margin-top: 24px;
 }

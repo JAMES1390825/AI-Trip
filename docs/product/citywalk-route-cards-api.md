@@ -43,6 +43,41 @@ Response:
 }
 ```
 
+## `POST /api/route-cards/revise`
+
+Revises the current route card with a user adjustment note. This endpoint keeps the original city, theme, date, and duration, enriches the next planning note with the current stop list and revision request, then runs the same Amap + AI/provider planning pipeline used by generation.
+
+The revision path follows the same safety rule as generation: AI can only arrange known Amap candidates, and provider failure falls back to deterministic or local planning.
+
+Request:
+
+```json
+{
+  "routeCard": {
+    "id": "uuid",
+    "city": "杭州",
+    "themeId": "easy_citywalk",
+    "startDate": "2026-05-10",
+    "durationDays": 1,
+    "stops": []
+  },
+  "reviseNote": "少走路一点，加一个吃饭点"
+}
+```
+
+Response:
+
+```json
+{
+  "routeCard": {
+    "id": "new-uuid",
+    "city": "杭州",
+    "revisionNote": "少走路一点，加一个吃饭点",
+    "revisionSummary": "已根据「少走路一点，加一个吃饭点」重新调整路线。"
+  }
+}
+```
+
 ## `GET /api/route-cards`
 
 Returns saved route-card summaries.

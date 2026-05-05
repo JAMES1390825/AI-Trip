@@ -36,6 +36,17 @@ The real planner is server-side only.
 
 AI providers are never allowed to invent POI facts. Amap coordinates, addresses, and provider IDs remain the source of truth.
 
+## Route Revision Workbench
+
+The revision flow is a thin layer over the same planning pipeline:
+
+1. The client sends the current `routeCard` plus `reviseNote` to `POST /api/route-cards/revise`.
+2. `route-revision` builds an enriched planning note with the original intent, current stop names, and the user's requested change.
+3. `real-route-planner` runs again against Amap candidates and the configured AI provider.
+4. The response is a new route card annotated with `revisionNote` and `revisionSummary`.
+
+This keeps the product closer to a route workbench than a chat transcript: users can keep improving the active card, then save the version they prefer.
+
 ## Persistence
 
 Local SQLite database at `.data/route-cards.sqlite` by default.

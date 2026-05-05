@@ -10,6 +10,7 @@ import { StoryShareCard } from "./share/StoryShareCard";
 type ShareMode = "poster" | "story";
 
 const cityOptions = ["上海", "杭州", "苏州", "成都"];
+const revisionQuickActions = ["少走路", "加吃饭点", "下雨改室内", "更省钱", "去掉寺庙", "压缩成半日"];
 
 async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -25,6 +26,7 @@ export function RoutePlannerApp() {
   const [startDate, setStartDate] = useState("2026-05-10");
   const [durationDays, setDurationDays] = useState<1 | 2>(1);
   const [note, setNote] = useState("想拍照，别太累");
+  const [revisionNote, setRevisionNote] = useState("少走路一点，加一个吃饭点");
   const [routeCard, setRouteCard] = useState<RouteCardData | null>(null);
   const [saved, setSaved] = useState<SavedRouteCardSummary[]>([]);
   const [status, setStatus] = useState("选择城市和主题，生成你的第一张路线卡。");
@@ -53,6 +55,41 @@ export function RoutePlannerApp() {
         );
         setRouteCard(payload.routeCard);
         setStatus("路线卡已生成，可以保存或切换分享包装。");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : String(error));
+      }
+    });
+  }
+
+  function applyRevisionQuickAction(action: string) {
+    setRevisionNote((current) => (current.trim() ? `${current.trim()}，${action}` : action));
+  }
+
+  function reviseRoute() {
+    if (!routeCard) {
+      setStatus("请先生成一张路线卡，再调整路线。");
+      return;
+    }
+
+    const trimmedRevisionNote = revisionNote.trim();
+    if (!trimmedRevisionNote) {
+      setStatus("请先写一句调整要求。");
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        setStatus("正在根据你的要求调整路线...");
+        const payload = await readJson<{ routeCard: RouteCardData }>(
+          await fetch("/api/route-cards/revise", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ routeCard, reviseNote: trimmedRevisionNote })
+          }),
+        );
+        setRouteCard(payload.routeCard);
+        setRevisionNote("");
+        setStatus("已按要求调整路线，可以保存这一版。");
       } catch (error) {
         setStatus(error instanceof Error ? error.message : String(error));
       }
@@ -189,6 +226,33 @@ export function RoutePlannerApp() {
           </button>
         </div>
         <p className="status">{status}</p>
+
+        <div className="revision-panel">
+          <div>
+            <p className="section-kicker">Route Workbench</p>
+            <h3>调整路线</h3>
+            <p>生成后不用重填需求，可以继续要求它少走路、加饭点、改室内或压缩行程。</p>
+          </div>
+          <div className="revision-quick-actions">
+            {revisionQuickActions.map((action) => (
+              <button key={action} onClick={() => applyRevisionQuickAction(action)} type="button">
+                {action}
+              </button>
+            ))}
+          </div>
+          <label>
+            调整要求
+            <textarea
+              placeholder="例如：少走路一点，中午加一个本地吃饭点，下午尽量室内"
+              value={revisionNote}
+              onChange={(event) => setRevisionNote(event.target.value)}
+            />
+          </label>
+          <button className="revision-submit" disabled={!routeCard || isPending} onClick={reviseRoute} type="button">
+            重新调整路线
+          </button>
+          {routeCard?.revisionSummary ? <p className="revision-summary">{routeCard.revisionSummary}</p> : null}
+        </div>
 
         <div className="saved-list">
           <h3>已保存</h3>
