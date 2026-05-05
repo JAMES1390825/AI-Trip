@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { fallbackPoiProvider } from "./poi-provider";
 import { generateRouteCard } from "./planner";
 
 test("generateRouteCard returns a route-first card with 3 to 5 executable stops", () => {
@@ -49,4 +50,28 @@ test("unknown city degrades clearly instead of pretending provider coverage exis
   assert.equal(card.degraded, true);
   assert.equal(card.sourceMode, "fallback");
   assert.equal(card.degradedReason, "city_seed_data_missing");
+});
+
+test("fallbackPoiProvider returns supported city POIs and falls back to Shanghai", () => {
+  const hangzhouPois = fallbackPoiProvider.getPois("杭州");
+  const unknownPois = fallbackPoiProvider.getPois("火星");
+
+  assert.ok(fallbackPoiProvider.getSupportedCities().includes("杭州"));
+  assert.ok(hangzhouPois.every((poi) => poi.city === "杭州"));
+  assert.ok(unknownPois.every((poi) => poi.city === "上海"));
+});
+
+test("generateRouteCard returns route-level enrichment metadata", () => {
+  const card = generateRouteCard({
+    city: "成都",
+    themeId: "food_linked",
+    startDate: "2026-05-10",
+    durationDays: 1,
+    note: "想吃小吃，也想拍照"
+  });
+
+  assert.ok(card.highlights.length >= 2);
+  assert.ok(card.fitFor.includes("适合"));
+  assert.ok(card.riskTips.length >= 1);
+  assert.equal(card.sourceLabel, "本地示例数据");
 });

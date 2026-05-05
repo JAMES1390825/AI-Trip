@@ -19,9 +19,10 @@ test("route card store saves, lists, loads, and deletes cards", async () => {
 
   try {
     await store.save(card);
-    const list = await store.list();
-    assert.equal(list.length, 1);
-    assert.equal(list[0].id, card.id);
+  const list = await store.list();
+  assert.equal(list.length, 1);
+  assert.equal(list[0].id, card.id);
+  assert.equal(list[0].sharePath, `/share/${card.id}`);
 
     const loaded = await store.get(card.id);
     assert.equal(loaded?.title, card.title);

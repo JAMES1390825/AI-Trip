@@ -27,10 +27,12 @@ test("POST /api/route-cards saves a generated route card and GET lists summaries
     );
     assert.equal(saveResponse.status, 201);
 
-    const listResponse = await GET();
-    assert.equal(listResponse.status, 200);
-    const payload = await listResponse.json();
-    assert.ok(payload.items.some((item: { id: string }) => item.id === routeCard.id));
+  const listResponse = await GET();
+  assert.equal(listResponse.status, 200);
+  const payload = await listResponse.json();
+  const savedItem = payload.items.find((item: { id: string }) => item.id === routeCard.id);
+  assert.ok(savedItem);
+  assert.equal(savedItem.sharePath, `/share/${routeCard.id}`);
   } finally {
     delete process.env.ROUTE_CARD_DATA_FILE;
     await rm(tempDir, { recursive: true, force: true });

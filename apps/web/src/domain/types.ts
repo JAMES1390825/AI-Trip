@@ -75,6 +75,10 @@ export type RouteCard = {
   themeLabel: string;
   title: string;
   summary: string;
+  highlights: string[];
+  fitFor: string;
+  riskTips: string[];
+  sourceLabel: string;
   startDate: string;
   durationDays: 1 | 2;
   estimatedCostCny: number;
@@ -91,6 +95,7 @@ export type RouteCard = {
 
 export type SavedRouteCardSummary = {
   id: string;
+  sharePath: string;
   city: string;
   themeLabel: string;
   title: string;

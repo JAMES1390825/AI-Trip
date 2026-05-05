@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { fallbackPois, supportedCities } from "./fallback-data";
+import { fallbackPoiProvider, type PoiProvider } from "./poi-provider";
 import { getRouteTheme } from "./theme-catalog";
 import type { PoiSeed, RouteCard, RouteCardRequest, RouteLeg, RouteStop } from "./types";
 
@@ -87,18 +87,44 @@ function buildLegs(selected: PoiSeed[]): RouteLeg[] {
   return legs;
 }
 
+function highlightForStop(stop: RouteStop): string {
+  if (stop.tags.includes("local_food") || stop.tags.includes("snack")) return `${stop.poi} 串起本地吃法`;
+  if (stop.tags.includes("night")) return `${stop.poi} 适合夜间收束`;
+  if (stop.tags.includes("rain_friendly") || stop.tags.includes("indoor")) return `${stop.poi} 可作为天气备选`;
+  if (stop.tags.includes("photo")) return `${stop.poi} 适合边走边拍`;
+  return `${stop.poi} 是路线主节点`;
+}
+
+function buildHighlights(stops: RouteStop[]): string[] {
+  return Array.from(new Set(stops.map(highlightForStop))).slice(0, 3);
+}
+
+function buildFitFor(themeLabel: string, note: string): string {
+  const trimmedNote = note.trim();
+  if (trimmedNote) return `适合想要${themeLabel}，同时偏好“${trimmedNote}”的轻旅行用户。`;
+  return `适合想要${themeLabel}、不想做复杂攻略的轻旅行用户。`;
+}
+
+function buildRiskTips(stops: RouteStop[], degraded: boolean): string[] {
+  const tips = new Set<string>();
+  if (degraded) tips.add("当前城市暂无种子数据，已用示例城市降级生成，请先核对点位可达性。");
+  if (stops.some((stop) => stop.risk.includes("营业时间"))) tips.add("部分点位有营业时间，出发前建议再确认。");
+  if (stops.some((stop) => !stop.tags.includes("indoor"))) tips.add("路线包含户外步行，雨天建议保留室内备选。");
+  tips.add("交通时间为规则估算，实际以地图导航为准。");
+  return Array.from(tips).slice(0, 3);
+}
+
 function confidenceFor(stops: RouteStop[], degraded: boolean): number {
   const base = degraded ? 0.48 : 0.72;
   const tagCoverage = Math.min(0.18, stops.length * 0.035);
   return Math.round((base + tagCoverage) * 100) / 100;
 }
 
-export function generateRouteCard(request: RouteCardRequest): RouteCard {
+export function generateRouteCard(request: RouteCardRequest, provider: PoiProvider = fallbackPoiProvider): RouteCard {
   const city = normalizeCity(request.city);
   const theme = getRouteTheme(request.themeId);
-  const citySupported = supportedCities.includes(city);
-  const cityPois = fallbackPois.filter((poi) => poi.city === city);
-  const pool = citySupported && cityPois.length >= 3 ? cityPois : fallbackPois.filter((poi) => poi.city === "上海");
+  const citySupported = provider.getSupportedCities().includes(city);
+  const pool = provider.getPois(city);
   const desiredTags = [...theme.primaryTags, ...theme.styleTags, ...noteTags(request.note)];
   const selected = [...pool]
     .sort((left, right) => scorePoi(right, desiredTags, theme.avoidTags) - scorePoi(left, desiredTags, theme.avoidTags))
@@ -116,6 +142,10 @@ export function generateRouteCard(request: RouteCardRequest): RouteCard {
     themeLabel: theme.label,
     title: `${city}${theme.label}`,
     summary: `${theme.promise} ${request.note.trim() ? `已考虑：${request.note.trim()}。` : ""}`.trim(),
+    highlights: buildHighlights(stops),
+    fitFor: buildFitFor(theme.label, request.note),
+    riskTips: buildRiskTips(stops, degraded),
+    sourceLabel: provider.getSourceLabel(),
     startDate: request.startDate,
     durationDays: request.durationDays,
     estimatedCostCny: selected.reduce((sum, poi) => sum + poi.costLevel * 80, 0),

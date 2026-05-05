@@ -43,6 +43,7 @@ async function writeState(dataFile: string, state: StoreState): Promise<void> {
 function summary(card: RouteCard): SavedRouteCardSummary {
   return {
     id: card.id,
+    sharePath: `/share/${card.id}`,
     city: card.city,
     themeLabel: card.themeLabel,
     title: card.title,
