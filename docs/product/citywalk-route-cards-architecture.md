@@ -20,6 +20,10 @@ The MVP uses data and rules first:
 - Planner scores and orders POIs.
 - AI/provider integrations can enrich later, but the model must not invent facts.
 
+## Provider Boundary
+
+`apps/web/src/domain/poi-provider.ts` defines the POI provider seam. The current implementation uses `fallbackPoiProvider`, which wraps local seed data and exposes a source label for user-facing trust copy. Future AMap or AI enrichment should implement this boundary instead of bypassing the planner.
+
 ## Persistence
 
 Local JSON file at `.data/route-cards.json` by default.
