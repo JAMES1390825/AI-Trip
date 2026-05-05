@@ -92,6 +92,8 @@ export type RouteCard = {
   arrangementReason?: string;
   skipSuggestion?: string;
   weatherAlternative?: string;
+  revisionNote?: string;
+  revisionSummary?: string;
   providerWarnings?: string[];
   startDate: string;
   durationDays: 1 | 2;

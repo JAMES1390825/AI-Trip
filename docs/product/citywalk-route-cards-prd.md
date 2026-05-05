@@ -8,6 +8,14 @@ Help C-end young users generate themed, executable citywalk route cards for week
 
 Users want a route that is attractive enough to share but concrete enough to actually follow.
 
+## Market Reference
+
+- Wanderlog validates an itinerary workspace pattern: itinerary, map view, collaboration, reservations, route optimization, and budgeting belong around the same trip object.
+- Roadtrippers validates route-first editing: users add, remove, and optimize stops around a route instead of treating generation as a one-shot answer.
+- TripIt validates the value of a single itinerary timeline: travel details become useful when the user can see where to be, when, and how to get there.
+
+AI Trip should not copy these products wholesale. The near-term wedge is a lighter C-end personal travel route workbench: generate a real route, adjust it with simple requests, save the better version, then share it.
+
 ## MVP Scope
 
 1. Choose city, theme, date, and note.
@@ -20,6 +28,7 @@ Users want a route that is attractive enough to share but concrete enough to act
 8. Delete saved routes.
 9. Regenerate another route from the current preferences.
 10. Choose one-day or two-day duration.
+11. Revise a generated route with quick actions or a natural-language adjustment note.
 
 ## First Themes
 
@@ -37,3 +46,4 @@ Users want a route that is attractive enough to share but concrete enough to act
 - Community feed.
 - Booking.
 - Multi-user collaboration.
+- Full drag-and-drop route editing.
