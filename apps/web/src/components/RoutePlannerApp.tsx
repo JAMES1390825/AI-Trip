@@ -4,6 +4,10 @@ import { useEffect, useState, useTransition } from "react";
 import { routeThemes } from "@/domain/theme-catalog";
 import type { RouteCard as RouteCardData, SavedRouteCardSummary } from "@/domain/types";
 import { RouteCard } from "./RouteCard";
+import { PosterShareCard } from "./share/PosterShareCard";
+import { StoryShareCard } from "./share/StoryShareCard";
+
+type ShareMode = "poster" | "story";
 
 const cityOptions = ["上海", "杭州", "苏州", "成都"];
 
@@ -23,6 +27,7 @@ export function RoutePlannerApp() {
   const [routeCard, setRouteCard] = useState<RouteCardData | null>(null);
   const [saved, setSaved] = useState<SavedRouteCardSummary[]>([]);
   const [status, setStatus] = useState("选择城市和主题，生成你的第一张路线卡。");
+  const [shareMode, setShareMode] = useState<ShareMode>("poster");
   const [isPending, startTransition] = useTransition();
 
   async function loadSaved() {
@@ -144,9 +149,15 @@ export function RoutePlannerApp() {
         {routeCard ? (
           <>
             <RouteCard routeCard={routeCard} />
-            <div className="share-placeholder">
-              A 海报包装和 C 故事包装会在下一步接入；当前先保证 B 型路线卡可生成、可信、可保存。
+            <div className="share-switch">
+              <button className={shareMode === "poster" ? "active" : ""} onClick={() => setShareMode("poster")} type="button">
+                海报包装
+              </button>
+              <button className={shareMode === "story" ? "active" : ""} onClick={() => setShareMode("story")} type="button">
+                故事包装
+              </button>
             </div>
+            {shareMode === "poster" ? <PosterShareCard routeCard={routeCard} /> : <StoryShareCard routeCard={routeCard} />}
           </>
         ) : (
           <div className="empty-preview">生成后这里会出现 B 型可执行路线卡。</div>
