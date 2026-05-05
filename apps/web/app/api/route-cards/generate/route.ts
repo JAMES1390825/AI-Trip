@@ -1,4 +1,4 @@
-import { generateRouteCard } from "@/domain/planner";
+import { generateRealRouteCard } from "@/domain/real-route-planner";
 import { isRouteThemeId } from "@/domain/theme-catalog";
 import type { RouteCardRequest } from "@/domain/types";
 import { jsonError, jsonOk } from "@/server/api-response";
@@ -34,5 +34,5 @@ export async function POST(request: Request): Promise<Response> {
     return jsonError(400, "BAD_REQUEST", "city, themeId, startDate, and durationDays are required.");
   }
 
-  return jsonOk({ routeCard: generateRouteCard(body) });
+  return jsonOk({ routeCard: await generateRealRouteCard(body) });
 }
