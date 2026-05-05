@@ -36,7 +36,7 @@
 - Modify: `apps/web/src/domain/planner.test.ts`
 - Modify: `apps/web/src/domain/planner.ts`
 
-- [ ] **Step 1: Add failing duration tests**
+- [x] **Step 1: Add failing duration tests**
 
 Append to `apps/web/src/domain/planner.test.ts`:
 
@@ -76,7 +76,7 @@ test("route title and summary reflect duration days", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 Run:
 
@@ -87,7 +87,7 @@ npm test
 
 Expected: FAIL because two-day routes still have the same stop count and title/summary do not mention duration.
 
-- [ ] **Step 3: Add duration helpers**
+- [x] **Step 3: Add duration helpers**
 
 Add these helpers in `apps/web/src/domain/planner.ts` before `generateRouteCard`:
 
@@ -102,7 +102,7 @@ function durationLabel(durationDays: 1 | 2): string {
 }
 ```
 
-- [ ] **Step 4: Use duration in planner selection and copy**
+- [x] **Step 4: Use duration in planner selection and copy**
 
 In `generateRouteCard`, before selecting POIs, add:
 
@@ -124,7 +124,7 @@ Replace the returned `title` and `summary` fields with:
     summary: `${label}路线：${theme.promise} ${request.note.trim() ? `已考虑：${request.note.trim()}。` : ""}`.trim(),
 ```
 
-- [ ] **Step 5: Run tests and verify GREEN**
+- [x] **Step 5: Run tests and verify GREEN**
 
 Run:
 
@@ -135,7 +135,7 @@ npm test
 
 Expected: PASS.
 
-- [ ] **Step 6: Run typecheck**
+- [x] **Step 6: Run typecheck**
 
 Run:
 
@@ -146,7 +146,7 @@ npm run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit duration planner changes**
+- [x] **Step 7: Commit duration planner changes**
 
 Run:
 
@@ -164,7 +164,7 @@ Expected: Commit succeeds.
 **Files:**
 - Create: `apps/web/app/api/route-cards/route-detail.test.ts`
 
-- [ ] **Step 1: Create detail/delete tests**
+- [x] **Step 1: Create detail/delete tests**
 
 Create `apps/web/app/api/route-cards/route-detail.test.ts`:
 
@@ -216,7 +216,7 @@ test("GET and DELETE /api/route-cards/:id load and remove a saved route card", a
 });
 ```
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 Run:
 
@@ -227,7 +227,7 @@ npm test
 
 Expected: PASS, because detail/delete handlers already exist. If this fails due module caching with `ROUTE_CARD_DATA_FILE`, fix the test by importing routes only after setting the environment variable as shown above.
 
-- [ ] **Step 3: Commit detail/delete API tests**
+- [x] **Step 3: Commit detail/delete API tests**
 
 Run:
 
@@ -246,7 +246,7 @@ Expected: Commit succeeds.
 - Modify: `apps/web/src/components/RoutePlannerApp.tsx`
 - Modify: `apps/web/app/globals.css`
 
-- [ ] **Step 1: Add duration state**
+- [x] **Step 1: Add duration state**
 
 In `apps/web/src/components/RoutePlannerApp.tsx`, add this state after `startDate`:
 
@@ -254,7 +254,7 @@ In `apps/web/src/components/RoutePlannerApp.tsx`, add this state after `startDat
   const [durationDays, setDurationDays] = useState<1 | 2>(1);
 ```
 
-- [ ] **Step 2: Use duration in generate body**
+- [x] **Step 2: Use duration in generate body**
 
 Replace `durationDays: 1` in the generate request body with:
 
@@ -262,7 +262,7 @@ Replace `durationDays: 1` in the generate request body with:
 durationDays
 ```
 
-- [ ] **Step 3: Add duration selector in the form grid**
+- [x] **Step 3: Add duration selector in the form grid**
 
 After the date label in the `.form-grid`, add:
 
@@ -276,7 +276,7 @@ After the date label in the `.form-grid`, add:
           </label>
 ```
 
-- [ ] **Step 4: Add saved-route load/delete helpers**
+- [x] **Step 4: Add saved-route load/delete helpers**
 
 Add these functions inside `RoutePlannerApp` before `return`:
 
@@ -316,7 +316,7 @@ Add these functions inside `RoutePlannerApp` before `return`:
   }
 ```
 
-- [ ] **Step 5: Add regenerate action**
+- [x] **Step 5: Add regenerate action**
 
 The existing `generate()` already regenerates with current state after Step 2. In the preview panel, add a button inside `.share-actions` after copy button:
 
@@ -326,7 +326,7 @@ The existing `generate()` already regenerates with current state after Step 2. I
               </button>
 ```
 
-- [ ] **Step 6: Replace saved row action link with action row**
+- [x] **Step 6: Replace saved row action link with action row**
 
 Replace the single saved-list `<a>` with:
 
@@ -344,7 +344,7 @@ Replace the single saved-list `<a>` with:
                 </div>
 ```
 
-- [ ] **Step 7: Add CSS**
+- [x] **Step 7: Add CSS**
 
 Append to `apps/web/app/globals.css` before the media query:
 
@@ -372,7 +372,7 @@ Append to `apps/web/app/globals.css` before the media query:
 }
 ```
 
-- [ ] **Step 8: Run typecheck and build**
+- [x] **Step 8: Run typecheck and build**
 
 Run:
 
@@ -384,7 +384,7 @@ npm run build
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit UI management loop**
+- [x] **Step 9: Commit UI management loop**
 
 Run:
 
@@ -403,7 +403,7 @@ Expected: Commit succeeds.
 - Modify: `docs/product/citywalk-route-cards-prd.md`
 - Modify: `docs/product/citywalk-route-cards-api.md`
 
-- [ ] **Step 1: Update PRD management scope**
+- [x] **Step 1: Update PRD management scope**
 
 In `docs/product/citywalk-route-cards-prd.md`, under "MVP Scope", add:
 
@@ -414,7 +414,7 @@ In `docs/product/citywalk-route-cards-prd.md`, under "MVP Scope", add:
 10. Choose one-day or two-day duration.
 ```
 
-- [ ] **Step 2: Update API doc for detail/delete usage**
+- [x] **Step 2: Update API doc for detail/delete usage**
 
 In `docs/product/citywalk-route-cards-api.md`, under `GET /api/route-cards/:id`, add:
 
@@ -428,7 +428,7 @@ Under `DELETE /api/route-cards/:id`, add:
 Used by the main page saved-list delete action.
 ```
 
-- [ ] **Step 3: Run full verification**
+- [x] **Step 3: Run full verification**
 
 Run:
 
@@ -438,7 +438,7 @@ bash scripts/dev.sh verify
 
 Expected: typecheck, tests, and build pass.
 
-- [ ] **Step 4: Commit docs**
+- [x] **Step 4: Commit docs**
 
 Run:
 
