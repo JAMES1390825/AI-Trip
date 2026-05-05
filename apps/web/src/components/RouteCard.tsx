@@ -49,6 +49,29 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
             <strong>¥{routeCard.estimatedCostCny}</strong>
           </div>
         </div>
+        <div className="route-meta">
+          <div>
+            <span>适合人群</span>
+            <p>{routeCard.fitFor}</p>
+          </div>
+          <div>
+            <span>路线亮点</span>
+            <ul>
+              {routeCard.highlights.map((highlight) => (
+                <li key={highlight}>{highlight}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <span>数据来源</span>
+            <p>{routeCard.sourceLabel}</p>
+          </div>
+        </div>
+        <div className="risk-list">
+          {routeCard.riskTips.map((tip) => (
+            <span key={tip}>{tip}</span>
+          ))}
+        </div>
         {routeCard.degraded ? <p className="warning">当前为降级草案：{routeCard.degradedReason}</p> : null}
       </div>
     </article>

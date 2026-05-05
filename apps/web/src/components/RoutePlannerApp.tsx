@@ -62,19 +62,39 @@ export function RoutePlannerApp() {
     if (!routeCard) return;
     startTransition(async () => {
       try {
-        await readJson<{ routeCard: RouteCardData }>(
+        const payload = await readJson<{ routeCard: RouteCardData }>(
           await fetch("/api/route-cards", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ routeCard })
           }),
         );
+        setRouteCard(payload.routeCard);
         await loadSaved();
         setStatus("已保存路线卡。");
       } catch (error) {
         setStatus(error instanceof Error ? error.message : String(error));
       }
     });
+  }
+
+  function sharePathFor(card: RouteCardData): string {
+    return `/share/${card.id}`;
+  }
+
+  function absoluteShareUrl(card: RouteCardData): string {
+    if (typeof window === "undefined") return sharePathFor(card);
+    return `${window.location.origin}${sharePathFor(card)}`;
+  }
+
+  async function copyShareLink(card: RouteCardData) {
+    const url = absoluteShareUrl(card);
+    try {
+      await navigator.clipboard.writeText(url);
+      setStatus("分享链接已复制。");
+    } catch {
+      setStatus(`复制失败，可以手动复制：${url}`);
+    }
   }
 
   return (
@@ -137,6 +157,9 @@ export function RoutePlannerApp() {
                 <span>
                   {item.city} · {item.themeLabel} · {Math.round(item.confidence * 100)}%
                 </span>
+                <a href={item.sharePath} target="_blank" rel="noreferrer">
+                  打开 / 分享
+                </a>
               </div>
             ))
           ) : (
@@ -149,6 +172,14 @@ export function RoutePlannerApp() {
         {routeCard ? (
           <>
             <RouteCard routeCard={routeCard} />
+            <div className="share-actions">
+              <a href={sharePathFor(routeCard)} target="_blank" rel="noreferrer">
+                打开分享页
+              </a>
+              <button onClick={() => void copyShareLink(routeCard)} type="button">
+                复制分享链接
+              </button>
+            </div>
             <div className="share-switch">
               <button className={shareMode === "poster" ? "active" : ""} onClick={() => setShareMode("poster")} type="button">
                 海报包装

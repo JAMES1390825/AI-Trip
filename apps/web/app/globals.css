@@ -329,6 +329,53 @@ textarea {
   padding: 12px;
 }
 
+.route-meta {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.route-meta div {
+  border: 1px solid rgba(24, 32, 19, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 12px;
+}
+
+.route-meta span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.route-meta p,
+.route-meta ul {
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.route-meta li {
+  margin-left: 18px;
+  line-height: 1.55;
+}
+
+.risk-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.risk-list span {
+  border-radius: 999px;
+  background: #fff7df;
+  color: #7c5200;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .empty-preview {
   display: grid;
   min-height: 420px;
@@ -377,6 +424,31 @@ textarea {
 .share-switch .active {
   border-color: var(--ink);
   background: var(--ink);
+  color: #fff;
+}
+
+.share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.share-actions a,
+.share-actions button,
+.saved-item a {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  padding: 9px 12px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.share-actions a {
+  background: var(--green);
   color: #fff;
 }
 
