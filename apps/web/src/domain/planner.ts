@@ -120,15 +120,26 @@ function confidenceFor(stops: RouteStop[], degraded: boolean): number {
   return Math.round((base + tagCoverage) * 100) / 100;
 }
 
+function stopCountForDuration(durationDays: 1 | 2, poolSize: number): number {
+  const desired = durationDays === 2 ? 6 : 4;
+  return Math.max(3, Math.min(desired, poolSize));
+}
+
+function durationLabel(durationDays: 1 | 2): string {
+  return durationDays === 2 ? "2日" : "1日";
+}
+
 export function generateRouteCard(request: RouteCardRequest, provider: PoiProvider = fallbackPoiProvider): RouteCard {
   const city = normalizeCity(request.city);
   const theme = getRouteTheme(request.themeId);
   const citySupported = provider.getSupportedCities().includes(city);
   const pool = provider.getPois(city);
   const desiredTags = [...theme.primaryTags, ...theme.styleTags, ...noteTags(request.note)];
+  const stopCount = stopCountForDuration(request.durationDays, pool.length);
+  const label = durationLabel(request.durationDays);
   const selected = [...pool]
     .sort((left, right) => scorePoi(right, desiredTags, theme.avoidTags) - scorePoi(left, desiredTags, theme.avoidTags))
-    .slice(0, 4);
+    .slice(0, stopCount);
 
   const stops = buildStops(selected, theme.label);
   const legs = buildLegs(selected);
@@ -140,8 +151,8 @@ export function generateRouteCard(request: RouteCardRequest, provider: PoiProvid
     city,
     themeId: theme.id,
     themeLabel: theme.label,
-    title: `${city}${theme.label}`,
-    summary: `${theme.promise} ${request.note.trim() ? `已考虑：${request.note.trim()}。` : ""}`.trim(),
+    title: `${city}${label}${theme.label}`,
+    summary: `${label}路线：${theme.promise} ${request.note.trim() ? `已考虑：${request.note.trim()}。` : ""}`.trim(),
     highlights: buildHighlights(stops),
     fitFor: buildFitFor(theme.label, request.note),
     riskTips: buildRiskTips(stops, degraded),

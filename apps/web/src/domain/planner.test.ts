@@ -75,3 +75,37 @@ test("generateRouteCard returns route-level enrichment metadata", () => {
   assert.ok(card.riskTips.length >= 1);
   assert.equal(card.sourceLabel, "本地示例数据");
 });
+
+test("two-day routes include more stops than one-day routes when seed data allows", () => {
+  const oneDay = generateRouteCard({
+    city: "杭州",
+    themeId: "classic",
+    startDate: "2026-05-10",
+    durationDays: 1,
+    note: ""
+  });
+  const twoDay = generateRouteCard({
+    city: "杭州",
+    themeId: "classic",
+    startDate: "2026-05-10",
+    durationDays: 2,
+    note: ""
+  });
+
+  assert.ok(oneDay.stops.length <= 4);
+  assert.ok(twoDay.stops.length > oneDay.stops.length);
+  assert.ok(twoDay.stops.length <= 6);
+});
+
+test("route title and summary reflect duration days", () => {
+  const card = generateRouteCard({
+    city: "成都",
+    themeId: "easy_citywalk",
+    startDate: "2026-05-10",
+    durationDays: 2,
+    note: "想轻松"
+  });
+
+  assert.ok(card.title.includes("2日"));
+  assert.ok(card.summary.includes("2日"));
+});
