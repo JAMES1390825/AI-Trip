@@ -20,9 +20,18 @@ The MVP uses data and rules first:
 - Planner scores and orders POIs.
 - AI/provider integrations can enrich later, but the model must not invent facts.
 
-## Provider Boundary
+## Provider And AI Boundary
 
-`apps/web/src/domain/poi-provider.ts` defines the POI provider seam. The current implementation uses `fallbackPoiProvider`, which wraps local seed data and exposes a source label for user-facing trust copy. Future AMap or AI enrichment should implement this boundary instead of bypassing the planner.
+The real planner is server-side only.
+
+1. `user-intent` structures user preference from theme and note.
+2. `route-blueprint` turns intent into abstract search slots.
+3. `amap-client` resolves slots into real POI candidates and walking times.
+4. `openai-route-client` asks OpenAI for structured JSON only.
+5. `route-arrangement` validates that AI selected only candidate IDs from Amap.
+6. `real-route-planner` assembles a route card or falls back to the local seed planner.
+
+OpenAI is never allowed to invent POI facts. Amap coordinates, addresses, and provider IDs remain the source of truth.
 
 ## Persistence
 

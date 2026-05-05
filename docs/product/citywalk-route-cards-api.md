@@ -2,6 +2,14 @@
 
 ## `POST /api/route-cards/generate`
 
+Generation mode is environment-driven:
+
+- `AMAP_WEB_SERVICE_KEY` + `OPENAI_API_KEY`: uses AI intent/blueprint, Amap real POIs, AI candidate-only arrangement, and Amap walking time.
+- `AMAP_WEB_SERVICE_KEY` only: uses Amap real POIs with deterministic rule arrangement.
+- No provider keys or provider failure: falls back to local seed data.
+
+Route cards may include `planningMode`, `intentSummary`, `blueprintSummary`, `arrangementReason`, `skipSuggestion`, `weatherAlternative`, and `providerWarnings`.
+
 Request:
 
 ```json
