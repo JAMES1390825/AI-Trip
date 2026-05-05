@@ -22,7 +22,7 @@
 
 - Modify `apps/web/src/domain/planner.test.ts`: add duration route-length and title/summary tests.
 - Modify `apps/web/src/domain/planner.ts`: make `durationDays` affect stop count and title/summary.
-- Create `apps/web/app/api/route-cards/[id]/route.test.ts`: test detail and delete handlers.
+- Create `apps/web/app/api/route-cards/route-detail.test.ts`: test detail and delete handlers.
 - Modify `apps/web/src/components/RoutePlannerApp.tsx`: add duration selector, preview saved card, delete saved card, regenerate.
 - Modify `apps/web/app/globals.css`: style saved actions, duration selector, and preview actions.
 - Modify `docs/product/citywalk-route-cards-api.md`: document detail/delete use from main page.
@@ -162,11 +162,11 @@ Expected: Commit succeeds.
 ### Task 2: Test Detail And Delete Route Handlers
 
 **Files:**
-- Create: `apps/web/app/api/route-cards/[id]/route.test.ts`
+- Create: `apps/web/app/api/route-cards/route-detail.test.ts`
 
-- [ ] **Step 1: Create failing detail/delete tests**
+- [ ] **Step 1: Create detail/delete tests**
 
-Create `apps/web/app/api/route-cards/[id]/route.test.ts`:
+Create `apps/web/app/api/route-cards/route-detail.test.ts`:
 
 ```ts
 import assert from "node:assert/strict";
@@ -181,8 +181,8 @@ test("GET and DELETE /api/route-cards/:id load and remove a saved route card", a
   process.env.ROUTE_CARD_DATA_FILE = path.join(tempDir, "route-cards.json");
 
   try {
-    const listRoute = await import("../route");
-    const detailRoute = await import("./route");
+    const listRoute = await import("./route");
+    const detailRoute = await import("./[id]/route");
     const routeCard = generateRouteCard({
       city: "苏州",
       themeId: "classic",
@@ -232,7 +232,7 @@ Expected: PASS, because detail/delete handlers already exist. If this fails due 
 Run:
 
 ```bash
-git add 'apps/web/app/api/route-cards/[id]/route.test.ts'
+git add apps/web/app/api/route-cards/route-detail.test.ts
 git commit -m "test: cover route card detail delete api"
 ```
 
