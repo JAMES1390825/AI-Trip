@@ -7,7 +7,8 @@ const candidates: RealPoiCandidate[] = [
   { id: "a", providerPoiId: "a", name: "A", city: "杭州", address: "A路", providerType: "景点", lat: 30, lng: 120, tags: ["landmark", "photo"], sourceMode: "provider" },
   { id: "b", providerPoiId: "b", name: "B", city: "杭州", address: "B路", providerType: "餐饮", lat: 30.01, lng: 120.01, tags: ["local_food"], sourceMode: "provider" },
   { id: "c", providerPoiId: "c", name: "C", city: "杭州", address: "C路", providerType: "文化", lat: 30.02, lng: 120.02, tags: ["culture"], sourceMode: "provider" },
-  { id: "d", providerPoiId: "d", name: "D", city: "杭州", address: "D路", providerType: "咖啡", lat: 30.03, lng: 120.03, tags: ["coffee"], sourceMode: "provider" }
+  { id: "d", providerPoiId: "d", name: "D", city: "杭州", address: "D路", providerType: "咖啡", lat: 30.03, lng: 120.03, tags: ["coffee"], sourceMode: "provider" },
+  { id: "e", providerPoiId: "e", name: "E", city: "杭州", address: "E路", providerType: "景点", lat: 30.04, lng: 120.04, tags: ["landmark"], sourceMode: "provider" }
 ];
 
 test("validateAiArrangement rejects unknown candidate ids", () => {
@@ -30,10 +31,35 @@ test("validateAiArrangement rejects duplicate candidate ids", () => {
   assert.equal(result.ok, false);
 });
 
+test("validateAiArrangement trims extra valid AI stops to the day limit", () => {
+  const result = validateAiArrangement(
+    {
+      selectedStops: [
+        { candidateId: "a", day: 1, reason: "x" },
+        { candidateId: "b", day: 1, reason: "x" },
+        { candidateId: "c", day: 1, reason: "x" },
+        { candidateId: "d", day: 1, reason: "x" },
+        { candidateId: "e", day: 1, reason: "x" }
+      ],
+      arrangementReason: "x",
+      skipSuggestion: "x",
+      weatherAlternative: "x"
+    },
+    candidates,
+    1,
+  );
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.arrangement.selectedStops.length, 4);
+    assert.deepEqual(result.arrangement.selectedStops.map((stop) => stop.candidateId), ["a", "b", "c", "d"]);
+  }
+});
+
 test("arrangeCandidatesByRule returns day assignments and user-facing explanations", () => {
   const arrangement = arrangeCandidatesByRule(candidates, 2);
 
-  assert.equal(arrangement.selectedStops.length, 4);
+  assert.equal(arrangement.selectedStops.length, 5);
   assert.ok(arrangement.selectedStops.some((stop) => stop.day === 1));
   assert.ok(arrangement.selectedStops.some((stop) => stop.day === 2));
   assert.match(arrangement.arrangementReason, /真实地点|可走/);

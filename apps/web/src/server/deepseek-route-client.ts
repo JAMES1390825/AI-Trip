@@ -43,7 +43,7 @@ export class DeepSeekRouteClient {
         messages: [
           {
             role: "system",
-            content: `${systemPrompt}\nReturn valid json only. Example keys: selectedStops, arrangementReason, skipSuggestion, weatherAlternative.`
+            content: `${systemPrompt}\nReturn valid json only. selectedStops must be an array of objects with exactly candidateId, day, and reason. For 1-day routes select 3 to 4 stops. For 2-day routes select 5 to 8 stops and include day 2. Use only candidateId values from the input candidates. Do not mention non-candidate places in any field. Required top-level keys: selectedStops, arrangementReason, skipSuggestion, weatherAlternative.`
           },
           { role: "user", content: userPrompt }
         ],

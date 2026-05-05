@@ -47,6 +47,6 @@ bash scripts/dev.sh verify
 
 ## Environment
 
-Copy `.env.example` to `.env.local` if needed.
+Copy `.env.example` to `.env` at the project root if needed.
 
-The MVP works without provider keys by using local fallback data. Provider and AI integrations are optional future-compatible configuration.
+`scripts/dev.sh` loads the root `.env` before running the Web app, so provider keys should live in one place. The MVP works without provider keys by using local fallback data; real map and AI integrations are optional.

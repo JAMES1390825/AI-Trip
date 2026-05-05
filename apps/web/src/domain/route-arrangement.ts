@@ -25,23 +25,24 @@ export function validateAiArrangement(raw: unknown, candidates: RealPoiCandidate
   if (!raw || typeof raw !== "object") return { ok: false, reason: "arrangement_not_object" };
   const arrangement = raw as Partial<AiRouteArrangement>;
   if (!Array.isArray(arrangement.selectedStops)) return { ok: false, reason: "selected_stops_missing" };
-  if (arrangement.selectedStops.length < 3 || arrangement.selectedStops.length > maxStops(durationDays)) return { ok: false, reason: "invalid_stop_count" };
+  if (arrangement.selectedStops.length < 3) return { ok: false, reason: "invalid_stop_count" };
+  const selectedStops = arrangement.selectedStops.slice(0, maxStops(durationDays));
 
   const allowed = new Set(candidates.map((candidate) => candidate.id));
   const seen = new Set<string>();
-  for (const stop of arrangement.selectedStops) {
+  for (const stop of selectedStops) {
     if (!allowed.has(stop.candidateId)) return { ok: false, reason: "unknown_candidate_id" };
     if (seen.has(stop.candidateId)) return { ok: false, reason: "duplicate_candidate_id" };
     seen.add(stop.candidateId);
     if (stop.day !== 1 && stop.day !== 2) return { ok: false, reason: "invalid_day" };
     if (durationDays === 1 && stop.day !== 1) return { ok: false, reason: "day_two_in_one_day_route" };
   }
-  if (durationDays === 2 && !arrangement.selectedStops.some((stop) => stop.day === 2)) return { ok: false, reason: "missing_day_two" };
+  if (durationDays === 2 && !selectedStops.some((stop) => stop.day === 2)) return { ok: false, reason: "missing_day_two" };
 
   return {
     ok: true,
     arrangement: {
-      selectedStops: arrangement.selectedStops,
+      selectedStops,
       arrangementReason: arrangement.arrangementReason || "已从真实候选地点中选择更顺路的一组。",
       skipSuggestion: arrangement.skipSuggestion || "如果体力不够，优先跳过中间停留时间最短的一站。",
       weatherAlternative: arrangement.weatherAlternative || "天气变化时优先保留室内或交通更方便的点。"

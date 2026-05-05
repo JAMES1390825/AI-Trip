@@ -14,6 +14,7 @@ Tasks:
   help       Show this help
   install    Install web dependencies
   dev        Start Next.js dev server
+  start      Start built Next.js server
   test       Run web tests
   typecheck  Run TypeScript typecheck
   build      Build web app
@@ -21,7 +22,17 @@ Tasks:
 EOF
 }
 
+load_root_env() {
+  if [ -f "$ROOT/.env" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    . "$ROOT/.env"
+    set +a
+  fi
+}
+
 run_web() {
+  load_root_env
   cd "$WEB_DIR"
   "$@"
 }
@@ -35,6 +46,9 @@ case "$TASK" in
     ;;
   dev)
     run_web npm run dev
+    ;;
+  start)
+    run_web npm run start
     ;;
   test)
     run_web npm test

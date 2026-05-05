@@ -47,6 +47,10 @@ test("DeepSeekRouteClient posts JSON chat completion request", async () => {
   assert.match(requestBody, /deepseek-test/);
   assert.match(requestBody, /json_object/);
   assert.match(requestBody, /valid json only/i);
+  assert.match(requestBody, /selectedStops must be an array of objects/i);
+  assert.match(requestBody, /For 1-day routes select 3 to 4 stops/i);
+  assert.match(requestBody, /candidateId/i);
+  assert.match(requestBody, /Do not mention non-candidate/i);
 });
 
 test("DeepSeekRouteClient returns null for non-OK responses", async () => {
