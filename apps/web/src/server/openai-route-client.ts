@@ -1,10 +1,10 @@
+import type { JsonSchema } from "./route-ai-client";
+
 export type OpenAiRouteClientOptions = {
   apiKey?: string;
   model?: string;
   fetcher?: typeof fetch;
 };
-
-export type JsonSchema = Record<string, unknown>;
 
 export function parseStructuredOutputText<T>(payload: unknown): T | null {
   const output = (payload as { output?: Array<{ content?: Array<{ type?: string; text?: string }> }> }).output || [];

@@ -55,3 +55,46 @@ test("generateRealRouteCard accepts valid AI arrangement over candidates", async
   assert.equal(card.stops[0].poi, "南宋御街小吃");
   assert.equal(card.skipSuggestion, "太累就跳过城市阳台。");
 });
+
+test("generateRealRouteCard can arrange with configured DeepSeek provider", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalDeepSeekKey = process.env.DEEPSEEK_API_KEY;
+  const originalFetch = globalThis.fetch;
+  process.env.AI_PROVIDER = "deepseek";
+  process.env.DEEPSEEK_API_KEY = "test-deepseek-key";
+  globalThis.fetch = (async () =>
+    Response.json({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              selectedStops: [
+                { candidateId: "c", day: 1, reason: "先用开阔景观建立旅行兴奋感。" },
+                { candidateId: "a", day: 1, reason: "接着安排轻松步行和拍照。" },
+                { candidateId: "b", day: 1, reason: "最后用本地小吃收束。" }
+              ],
+              arrangementReason: "按景观、漫步、餐食收束排列。",
+              skipSuggestion: "太累就跳过湖滨步行街。",
+              weatherAlternative: "下雨改去室内展馆。"
+            })
+          }
+        }
+      ]
+    })) as typeof fetch;
+
+  try {
+    const card = await generateRealRouteCard(request, {
+      amapClient: { searchPois: async () => realCandidates, estimateWalkingMinutes: async () => 10 }
+    });
+
+    assert.equal(card.planningMode, "ai_amap");
+    assert.equal(card.stops[0].poi, "城市阳台");
+    assert.equal(card.arrangementReason, "按景观、漫步、餐食收束排列。");
+  } finally {
+    if (originalProvider === undefined) delete process.env.AI_PROVIDER;
+    else process.env.AI_PROVIDER = originalProvider;
+    if (originalDeepSeekKey === undefined) delete process.env.DEEPSEEK_API_KEY;
+    else process.env.DEEPSEEK_API_KEY = originalDeepSeekKey;
+    globalThis.fetch = originalFetch;
+  }
+});

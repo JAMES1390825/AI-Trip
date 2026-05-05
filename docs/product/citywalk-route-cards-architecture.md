@@ -27,11 +27,13 @@ The real planner is server-side only.
 1. `user-intent` structures user preference from theme and note.
 2. `route-blueprint` turns intent into abstract search slots.
 3. `amap-client` resolves slots into real POI candidates and walking times.
-4. `openai-route-client` asks OpenAI for structured JSON only.
-5. `route-arrangement` validates that AI selected only candidate IDs from Amap.
-6. `real-route-planner` assembles a route card or falls back to the local seed planner.
+4. `route-ai-client` selects the configured AI provider.
+5. `openai-route-client` uses OpenAI Responses structured output when `AI_PROVIDER=openai`.
+6. `deepseek-route-client` uses DeepSeek Chat Completions JSON Output when `AI_PROVIDER=deepseek`.
+7. `route-arrangement` validates that AI selected only candidate IDs from Amap.
+8. `real-route-planner` assembles a route card or falls back to the local seed planner.
 
-OpenAI is never allowed to invent POI facts. Amap coordinates, addresses, and provider IDs remain the source of truth.
+AI providers are never allowed to invent POI facts. Amap coordinates, addresses, and provider IDs remain the source of truth.
 
 ## Persistence
 

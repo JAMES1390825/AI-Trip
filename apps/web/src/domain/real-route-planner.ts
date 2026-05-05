@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { AmapClient, type RealPoiCandidate } from "@/server/amap-client";
-import { OpenAiRouteClient } from "@/server/openai-route-client";
+import { createRouteAiClient, type RouteAiJsonClient } from "@/server/route-ai-client";
 import { arrangeCandidatesByRule, validateAiArrangement, type AiRouteArrangement } from "./route-arrangement";
 import { buildFallbackBlueprint, searchSlotsToAmapQueries } from "./route-blueprint";
 import { getRouteTheme } from "./theme-catalog";
@@ -11,11 +11,12 @@ import { inferUserIntent } from "./user-intent";
 const stopTimes = ["10:00", "12:20", "15:00", "19:30", "10:00", "12:20", "15:30", "19:30"];
 
 type PlannerAmapClient = Pick<AmapClient, "searchPois" | "estimateWalkingMinutes">;
-type PlannerOpenAiClient = Pick<OpenAiRouteClient, "createJson">;
+type PlannerAiClient = RouteAiJsonClient;
 
 export type RealRoutePlannerDeps = {
   amapClient?: PlannerAmapClient;
-  openAiClient?: PlannerOpenAiClient;
+  aiClient?: PlannerAiClient;
+  openAiClient?: PlannerAiClient;
 };
 
 function dedupeCandidates(candidates: RealPoiCandidate[]): RealPoiCandidate[] {
@@ -129,13 +130,13 @@ function assembleCard(
 }
 
 async function maybeAiArrangement(
-  openAiClient: PlannerOpenAiClient | undefined,
+  aiClient: PlannerAiClient | undefined,
   request: RouteCardRequest,
   candidates: RealPoiCandidate[],
   blueprintSummary: string,
 ): Promise<AiRouteArrangement | null> {
-  if (!openAiClient) return null;
-  const raw = await openAiClient.createJson<unknown>(
+  if (!aiClient) return null;
+  const raw = await aiClient.createJson<unknown>(
     "You arrange travel routes. Only choose candidateId values from the provided candidates. Do not invent POIs.",
     JSON.stringify({ request, blueprintSummary, candidates: candidates.map(({ id, name, address, tags }) => ({ id, name, address, tags })) }),
     {
@@ -168,7 +169,7 @@ async function maybeAiArrangement(
 
 export async function generateRealRouteCard(request: RouteCardRequest, deps: RealRoutePlannerDeps = {}): Promise<RouteCard> {
   const amapClient = deps.amapClient || new AmapClient();
-  const openAiClient = deps.openAiClient || (process.env.OPENAI_API_KEY ? new OpenAiRouteClient() : undefined);
+  const aiClient = deps.aiClient || deps.openAiClient || createRouteAiClient();
   const intent = inferUserIntent({ themeId: request.themeId, note: request.note });
   const blueprint = buildFallbackBlueprint({ ...request, intent });
   const queries = searchSlotsToAmapQueries(request.city, blueprint.searchSlots);
@@ -186,7 +187,7 @@ export async function generateRealRouteCard(request: RouteCardRequest, deps: Rea
     };
   }
 
-  const aiArrangement = await maybeAiArrangement(openAiClient, request, candidates, blueprint.summary);
+  const aiArrangement = await maybeAiArrangement(aiClient, request, candidates, blueprint.summary);
   const arrangement = aiArrangement || arrangeCandidatesByRule(candidates, request.durationDays);
   const mode = aiArrangement ? "ai_amap" : "rule_amap";
   const stops = buildStopsFromArrangement(candidates, arrangement);

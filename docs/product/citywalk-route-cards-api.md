@@ -4,9 +4,12 @@
 
 Generation mode is environment-driven:
 
-- `AMAP_WEB_SERVICE_KEY` + `OPENAI_API_KEY`: uses AI intent/blueprint, Amap real POIs, AI candidate-only arrangement, and Amap walking time.
+- `AMAP_WEB_SERVICE_KEY` + `AI_PROVIDER=openai` + `OPENAI_API_KEY`: uses Amap real POIs, OpenAI candidate-only arrangement, and Amap walking time.
+- `AMAP_WEB_SERVICE_KEY` + `AI_PROVIDER=deepseek` + `DEEPSEEK_API_KEY`: uses Amap real POIs, DeepSeek candidate-only arrangement, and Amap walking time.
 - `AMAP_WEB_SERVICE_KEY` only: uses Amap real POIs with deterministic rule arrangement.
 - No provider keys or provider failure: falls back to local seed data.
+
+If `AI_PROVIDER` is unset, the server defaults to `openai`. AI output is accepted only when it selects known Amap candidate IDs and passes local validation.
 
 Route cards may include `planningMode`, `intentSummary`, `blueprintSummary`, `arrangementReason`, `skipSuggestion`, `weatherAlternative`, and `providerWarnings`.
 
