@@ -1,8 +1,0 @@
-global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
-
-# Single-machine default: monitoring pipeline is paused until trip-api exposes
-# a Prometheus-compatible metrics endpoint.
-rule_files: []
-scrape_configs: []
