@@ -139,7 +139,6 @@ Create `apps/web/tsconfig.json`:
     "jsx": "preserve",
     "incremental": true,
     "plugins": [{ "name": "next" }],
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
@@ -282,9 +281,10 @@ Append these lines to the root `.gitignore` if they are not already present:
 ```gitignore
 .next/
 .data/
+*.tsbuildinfo
 ```
 
-Expected: Next build output and local route-card JSON storage are ignored anywhere in the repository.
+Expected: Next build output, local route-card JSON storage, and TypeScript incremental cache files are ignored anywhere in the repository.
 
 - [ ] **Step 8: Install dependencies**
 

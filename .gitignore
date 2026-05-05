@@ -10,6 +10,9 @@ out/
 .env.*
 node_modules/
 dist/
+.next/
+.data/
+*.tsbuildinfo
 __pycache__/
 .pytest_cache/
 
