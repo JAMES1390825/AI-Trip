@@ -23,6 +23,7 @@ export function RoutePlannerApp() {
   const [city, setCity] = useState("杭州");
   const [themeId, setThemeId] = useState(routeThemes[0].id);
   const [startDate, setStartDate] = useState("2026-05-10");
+  const [durationDays, setDurationDays] = useState<1 | 2>(1);
   const [note, setNote] = useState("想拍照，别太累");
   const [routeCard, setRouteCard] = useState<RouteCardData | null>(null);
   const [saved, setSaved] = useState<SavedRouteCardSummary[]>([]);
@@ -47,7 +48,7 @@ export function RoutePlannerApp() {
           await fetch("/api/route-cards/generate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ city, themeId, startDate, durationDays: 1, note })
+            body: JSON.stringify({ city, themeId, startDate, durationDays, note })
           }),
         );
         setRouteCard(payload.routeCard);
@@ -97,6 +98,40 @@ export function RoutePlannerApp() {
     }
   }
 
+  function loadSavedPreview(id: string) {
+    startTransition(async () => {
+      try {
+        setStatus("正在载入保存的路线卡...");
+        const payload = await readJson<{ routeCard: RouteCardData }>(await fetch(`/api/route-cards/${id}`));
+        setRouteCard(payload.routeCard);
+        setCity(payload.routeCard.city);
+        setThemeId(payload.routeCard.themeId);
+        setStartDate(payload.routeCard.startDate);
+        setDurationDays(payload.routeCard.durationDays);
+        setStatus("已载入保存的路线卡。");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : String(error));
+      }
+    });
+  }
+
+  function deleteSaved(id: string) {
+    startTransition(async () => {
+      try {
+        setStatus("正在删除路线卡...");
+        const response = await fetch(`/api/route-cards/${id}`, { method: "DELETE" });
+        if (!response.ok) {
+          throw new Error("删除失败，请稍后再试。");
+        }
+        if (routeCard?.id === id) setRouteCard(null);
+        await loadSaved();
+        setStatus("已删除路线卡。");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : String(error));
+      }
+    });
+  }
+
   return (
     <div className="app-grid">
       <section className="planner-panel">
@@ -116,6 +151,13 @@ export function RoutePlannerApp() {
           <label>
             日期
             <input value={startDate} onChange={(event) => setStartDate(event.target.value)} type="date" />
+          </label>
+          <label>
+            时长
+            <select value={durationDays} onChange={(event) => setDurationDays(Number(event.target.value) as 1 | 2)}>
+              <option value={1}>1日</option>
+              <option value={2}>2日</option>
+            </select>
           </label>
         </div>
 
@@ -157,9 +199,17 @@ export function RoutePlannerApp() {
                 <span>
                   {item.city} · {item.themeLabel} · {Math.round(item.confidence * 100)}%
                 </span>
-                <a href={item.sharePath} target="_blank" rel="noreferrer">
-                  打开 / 分享
-                </a>
+                <div className="saved-actions">
+                  <button onClick={() => loadSavedPreview(item.id)} type="button" disabled={isPending}>
+                    预览
+                  </button>
+                  <a href={item.sharePath} target="_blank" rel="noreferrer">
+                    打开 / 分享
+                  </a>
+                  <button onClick={() => deleteSaved(item.id)} type="button" disabled={isPending}>
+                    删除
+                  </button>
+                </div>
               </div>
             ))
           ) : (
@@ -178,6 +228,9 @@ export function RoutePlannerApp() {
               </a>
               <button onClick={() => void copyShareLink(routeCard)} type="button">
                 复制分享链接
+              </button>
+              <button onClick={generate} type="button" disabled={isPending}>
+                再生成一版
               </button>
             </div>
             <div className="share-switch">

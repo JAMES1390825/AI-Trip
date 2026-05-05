@@ -452,6 +452,28 @@ textarea {
   color: #fff;
 }
 
+.saved-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.saved-actions button,
+.saved-actions a {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  padding: 8px 10px;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.saved-actions button:last-child {
+  color: #9b3b24;
+}
+
 .poster-card {
   background: linear-gradient(145deg, #f6b13e, #e76755, #251913);
   color: #fff;
