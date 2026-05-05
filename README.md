@@ -50,3 +50,5 @@ bash scripts/dev.sh verify
 Copy `.env.example` to `.env` at the project root if needed.
 
 `scripts/dev.sh` loads the root `.env` before running the Web app, so provider keys should live in one place. The MVP works without provider keys by using local fallback data; real map and AI integrations are optional.
+
+Saved route cards use a local SQLite database by default at `apps/web/.data/route-cards.sqlite`. Set `ROUTE_CARD_DATABASE_FILE` in `.env` to use another database file.

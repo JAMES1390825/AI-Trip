@@ -9,7 +9,7 @@ Single Node/TypeScript Web app in `apps/web`.
 1. UI: `apps/web/app` and `apps/web/src/components`.
 2. API: Next.js Route Handlers in `apps/web/app/api`.
 3. Domain: route themes, fallback data, planner in `apps/web/src/domain`.
-4. Persistence: local JSON store in `apps/web/src/server`.
+4. Persistence: local SQLite store in `apps/web/src/server`.
 
 ## Planning Model
 
@@ -38,4 +38,4 @@ AI providers are never allowed to invent POI facts. Amap coordinates, addresses,
 
 ## Persistence
 
-Local JSON file at `.data/route-cards.json` by default.
+Local SQLite database at `.data/route-cards.sqlite` by default.

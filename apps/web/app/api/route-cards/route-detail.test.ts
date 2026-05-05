@@ -7,7 +7,7 @@ import { generateRouteCard } from "@/domain/planner";
 
 test("GET and DELETE /api/route-cards/:id load and remove a saved route card", async () => {
   const tempDir = await mkdtemp(path.join(tmpdir(), "route-cards-detail-api-"));
-  process.env.ROUTE_CARD_DATA_FILE = path.join(tempDir, "route-cards.json");
+  process.env.ROUTE_CARD_DATABASE_FILE = path.join(tempDir, "route-cards.sqlite");
 
   try {
     const listRoute = await import("./route");
@@ -39,7 +39,7 @@ test("GET and DELETE /api/route-cards/:id load and remove a saved route card", a
     const missingResponse = await detailRoute.GET(new Request(`http://localhost/api/route-cards/${routeCard.id}`), context);
     assert.equal(missingResponse.status, 404);
   } finally {
-    delete process.env.ROUTE_CARD_DATA_FILE;
+    delete process.env.ROUTE_CARD_DATABASE_FILE;
     await rm(tempDir, { recursive: true, force: true });
   }
 });

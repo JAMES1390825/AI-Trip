@@ -7,7 +7,7 @@ import { generateRouteCard } from "@/domain/planner";
 
 test("POST /api/route-cards saves a generated route card and GET lists summaries", async () => {
   const tempDir = await mkdtemp(path.join(tmpdir(), "route-cards-api-"));
-  process.env.ROUTE_CARD_DATA_FILE = path.join(tempDir, "route-cards.json");
+  process.env.ROUTE_CARD_DATABASE_FILE = path.join(tempDir, "route-cards.sqlite");
 
   try {
     const { GET, POST } = await import("./route");
@@ -34,7 +34,7 @@ test("POST /api/route-cards saves a generated route card and GET lists summaries
   assert.ok(savedItem);
   assert.equal(savedItem.sharePath, `/share/${routeCard.id}`);
   } finally {
-    delete process.env.ROUTE_CARD_DATA_FILE;
+    delete process.env.ROUTE_CARD_DATABASE_FILE;
     await rm(tempDir, { recursive: true, force: true });
   }
 });
