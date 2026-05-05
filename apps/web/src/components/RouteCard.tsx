@@ -2,6 +2,7 @@ import type { RouteCard as RouteCardData } from "@/domain/types";
 
 export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
   const totalTransit = routeCard.legs.reduce((sum, leg) => sum + leg.minutes, 0);
+  const riskItems = Array.from(new Set([...(routeCard.riskTips || []), ...(routeCard.providerWarnings || [])]));
 
   return (
     <article className="route-card">
@@ -21,15 +22,45 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
           <span className="chip">{routeCard.themeLabel}</span>
           <span className="chip chip-light">{routeCard.city}</span>
           <span className="chip chip-light">{routeCard.durationDays} 日</span>
+          {routeCard.planningMode ? <span className="chip chip-light">{routeCard.planningMode}</span> : null}
         </div>
         <h2>{routeCard.title}</h2>
         <p className="route-summary">{routeCard.summary}</p>
+        {routeCard.intentSummary || routeCard.arrangementReason || routeCard.skipSuggestion || routeCard.weatherAlternative ? (
+          <div className="explain-panel">
+            {routeCard.intentSummary ? (
+              <div>
+                <span>路线构思</span>
+                <p>{routeCard.intentSummary}</p>
+              </div>
+            ) : null}
+            {routeCard.arrangementReason ? (
+              <div>
+                <span>这样安排的原因</span>
+                <p>{routeCard.arrangementReason}</p>
+              </div>
+            ) : null}
+            {routeCard.skipSuggestion ? (
+              <div>
+                <span>太累就跳过</span>
+                <p>{routeCard.skipSuggestion}</p>
+              </div>
+            ) : null}
+            {routeCard.weatherAlternative ? (
+              <div>
+                <span>天气变化备选</span>
+                <p>{routeCard.weatherAlternative}</p>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <div className="timeline">
           {routeCard.stops.map((stop) => (
             <a className="timeline-row" href={stop.mapUrl} key={stop.id} rel="noreferrer" target="_blank">
               <span className="time">{stop.time}</span>
               <span>
                 <strong>{stop.poi}</strong>
+                {stop.address ? <small>{stop.address}</small> : null}
                 <em>{stop.reason}</em>
               </span>
             </a>
@@ -68,7 +99,7 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
           </div>
         </div>
         <div className="risk-list">
-          {routeCard.riskTips.map((tip) => (
+          {riskItems.map((tip) => (
             <span key={tip}>{tip}</span>
           ))}
         </div>

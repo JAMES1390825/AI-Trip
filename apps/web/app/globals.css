@@ -335,6 +335,35 @@ textarea {
   margin-top: 18px;
 }
 
+.explain-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.explain-panel div {
+  border: 1px solid rgba(18, 107, 67, 0.12);
+  border-radius: 18px;
+  background: rgba(231, 255, 240, 0.58);
+  padding: 12px;
+}
+
+.explain-panel span {
+  display: block;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.explain-panel p,
+.timeline-row small {
+  display: block;
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .route-meta div {
   border: 1px solid rgba(24, 32, 19, 0.08);
   border-radius: 18px;
