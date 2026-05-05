@@ -16,6 +16,10 @@ Users want a route that is attractive enough to share but concrete enough to act
 4. Save route cards.
 5. Review saved cards.
 6. Export A poster or C story share wrappers.
+7. Reopen saved routes in the preview.
+8. Delete saved routes.
+9. Regenerate another route from the current preferences.
+10. Choose one-day or two-day duration.
 
 ## First Themes
 

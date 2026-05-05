@@ -45,6 +45,10 @@ Saves a generated route card.
 
 Returns one saved route card.
 
+Used by the main page to load a saved route back into the preview panel.
+
 ## `DELETE /api/route-cards/:id`
 
 Deletes one saved route card.
+
+Used by the main page saved-list delete action.
