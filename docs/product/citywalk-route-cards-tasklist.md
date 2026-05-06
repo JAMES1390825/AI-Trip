@@ -15,4 +15,4 @@
 1. `npm test` passes in `apps/web`.
 2. `npm run typecheck` passes in `apps/web`.
 3. `npm run build` passes in `apps/web`.
-4. `bash scripts/dev.sh verify` passes at repo root.
+4. `npm run verify` passes in `apps/web`.

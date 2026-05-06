@@ -13,7 +13,6 @@ The product helps young users generate a themed route card that is:
 
 - Web app: `apps/web`
 - Product docs: `docs/product`
-- Local scripts: `scripts/dev.sh`
 
 Retired from the current mainline:
 
@@ -26,8 +25,9 @@ Retired from the current mainline:
 ## Quick Start
 
 ```bash
-bash scripts/dev.sh install
-bash scripts/dev.sh dev
+cd apps/web
+npm install
+npm run dev
 ```
 
 Open:
@@ -39,16 +39,17 @@ http://localhost:3000
 ## Verification
 
 ```bash
-bash scripts/dev.sh test
-bash scripts/dev.sh typecheck
-bash scripts/dev.sh build
-bash scripts/dev.sh verify
+cd apps/web
+npm test
+npm run typecheck
+npm run build
+npm run verify
 ```
 
 ## Environment
 
-Copy `.env.example` to `.env` at the project root if needed.
+Copy `.env.example` to `apps/web/.env.local` if provider keys are needed.
 
-`scripts/dev.sh` loads the root `.env` before running the Web app, so provider keys should live in one place. The MVP works without provider keys by using local fallback data; real map and AI integrations are optional.
+The MVP works without provider keys by using local fallback data; real map and AI integrations are optional.
 
-Saved route cards use a local SQLite database by default at `apps/web/.data/route-cards.sqlite`. Set `ROUTE_CARD_DATABASE_FILE` in `.env` to use another database file.
+Saved route cards use a local SQLite database by default at `apps/web/.data/route-cards.sqlite`. Set `ROUTE_CARD_DATABASE_FILE` in `apps/web/.env.local` to use another database file.
