@@ -58,6 +58,21 @@ test("RoutePlannerApp exposes light create entries and planning chips", () => {
   assert.match(markup, /预算友好/);
 });
 
+test("RoutePlannerApp presents a launchable planning-first first screen", () => {
+  const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
+
+  assert.match(markup, /AI 旅行规划/);
+  assert.match(markup, /真实地点/);
+  assert.match(markup, /公开攻略证据/);
+  assert.match(markup, /先规划，再保存和调整/);
+  assert.match(markup, /高德真实地点/);
+  assert.match(markup, /AI 路线编排/);
+  assert.match(markup, /Exa 公开证据/);
+  assert.match(markup, /异常时本地兜底/);
+  assert.match(markup, /生成真实行程/);
+  assert.doesNotMatch(markup, /生成路线卡/);
+});
+
 test("RoutePlannerApp keeps route templates out of the light create flow", () => {
   const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
 

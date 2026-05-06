@@ -76,6 +76,23 @@ h1 {
   line-height: 1.75;
 }
 
+.trust-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0 8px;
+}
+
+.trust-strip span {
+  border: 1px solid rgba(18, 107, 67, 0.18);
+  border-radius: 999px;
+  background: rgba(231, 255, 240, 0.72);
+  color: var(--green);
+  padding: 8px 11px;
+  font-size: 12px;
+  font-weight: 950;
+}
+
 .app-grid {
   display: grid;
   grid-template-columns: minmax(320px, 0.9fr) minmax(360px, 1.1fr);

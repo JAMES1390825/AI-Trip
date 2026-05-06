@@ -272,9 +272,17 @@ export function RoutePlannerApp() {
   return (
     <div className="app-grid">
       <section className="planner-panel">
-        <p className="eyebrow">AI Trip · 我的行程</p>
-        <h1>把一句旅行想法变成可执行行程。</h1>
-        <p className="hero-copy">像在地图纸上做标注：先轻量创建，再用真实地点、公开攻略证据和路线校验生成可编辑路线卡。</p>
+        <p className="eyebrow">AI 旅行规划 · 我的行程</p>
+        <h1>一句想法，生成真实可走的旅行路线。</h1>
+        <p className="hero-copy">
+          先规划，再保存和调整。AI Trip 会结合真实地点、路线校验和公开攻略证据，帮你把周末 citywalk 或短途旅行变成可执行行程。
+        </p>
+        <div className="trust-strip" aria-label="规划可信来源">
+          <span>高德真实地点</span>
+          <span>AI 路线编排</span>
+          <span>Exa 公开证据</span>
+          <span>异常时本地兜底</span>
+        </div>
 
         <div className="create-entry-panel">
           <div>
@@ -365,7 +373,7 @@ export function RoutePlannerApp() {
 
         <div className="action-row">
           <button className="primary" disabled={isPending} onClick={generate} type="button">
-            {isPending ? "处理中..." : "生成路线卡"}
+            {isPending ? "规划中..." : "生成真实行程"}
           </button>
           <button disabled={!routeCard || isPending} onClick={save} type="button">
             保存
