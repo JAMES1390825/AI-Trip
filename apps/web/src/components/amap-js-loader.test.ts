@@ -35,11 +35,11 @@ function installDomStub() {
 }
 
 function installWindowStub(overrides: Partial<AmapWindow> = {}) {
-  const windowStub: AmapWindow = {
+  const windowStub = {
     AMap: undefined,
     _AMapSecurityConfig: undefined,
     ...overrides
-  };
+  } as unknown as AmapWindow;
 
   Object.defineProperty(globalThis, "window", {
     configurable: true,

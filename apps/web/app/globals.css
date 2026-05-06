@@ -380,6 +380,119 @@ textarea {
   font-size: 11px;
 }
 
+.route-map-workbench {
+  display: grid;
+  gap: 12px;
+}
+
+.route-map-canvas-shell {
+  position: relative;
+  min-height: 300px;
+  overflow: hidden;
+  border: 1px solid rgba(22, 32, 19, 0.14);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 18% 16%, rgba(255, 179, 64, 0.24), transparent 28%),
+    linear-gradient(135deg, rgba(255, 248, 237, 0.92), rgba(218, 235, 210, 0.9));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+
+.route-amap-canvas {
+  width: 100%;
+  height: 320px;
+}
+
+.route-map-loading {
+  position: absolute;
+  inset: 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 22px;
+  background: rgba(255, 248, 237, 0.76);
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.route-map-fallback {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.route-map-fallback > p {
+  margin: 0;
+  color: #42604a;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.map-marker {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 10px 24px rgba(22, 32, 19, 0.28);
+  color: var(--ink);
+  font-weight: 950;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.map-marker span {
+  transform: translateY(-1px);
+}
+
+.map-marker--selected {
+  background: #fff8ed;
+  box-shadow:
+    0 0 0 5px rgba(255, 179, 64, 0.36),
+    0 16px 30px rgba(22, 32, 19, 0.3);
+  transform: translateY(-4px) scale(1.08);
+}
+
+.route-selected-stop {
+  display: grid;
+  gap: 5px;
+  border: 1px solid rgba(18, 107, 67, 0.16);
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(255, 248, 237, 0.94), rgba(231, 255, 240, 0.88)),
+    #fff;
+  padding: 14px;
+}
+
+.route-selected-stop span {
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.route-selected-stop strong {
+  font-size: 18px;
+  letter-spacing: -0.03em;
+}
+
+.route-selected-stop em,
+.route-selected-stop small {
+  color: var(--muted);
+  font-style: normal;
+  line-height: 1.45;
+}
+
+.route-selected-stop p {
+  margin: 2px 0;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
 .route-card-body {
   padding: 20px;
 }
@@ -420,8 +533,18 @@ textarea {
   display: grid;
   grid-template-columns: 58px 1fr;
   gap: 12px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 18px;
+  background: transparent;
   color: inherit;
-  text-decoration: none;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.timeline-row--selected {
+  border-color: rgba(18, 107, 67, 0.22);
+  background: rgba(231, 255, 240, 0.78);
 }
 
 .time {

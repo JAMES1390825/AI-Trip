@@ -78,12 +78,14 @@ function renderAmapRoute(
     );
   }
 
-  if (amap.Marker) {
+  const Marker = amap.Marker;
+  if (Marker) {
+    const Pixel = amap.Pixel;
     validStops.forEach(({ stop, index }) => {
-      const marker = new amap.Marker({
+      const marker = new Marker({
         position: [stop.lng, stop.lat],
         content: createMarkerContent(index + 1, stop.poi, stop.id === selectedStopId),
-        offset: amap.Pixel ? new amap.Pixel(-18, -18) : undefined,
+        offset: Pixel ? new Pixel(-18, -18) : undefined,
         zIndex: stop.id === selectedStopId ? 80 : 60
       }) as AmapMarkerInstance;
       marker.on?.("click", () => onSelectStop(stop.id));
