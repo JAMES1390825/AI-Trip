@@ -107,6 +107,53 @@ test("buildPretripChecklist deduplicates category title pairs", () => {
   assert.equal(new Set(keys).size, keys.length);
 });
 
+test("buildPretripChecklist creates weather backup item from weather alternative for indoor routes", () => {
+  const card: RouteCard = {
+    ...generateRouteCard({
+      city: "杭州",
+      themeId: "classic",
+      startDate: "2026-05-10",
+      durationDays: 1,
+      note: "想拍照"
+    }),
+    weatherAlternative: "下雨改去室内展馆。",
+    stops: [
+      {
+        id: "1-a",
+        time: "10:00",
+        poiId: "a",
+        poi: "室内展馆",
+        tags: ["indoor"],
+        lat: 30,
+        lng: 120,
+        mapUrl: "https://uri.amap.com/marker",
+        reason: "适合雨天。",
+        risk: "风险较低。",
+        sourceMode: "provider"
+      },
+      {
+        id: "2-b",
+        time: "12:20",
+        poiId: "b",
+        poi: "室内书店",
+        tags: ["indoor"],
+        lat: 30.01,
+        lng: 120.01,
+        mapUrl: "https://uri.amap.com/marker",
+        reason: "适合休息。",
+        risk: "风险较低。",
+        sourceMode: "provider"
+      }
+    ],
+    legs: [{ fromPoi: "室内展馆", toPoi: "室内书店", minutes: 15, sourceMode: "provider" }]
+  };
+
+  const weatherItem = buildPretripChecklist(card).find((item) => item.category === "weather");
+
+  assert.ok(weatherItem);
+  assert.ok(weatherItem.detail.includes("下雨改去室内展馆。"));
+});
+
 test("buildPretripChecklist creates booking items from provider warnings or risk tips mentioning booking", () => {
   const card = generateRouteCard({
     city: "杭州",

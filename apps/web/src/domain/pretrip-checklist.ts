@@ -65,7 +65,7 @@ export function buildPretripChecklist(routeCard: RouteCard): PretripChecklistIte
     });
   }
 
-  if (hasOutdoorStop(routeCard)) {
+  if (hasOutdoorStop(routeCard) || routeCard.weatherAlternative) {
     items.push({
       category: "weather",
       title: "保留雨天或高温备选",
