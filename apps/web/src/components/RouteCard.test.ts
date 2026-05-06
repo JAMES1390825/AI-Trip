@@ -100,8 +100,12 @@ test("RouteCard renders real planning explanation fields", () => {
   assert.match(markup, /查看天气/);
   assert.match(markup, /pretrip-item pretrip-item--warning/);
   assert.doesNotMatch(markup, /pretrip-item warning/);
-  assert.match(markup, /App 内路线预览 · 点击站点可打开高德/);
-  assert.match(markup, /route-mini-map/);
-  assert.match(markup, /href="https:\/\/uri\.amap\.com\/marker/);
+  assert.match(markup, /动态地图未配置，已显示路线预览。/);
+  assert.match(markup, /当前点位/);
+  assert.match(markup, /10:00 · 湖滨步行街/);
+  assert.match(markup, /type="button"/);
+  assert.match(markup, /timeline-row timeline-row--selected/);
+  assert.doesNotMatch(markup, /href="https:\/\/uri\.amap\.com\/marker/);
+  assert.doesNotMatch(markup, /点击站点可打开高德/);
   assert.doesNotMatch(markup, /map-pin/);
 });

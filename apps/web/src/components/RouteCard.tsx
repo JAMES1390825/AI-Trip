@@ -1,9 +1,12 @@
+"use client";
+
+import { useState } from "react";
 import type {
   PretripChecklistCategory,
   PretripChecklistSeverity,
   RouteCard as RouteCardData
 } from "@/domain/types";
-import { RouteMiniMap } from "./RouteMiniMap";
+import { RouteInteractiveMap } from "./RouteInteractiveMap";
 
 function severityLabel(severity: PretripChecklistSeverity): string {
   if (severity === "critical") return "高风险";
@@ -24,6 +27,9 @@ function categoryLabel(category: PretripChecklistCategory): string {
 }
 
 export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
+  const firstSelectableStopId = routeCard.stops[0]?.id;
+  const [selectedStopId, setSelectedStopId] = useState(firstSelectableStopId);
+  const activeStopId = selectedStopId || firstSelectableStopId;
   const totalTransit = routeCard.legs.reduce((sum, leg) => sum + leg.minutes, 0);
   const riskItems = Array.from(new Set([...(routeCard.riskTips || []), ...(routeCard.providerWarnings || [])]));
   const checklist = routeCard.pretripChecklist || [];
@@ -37,7 +43,7 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
   return (
     <article className="route-card">
       <div className="route-map">
-        <RouteMiniMap stops={routeCard.stops} />
+        <RouteInteractiveMap stops={routeCard.stops} selectedStopId={activeStopId} onSelectStop={setSelectedStopId} />
       </div>
       <div className="route-card-body">
         <div className="chip-row">
@@ -78,14 +84,19 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
         ) : null}
         <div className="timeline">
           {routeCard.stops.map((stop) => (
-            <a className="timeline-row" href={stop.mapUrl} key={stop.id} rel="noreferrer" target="_blank">
+            <button
+              className={stop.id === activeStopId ? "timeline-row timeline-row--selected" : "timeline-row"}
+              key={stop.id}
+              onClick={() => setSelectedStopId(stop.id)}
+              type="button"
+            >
               <span className="time">{stop.time}</span>
               <span>
                 <strong>{stop.poi}</strong>
                 {stop.address ? <small>{stop.address}</small> : null}
                 <em>{stop.reason}</em>
               </span>
-            </a>
+            </button>
           ))}
         </div>
         <div className="trust-panel">
