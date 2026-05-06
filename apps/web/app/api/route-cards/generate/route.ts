@@ -22,9 +22,15 @@ const allowedTripPreferences = new Set<TripPreferenceId>([
 
 const allowedTransportPreferences = new Set<TransportPreference>(["walk_first", "public_transit_ok", "taxi_ok"]);
 const allowedCompanions = new Set<CompanionType>(["solo", "friends", "couple", "family", "elderly"]);
+const maxImportedTextLength = 600;
+const maxLocationTextLength = 80;
 
 function asString(value: unknown): string {
   return String(value || "").trim();
+}
+
+function asCappedString(value: unknown, maxLength: number): string {
+  return asString(value).slice(0, maxLength);
 }
 
 function asTripPreferences(value: unknown): TripPreferenceId[] | undefined {
@@ -60,9 +66,9 @@ export function asRequestBody(value: unknown): RouteCardRequest | null {
 
   const requestBody: RouteCardRequest = { city, themeId, startDate, durationDays, note };
   const tripPreferences = asTripPreferences(body.tripPreferences);
-  const importedText = asString(body.importedText);
-  const startPoint = asString(body.startPoint);
-  const endPoint = asString(body.endPoint);
+  const importedText = asCappedString(body.importedText, maxImportedTextLength);
+  const startPoint = asCappedString(body.startPoint, maxLocationTextLength);
+  const endPoint = asCappedString(body.endPoint, maxLocationTextLength);
   const transportPreference = asTransportPreference(body.transportPreference);
   const companion = asCompanion(body.companion);
 

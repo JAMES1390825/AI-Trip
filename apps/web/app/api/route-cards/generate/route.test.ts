@@ -51,3 +51,24 @@ test("asRequestBody preserves lightweight trip planning fields", () => {
     companion: "friends"
   });
 });
+
+test("asRequestBody caps lightweight trip planning text fields", () => {
+  const importedText = "行".repeat(650);
+  const startPoint = "起".repeat(100);
+  const endPoint = "终".repeat(100);
+
+  const body = asRequestBody({
+    city: "杭州",
+    themeId: "easy_citywalk",
+    startDate: "2026-05-10",
+    durationDays: 2,
+    note: "想轻松一点",
+    importedText,
+    startPoint,
+    endPoint
+  });
+
+  assert.equal(body?.importedText, importedText.slice(0, 600));
+  assert.equal(body?.startPoint, startPoint.slice(0, 80));
+  assert.equal(body?.endPoint, endPoint.slice(0, 80));
+});
