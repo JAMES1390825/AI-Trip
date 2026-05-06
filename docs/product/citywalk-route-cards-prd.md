@@ -29,6 +29,7 @@ AI Trip should not copy these products wholesale. The near-term wedge is a light
 9. Regenerate another route from the current preferences.
 10. Choose one-day or two-day duration.
 11. Revise a generated route with quick actions or a natural-language adjustment note.
+12. Review a route-specific pretrip checklist for weather, opening, traffic, budget, and pacing risks.
 
 ## First Themes
 

@@ -47,6 +47,10 @@ The revision flow is a thin layer over the same planning pipeline:
 
 This keeps the product closer to a route workbench than a chat transcript: users can keep improving the active card, then save the version they prefer.
 
+## Pretrip Trust Layer
+
+`pretrip-checklist` derives read-only departure checks from the route card itself. It does not call live weather, booking, or opening-hours services in v1. The checklist is stored as part of the route card JSON, so saved routes and share pages preserve the same trust layer.
+
 ## Persistence
 
 Local SQLite database at `.data/route-cards.sqlite` by default.
