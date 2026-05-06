@@ -23,6 +23,24 @@ const routeCard: RouteCardData = {
   skipSuggestion: "太累就跳过第二站。",
   weatherAlternative: "下雨改去室内展馆。",
   providerWarnings: ["地点来自地图服务，营业/预约/交通以出发前实时信息为准。"],
+  pretripChecklist: [
+    {
+      id: "weather-1",
+      category: "weather",
+      title: "保留雨天或高温备选",
+      detail: "路线包含户外步行，出发前建议确认天气。",
+      severity: "warning",
+      actionLabel: "查看天气"
+    },
+    {
+      id: "traffic-1",
+      category: "traffic",
+      title: "这段路程可能偏长",
+      detail: "湖滨步行街 到 城市阳台 预计 35 分钟。",
+      severity: "info",
+      actionLabel: "打开地图复核"
+    }
+  ],
   startDate: "2026-05-10",
   durationDays: 1,
   estimatedCostCny: 240,
@@ -61,4 +79,10 @@ test("RouteCard renders real planning explanation fields", () => {
   assert.match(markup, /太累就跳过/);
   assert.match(markup, /天气变化备选/);
   assert.match(markup, /湖滨路/);
+  assert.match(markup, /出发前检查/);
+  assert.match(markup, /天气风险/);
+  assert.match(markup, /保留雨天或高温备选/);
+  assert.match(markup, /查看天气/);
+  assert.match(markup, /pretrip-item pretrip-item--warning/);
+  assert.doesNotMatch(markup, /pretrip-item warning/);
 });

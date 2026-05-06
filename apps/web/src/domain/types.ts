@@ -12,6 +12,20 @@ export type ConfidenceTier = "high" | "medium" | "needs_confirmation";
 
 export type PlanningMode = "ai_amap" | "rule_amap" | "fallback_seed";
 
+export type PretripChecklistCategory = "time" | "weather" | "traffic" | "booking" | "budget" | "comfort";
+
+export type PretripChecklistSeverity = "info" | "warning" | "critical";
+
+export type PretripChecklistItem = {
+  id: string;
+  category: PretripChecklistCategory;
+  title: string;
+  detail: string;
+  severity: PretripChecklistSeverity;
+  actionLabel: string;
+  relatedStopId?: string;
+};
+
 export type RouteTheme = {
   id: RouteThemeId;
   label: string;
@@ -95,6 +109,7 @@ export type RouteCard = {
   revisionNote?: string;
   revisionSummary?: string;
   providerWarnings?: string[];
+  pretripChecklist?: PretripChecklistItem[];
   startDate: string;
   durationDays: 1 | 2;
   estimatedCostCny: number;

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { fallbackPoiProvider, type PoiProvider } from "./poi-provider";
+import { buildPretripChecklist } from "./pretrip-checklist";
 import { getRouteTheme } from "./theme-catalog";
 import type { PoiSeed, RouteCard, RouteCardRequest, RouteLeg, RouteStop } from "./types";
 
@@ -146,7 +147,7 @@ export function generateRouteCard(request: RouteCardRequest, provider: PoiProvid
   const degraded = !citySupported;
   const confidence = confidenceFor(stops, degraded);
 
-  return {
+  const card: RouteCard = {
     id: randomUUID(),
     city,
     themeId: theme.id,
@@ -175,4 +176,6 @@ export function generateRouteCard(request: RouteCardRequest, provider: PoiProvid
     },
     createdAt: new Date().toISOString()
   };
+
+  return { ...card, pretripChecklist: buildPretripChecklist(card) };
 }

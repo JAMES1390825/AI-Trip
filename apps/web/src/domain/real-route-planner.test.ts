@@ -19,6 +19,8 @@ test("generateRealRouteCard falls back to local seed planner when Amap has no ca
 
   assert.equal(card.planningMode, "fallback_seed");
   assert.equal(card.degraded, true);
+  assert.ok(card.pretripChecklist);
+  assert.ok(card.pretripChecklist.length >= 1);
 });
 
 test("generateRealRouteCard uses Amap rule planning when real candidates exist without OpenAI", async () => {
@@ -40,6 +42,9 @@ test("generateRealRouteCard uses Amap rule planning when real candidates exist w
   assert.equal(card.stops[0].sourceMode, "provider");
   assert.ok(card.stops[0].address);
   assert.ok(card.arrangementReason);
+  assert.ok(card.pretripChecklist);
+  assert.ok(card.pretripChecklist.length >= 1);
+  assert.ok(card.pretripChecklist.some((item) => item.category === "booking" || item.category === "weather"));
   } finally {
     if (originalProvider === undefined) delete process.env.AI_PROVIDER;
     else process.env.AI_PROVIDER = originalProvider;

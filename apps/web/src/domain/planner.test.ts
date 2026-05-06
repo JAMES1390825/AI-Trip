@@ -74,6 +74,9 @@ test("generateRouteCard returns route-level enrichment metadata", () => {
   assert.ok(card.fitFor.includes("适合"));
   assert.ok(card.riskTips.length >= 1);
   assert.equal(card.sourceLabel, "本地示例数据");
+  assert.ok(card.pretripChecklist);
+  assert.ok(card.pretripChecklist.length >= 1);
+  assert.ok(card.pretripChecklist.some((item) => item.category === "weather" || item.category === "comfort"));
 });
 
 test("two-day routes include more stops than one-day routes when seed data allows", () => {
