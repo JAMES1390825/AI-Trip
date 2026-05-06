@@ -59,6 +59,21 @@ const routeCard: RouteCardData = {
       reason: "适合拍照。",
       risk: "出发前确认。",
       sourceMode: "provider"
+    },
+    {
+      id: "1-b",
+      time: "11:00",
+      poiId: "b",
+      poi: "城市阳台",
+      address: "之江路",
+      day: 1,
+      tags: ["landmark"],
+      lat: 30.02,
+      lng: 120.02,
+      mapUrl: "https://uri.amap.com/marker?position=120.02,30.02&name=%E5%9F%8E%E5%B8%82%E9%98%B3%E5%8F%B0",
+      reason: "适合看江景。",
+      risk: "出发前确认。",
+      sourceMode: "provider"
     }
   ],
   legs: [],
@@ -85,4 +100,8 @@ test("RouteCard renders real planning explanation fields", () => {
   assert.match(markup, /查看天气/);
   assert.match(markup, /pretrip-item pretrip-item--warning/);
   assert.doesNotMatch(markup, /pretrip-item warning/);
+  assert.match(markup, /App 内路线预览 · 点击站点可打开高德/);
+  assert.match(markup, /route-mini-map/);
+  assert.match(markup, /href="https:\/\/uri\.amap\.com\/marker/);
+  assert.doesNotMatch(markup, /map-pin/);
 });

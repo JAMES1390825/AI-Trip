@@ -281,22 +281,104 @@ textarea {
 
 .route-map {
   position: relative;
-  height: 220px;
+  min-height: 274px;
+  padding: 14px;
   background:
-    linear-gradient(90deg, transparent 49%, rgba(48, 78, 57, 0.16) 50%, transparent 51%),
-    linear-gradient(0deg, transparent 49%, rgba(48, 78, 57, 0.16) 50%, transparent 51%),
+    radial-gradient(circle at 12% 24%, rgba(246, 183, 74, 0.34), transparent 28%),
+    radial-gradient(circle at 82% 18%, rgba(113, 148, 94, 0.22), transparent 24%),
+    linear-gradient(90deg, transparent 49%, rgba(48, 78, 57, 0.12) 50%, transparent 51%),
+    linear-gradient(0deg, transparent 49%, rgba(48, 78, 57, 0.12) 50%, transparent 51%),
     #dcebd2;
-  background-size: 44px 44px;
+  background-size: auto, auto, 44px 44px, 44px 44px, auto;
 }
 
-.map-pin {
-  position: absolute;
+.route-mini-map {
   display: grid;
-  width: 34px;
-  height: 34px;
+  gap: 10px;
+  min-height: 246px;
+}
+
+.route-mini-map--empty {
+  min-height: 190px;
+  place-items: center;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.route-mini-map svg {
+  width: 100%;
+  min-height: 188px;
+  overflow: visible;
+}
+
+.route-line {
+  fill: none;
+  stroke: #315f3d;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 5;
+}
+
+.route-point {
+  fill: var(--accent);
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.route-point-number {
+  fill: var(--ink);
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.route-point-label,
+.route-empty-label {
+  fill: #2e4a34;
+  font-size: 13px;
+  font-weight: 900;
+  paint-order: stroke;
+  stroke: rgba(251, 241, 223, 0.82);
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+
+.route-map-caption {
+  margin: 0;
+  color: #42604a;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.route-map-stops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.route-map-stop-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  border: 1px solid rgba(48, 78, 57, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #2f4b34;
+  padding: 6px 9px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.route-map-stop-chip b {
+  display: grid;
+  width: 18px;
+  height: 18px;
   place-items: center;
   border-radius: 999px;
-  background: var(--accent);
+  background: var(--ink);
+  color: #fff;
+  font-size: 11px;
+}
   color: var(--ink);
   font-weight: 950;
 }

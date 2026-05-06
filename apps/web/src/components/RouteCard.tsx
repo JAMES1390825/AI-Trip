@@ -3,6 +3,7 @@ import type {
   PretripChecklistSeverity,
   RouteCard as RouteCardData
 } from "@/domain/types";
+import { RouteMiniMap } from "./RouteMiniMap";
 
 function severityLabel(severity: PretripChecklistSeverity): string {
   if (severity === "critical") return "高风险";
@@ -36,15 +37,7 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
   return (
     <article className="route-card">
       <div className="route-map">
-        {routeCard.stops.map((stop, index) => (
-          <span
-            className="map-pin"
-            key={stop.id}
-            style={{ left: `${18 + index * 21}%`, top: `${32 + (index % 2) * 22}%` }}
-          >
-            {index + 1}
-          </span>
-        ))}
+        <RouteMiniMap stops={routeCard.stops} />
       </div>
       <div className="route-card-body">
         <div className="chip-row">
