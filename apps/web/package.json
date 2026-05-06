@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start -p 3000",
     "typecheck": "tsc --noEmit",
-    "test": "sh -c 'tsx --test $(find src app -name \"*.test.ts\" -print)'",
+    "test": "sh -c 'tsx --test $(find src app \\( -name \"*.test.ts\" -o -name \"*.test.tsx\" \\) -print)'",
     "verify": "npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
