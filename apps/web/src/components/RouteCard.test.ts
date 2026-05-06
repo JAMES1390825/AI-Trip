@@ -23,6 +23,16 @@ const routeCard: RouteCardData = {
   skipSuggestion: "太累就跳过第二站。",
   weatherAlternative: "下雨改去室内展馆。",
   providerWarnings: ["地点来自地图服务，营业/预约/交通以出发前实时信息为准。"],
+  evidenceSummary: "公开攻略证据：example.com《杭州拍照路线》",
+  evidenceSources: [
+    {
+      title: "杭州拍照路线",
+      sourceName: "example.com",
+      url: "https://example.com/hangzhou",
+      snippet: "公开攻略证据支持湖滨步行街与江景串联。",
+      usedFor: "reason"
+    }
+  ],
   pretripChecklist: [
     {
       id: "weather-1",
@@ -74,6 +84,21 @@ const routeCard: RouteCardData = {
       reason: "适合看江景。",
       risk: "出发前确认。",
       sourceMode: "provider"
+    },
+    {
+      id: "2-a",
+      time: "09:30",
+      poiId: "c",
+      poi: "南宋御街",
+      address: "中山中路",
+      day: 2,
+      tags: ["food"],
+      lat: 30.01,
+      lng: 120.01,
+      mapUrl: "https://uri.amap.com/marker?position=120.01,30.01&name=%E5%8D%97%E5%AE%8B%E5%BE%A1%E8%A1%97",
+      reason: "适合慢逛吃点心。",
+      risk: "出发前确认。",
+      sourceMode: "provider"
     }
   ],
   legs: [],
@@ -93,6 +118,12 @@ test("RouteCard renders real planning explanation fields", () => {
   assert.match(markup, /这样安排的原因/);
   assert.match(markup, /太累就跳过/);
   assert.match(markup, /天气变化备选/);
+  assert.match(markup, /总览/);
+  assert.match(markup, /DAY1/);
+  assert.match(markup, /DAY2/);
+  assert.match(markup, /每日行程/);
+  assert.match(markup, /公开攻略证据/);
+  assert.match(markup, /example\.com/);
   assert.match(markup, /湖滨路/);
   assert.match(markup, /出发前检查/);
   assert.match(markup, /天气风险/);

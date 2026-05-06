@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { dayForTab, dayTabsFor, filterStopsByDay, reorderStopsWithinDay, type ItineraryTabId } from "@/domain/itinerary-days";
 import type {
   PretripChecklistCategory,
   PretripChecklistSeverity,
@@ -29,9 +30,17 @@ function categoryLabel(category: PretripChecklistCategory): string {
 export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
   const firstSelectableStopId = routeCard.stops[0]?.id;
   const [selectedStopId, setSelectedStopId] = useState(firstSelectableStopId);
+  const [activeTab, setActiveTab] = useState<ItineraryTabId>("overview");
+  const [orderedStops, setOrderedStops] = useState(routeCard.stops);
+  const [draggedStopId, setDraggedStopId] = useState<string | null>(null);
+  const [needsRevalidation, setNeedsRevalidation] = useState(false);
+  const itineraryTabs = dayTabsFor(orderedStops);
+  const activeDay = dayForTab(activeTab);
+  const visibleStops = filterStopsByDay(orderedStops, activeTab);
   const activeStopId = selectedStopId || firstSelectableStopId;
   const totalTransit = routeCard.legs.reduce((sum, leg) => sum + leg.minutes, 0);
   const riskItems = Array.from(new Set([...(routeCard.riskTips || []), ...(routeCard.providerWarnings || [])]));
+  const evidenceSources = (routeCard.evidenceSources || []).slice(0, 4);
   const checklist = routeCard.pretripChecklist || [];
   const highestSeverity = checklist.some((item) => item.severity === "critical")
     ? "critical"
@@ -40,10 +49,33 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
       : "info";
   const hasWeatherRisk = checklist.some((item) => item.category === "weather");
 
+  useEffect(() => {
+    const nextFirstSelectableStopId = routeCard.stops[0]?.id;
+    setOrderedStops(routeCard.stops);
+    setActiveTab("overview");
+    setDraggedStopId(null);
+    setSelectedStopId(nextFirstSelectableStopId);
+    setNeedsRevalidation(false);
+  }, [routeCard]);
+
+  function selectTab(tabId: ItineraryTabId) {
+    setActiveTab(tabId);
+    setDraggedStopId(null);
+    const firstVisibleStop = filterStopsByDay(orderedStops, tabId)[0];
+    setSelectedStopId(firstVisibleStop?.id);
+  }
+
+  function dropStopOn(targetId: string) {
+    if (!activeDay || !draggedStopId) return;
+    setOrderedStops((currentStops) => reorderStopsWithinDay(currentStops, activeDay, draggedStopId, targetId));
+    setDraggedStopId(null);
+    setNeedsRevalidation(true);
+  }
+
   return (
     <article className="route-card">
       <div className="route-map">
-        <RouteInteractiveMap stops={routeCard.stops} selectedStopId={activeStopId} onSelectStop={setSelectedStopId} />
+        <RouteInteractiveMap stops={visibleStops} selectedStopId={activeStopId} onSelectStop={setSelectedStopId} />
       </div>
       <div className="route-card-body">
         <div className="chip-row">
@@ -51,6 +83,21 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
           <span className="chip chip-light">{routeCard.city}</span>
           <span className="chip chip-light">{routeCard.durationDays} 日</span>
           {routeCard.planningMode ? <span className="chip chip-light">{routeCard.planningMode}</span> : null}
+        </div>
+        <div aria-label="行程视图" className="itinerary-tabs" role="tablist">
+          {itineraryTabs.map((tab) => (
+            <button
+              aria-selected={tab.id === activeTab}
+              className={tab.id === activeTab ? "itinerary-tab itinerary-tab--active" : "itinerary-tab"}
+              key={tab.id}
+              onClick={() => selectTab(tab.id)}
+              role="tab"
+              type="button"
+            >
+              <span>{tab.label}</span>
+              <small>{tab.stopCount} 站</small>
+            </button>
+          ))}
         </div>
         <h2>{routeCard.title}</h2>
         <p className="route-summary">{routeCard.summary}</p>
@@ -83,10 +130,20 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
           </div>
         ) : null}
         <div className="timeline">
-          {routeCard.stops.map((stop) => (
+          {visibleStops.map((stop) => (
             <button
               className={stop.id === activeStopId ? "timeline-row timeline-row--selected" : "timeline-row"}
+              draggable={activeTab !== "overview"}
               key={stop.id}
+              onDragEnd={() => setDraggedStopId(null)}
+              onDragOver={(event) => {
+                if (activeDay) event.preventDefault();
+              }}
+              onDragStart={() => setDraggedStopId(stop.id)}
+              onDrop={(event) => {
+                event.preventDefault();
+                dropStopOn(stop.id);
+              }}
               onClick={() => setSelectedStopId(stop.id)}
               type="button"
             >
@@ -99,6 +156,25 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
             </button>
           ))}
         </div>
+        {needsRevalidation ? <p className="route-revalidation-note">顺序已调整，下一步可重新校验交通时间与开放状态。</p> : null}
+        <section className="day-itinerary-panel">
+          <div className="day-itinerary-heading">
+            <span>每日行程</span>
+            <strong>{activeDay ? `DAY${activeDay} 工作台` : "全程鸟瞰"}</strong>
+          </div>
+          <div className="day-itinerary-grid">
+            {itineraryTabs.filter((tab) => tab.day).map((tab) => {
+              const dayStops = filterStopsByDay(orderedStops, tab.id);
+              return (
+                <div className="day-itinerary-card" key={tab.id}>
+                  <span>{tab.label}</span>
+                  <strong>{dayStops.map((stop) => stop.poi).join(" → ")}</strong>
+                  <p>{dayStops.length ? `${dayStops[0].time} 开始 · ${dayStops.length} 个点位` : "暂无点位"}</p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
         <div className="trust-panel">
           <div>
             <span>可信度</span>
@@ -131,6 +207,27 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
             <p>{routeCard.sourceLabel}</p>
           </div>
         </div>
+        {routeCard.evidenceSummary || evidenceSources.length ? (
+          <section className="evidence-panel">
+            <div>
+              <span>公开攻略证据</span>
+              {routeCard.evidenceSummary ? <p>{routeCard.evidenceSummary}</p> : null}
+            </div>
+            {evidenceSources.length ? (
+              <ul className="evidence-list">
+                {evidenceSources.map((source) => (
+                  <li key={`${source.sourceName}-${source.url}`}>
+                    <a href={source.url} rel="noreferrer" target="_blank">
+                      <strong>{source.sourceName}</strong>
+                      <span>{source.title}</span>
+                    </a>
+                    <p>{source.snippet || source.usedFor}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+        ) : null}
         <div className="risk-list">
           {riskItems.map((tip) => (
             <span key={tip}>{tip}</span>
