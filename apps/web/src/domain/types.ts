@@ -16,6 +16,18 @@ export type PretripChecklistCategory = "time" | "weather" | "traffic" | "booking
 
 export type PretripChecklistSeverity = "info" | "warning" | "critical";
 
+export type EvidenceUseCase = "reason" | "risk" | "season" | "reservation" | "context";
+
+export type StopEvidence = {
+  stopId?: string;
+  title: string;
+  url: string;
+  sourceName: string;
+  snippet: string;
+  usedFor: EvidenceUseCase;
+  publishedDate?: string;
+};
+
 export type PretripChecklistItem = {
   id: string;
   category: PretripChecklistCategory;
@@ -133,6 +145,8 @@ export type RouteCard = {
   revisionNote?: string;
   revisionSummary?: string;
   providerWarnings?: string[];
+  evidenceSummary?: string;
+  evidenceSources?: StopEvidence[];
   pretripChecklist?: PretripChecklistItem[];
   startDate: string;
   durationDays: 1 | 2;
