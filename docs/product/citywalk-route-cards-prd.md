@@ -18,19 +18,16 @@ AI Trip should not copy these products wholesale. The near-term wedge is a light
 
 ## MVP Scope
 
-1. Choose city, theme, date, and note.
-2. Generate a B route-first card.
-3. Review timeline, in-app interactive map, selected-stop details, reasons, risk, and confidence.
-4. Save route cards.
-5. Review saved cards.
-6. Export A poster or C story share wrappers.
-7. Reopen saved routes in the preview.
-8. Delete saved routes.
-9. Regenerate another route from the current preferences.
-10. Choose one-day or two-day duration.
-11. Revise a generated route with quick actions or a natural-language adjustment note.
-12. Review a route-specific pretrip checklist for weather, opening, traffic, budget, and pacing risks.
-13. Use map markers and timeline rows to select route stops inside AI Trip without leaving the app.
+1. Create a trip from city, date range, preference chips, and natural-language notes.
+2. Optionally import a lightweight place list or existing itinerary text.
+3. Generate one best route plan from the user's description; do not ask users to pick route templates.
+4. Use real POI candidates, AI route arrangement, public web evidence, and local fallback behavior where configured.
+5. Review map, DAY tabs, timeline, selected-stop details, route reasons, confidence, evidence, risks, and pre-trip checklist.
+6. Select map markers and timeline rows inside AI Trip without leaving the app.
+7. Revise a generated route with quick actions, selected-stop actions, drag reorder, or a natural-language adjustment note.
+8. Save generated route cards.
+9. Reopen and delete saved route cards from "My Trips".
+10. Open share pages and poster/story wrappers as secondary packaging.
 
 ## First Themes
 
