@@ -2,7 +2,30 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { RoutePlannerApp } from "./RoutePlannerApp";
+import type { RouteStop } from "@/domain/types";
+import {
+  reorderedStopsToReviseNote,
+  RoutePlannerApp,
+  stopActionToReviseNote
+} from "./RoutePlannerApp";
+
+function routeStop(id: string, poi: string): RouteStop {
+  return {
+    id,
+    time: "10:00",
+    poiId: id,
+    poi,
+    address: "湖滨路",
+    day: 1,
+    tags: ["photo"],
+    lat: 30,
+    lng: 120,
+    mapUrl: "https://uri.amap.com/marker",
+    reason: "适合散步。",
+    risk: "出发前确认。",
+    sourceMode: "provider"
+  };
+}
 
 test("RoutePlannerApp renders duration choices in the main planner form", () => {
   const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
@@ -49,4 +72,42 @@ test("RoutePlannerApp renders honest generation progress labels", () => {
   assert.match(markup, /Exa 检索公开攻略证据/);
   assert.match(markup, /不展示未接入来源/);
   assert.doesNotMatch(markup, /正在搜索小红书官方/);
+});
+
+test("stopActionToReviseNote maps stop actions to revise notes", () => {
+  assert.equal(
+    stopActionToReviseNote({ type: "replace", stopId: "a", stopName: "湖滨步行街" }),
+    "替换「湖滨步行街」，保持路线真实可走。",
+  );
+  assert.equal(
+    stopActionToReviseNote({ type: "delete", stopId: "a", stopName: "湖滨步行街" }),
+    "删除「湖滨步行街」，并重新连接前后路线。",
+  );
+  assert.equal(
+    stopActionToReviseNote({ type: "add_food_before", stopId: "a", stopName: "湖滨步行街" }),
+    "在「湖滨步行街」前面加一个真实可达的吃饭点。",
+  );
+  assert.equal(
+    stopActionToReviseNote({ type: "add_rest_after", stopId: "a", stopName: "湖滨步行街" }),
+    "在「湖滨步行街」后面加一个适合休息的点。",
+  );
+  assert.equal(
+    stopActionToReviseNote({ type: "make_indoor", stopId: "a", stopName: "湖滨步行街" }),
+    "把「湖滨步行街」替换成室内或雨天更稳的点。",
+  );
+  assert.equal(
+    stopActionToReviseNote({ type: "less_walking", stopId: "a", stopName: "湖滨步行街" }),
+    "优化「湖滨步行街」附近路线，减少步行距离。",
+  );
+});
+
+test("reorderedStopsToReviseNote maps ordered stops to revise note", () => {
+  assert.equal(
+    reorderedStopsToReviseNote([
+      routeStop("a", "湖滨步行街"),
+      routeStop("b", "南宋御街"),
+      routeStop("c", "城市阳台")
+    ]),
+    "用户拖拽调整了当天顺序，请优先按这个顺序重新校验路线时间：湖滨步行街 -> 南宋御街 -> 城市阳台",
+  );
 });

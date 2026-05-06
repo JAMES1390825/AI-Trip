@@ -17,7 +17,14 @@ import type {
   PretripChecklistSeverity,
   RouteCard as RouteCardData
 } from "@/domain/types";
-import { RouteInteractiveMap } from "./RouteInteractiveMap";
+import { RouteInteractiveMap, type StopAction } from "./RouteInteractiveMap";
+
+type RouteCardProps = {
+  routeCard: RouteCardData;
+  onStopAction?: (action: StopAction) => void;
+  onRevalidateOrder?: (stops: RouteCardData["stops"]) => void;
+  actionsDisabled?: boolean;
+};
 
 function severityLabel(severity: PretripChecklistSeverity): string {
   if (severity === "critical") return "高风险";
@@ -46,7 +53,11 @@ function isSafeExternalUrl(url: string): boolean {
   }
 }
 
-export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
+export function stopsForRevalidation(stops: RouteCardData["stops"], activeDay?: 1 | 2): RouteCardData["stops"] {
+  return activeDay ? stops.filter((stop) => (stop.day || 1) === activeDay) : stops;
+}
+
+export function RouteCard({ routeCard, onStopAction, onRevalidateOrder, actionsDisabled = false }: RouteCardProps) {
   const [localItineraryState, setLocalItineraryState] = useState<ItineraryState>(() =>
     initialItineraryState(routeCard.id, routeCard.stops),
   );
@@ -112,6 +123,8 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
           stops={visibleStops}
           selectedStopId={activeStopId}
           onSelectStop={selectStop}
+          onStopAction={onStopAction}
+          actionsDisabled={actionsDisabled}
         />
       </div>
       <div className="route-card-body">
@@ -193,7 +206,20 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
             </button>
           ))}
         </div>
-        {needsRevalidation ? <p className="route-revalidation-note">顺序已调整，下一步可重新校验交通时间与开放状态。</p> : null}
+        {needsRevalidation ? (
+          <div className="route-revalidation-note">
+            <p>顺序已调整，需要重新校验路线时间。</p>
+            {onRevalidateOrder ? (
+              <button
+                disabled={actionsDisabled}
+                onClick={() => onRevalidateOrder(stopsForRevalidation(orderedStops, activeDay))}
+                type="button"
+              >
+                重新校验路线
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         <section className="day-itinerary-panel">
           <div className="day-itinerary-heading">
             <span>每日行程</span>

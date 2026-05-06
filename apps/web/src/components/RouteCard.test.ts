@@ -3,7 +3,7 @@ import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { RouteCard as RouteCardData } from "@/domain/types";
-import { RouteCard } from "./RouteCard";
+import { RouteCard, stopsForRevalidation } from "./RouteCard";
 
 const routeCard: RouteCardData = {
   id: "card-1",
@@ -136,9 +136,40 @@ test("RouteCard renders real planning explanation fields", () => {
   assert.match(markup, /10:00 · 湖滨步行街/);
   assert.match(markup, /type="button"/);
   assert.match(markup, /timeline-row timeline-row--selected/);
-  assert.doesNotMatch(markup, /href="https:\/\/uri\.amap\.com\/marker/);
+  assert.match(markup, /导航方式/);
+  assert.match(markup, /高德导航/);
+  assert.match(markup, /href="https:\/\/uri\.amap\.com\/marker/);
   assert.doesNotMatch(markup, /点击站点可打开高德/);
   assert.doesNotMatch(markup, /map-pin/);
+});
+
+test("RouteCard renders stop edit actions when callback is provided", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(RouteCard, {
+      routeCard,
+      onStopAction: () => undefined
+    }),
+  );
+
+  assert.match(markup, /替换这个点/);
+  assert.match(markup, /删除这个点/);
+  assert.match(markup, /前面加吃饭点/);
+  assert.match(markup, /后面加休息点/);
+  assert.match(markup, /改室内/);
+  assert.match(markup, /这一段少走路/);
+});
+
+test("RouteCard forwards disabled state to stop action controls", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(RouteCard, {
+      routeCard,
+      onStopAction: () => undefined,
+      actionsDisabled: true
+    }),
+  );
+
+  assert.match(markup, /<button disabled=""/);
+  assert.match(markup, /替换这个点/);
 });
 
 test("RouteCard does not render unsafe evidence links", () => {
@@ -170,4 +201,11 @@ test("RouteCard does not render unsafe evidence links", () => {
   assert.doesNotMatch(markup, /不安全来源/);
   assert.match(markup, /https:\/\/example\.com\/safe/);
   assert.match(markup, /安全来源/);
+});
+
+test("stopsForRevalidation keeps reordered checks scoped to the active day", () => {
+  const dayOneStops = stopsForRevalidation(routeCard.stops, 1);
+
+  assert.deepEqual(dayOneStops.map((stop) => stop.poi), ["湖滨步行街", "城市阳台"]);
+  assert.doesNotMatch(dayOneStops.map((stop) => stop.poi).join(" -> "), /南宋御街/);
 });

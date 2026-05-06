@@ -597,6 +597,51 @@ textarea {
   line-height: 1.5;
 }
 
+.route-stop-actions,
+.route-navigation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.route-stop-actions button,
+.route-navigation-actions a {
+  border: 1px solid rgba(18, 107, 67, 0.18);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 247, 223, 0.82)),
+    #fff8ed;
+  color: #315f3d;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 950;
+  text-decoration: none;
+  box-shadow: 0 8px 18px rgba(22, 32, 19, 0.08);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.route-stop-actions button:hover,
+.route-navigation-actions a:hover {
+  border-color: rgba(18, 107, 67, 0.34);
+  box-shadow: 0 12px 22px rgba(22, 32, 19, 0.12);
+  transform: translateY(-1px);
+}
+
+.route-navigation-actions {
+  align-items: center;
+  border-top: 1px dashed rgba(18, 107, 67, 0.16);
+  padding-top: 10px;
+}
+
+.route-navigation-actions span {
+  flex: 1 1 96px;
+  letter-spacing: 0.08em;
+}
+
 .route-card-body {
   padding: 20px;
 }
@@ -730,14 +775,44 @@ textarea {
 }
 
 .route-revalidation-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   margin: 12px 0 0;
   border: 1px dashed rgba(126, 82, 18, 0.32);
   border-radius: 18px;
-  background: #fff7df;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(255, 179, 64, 0.24), transparent 34%),
+    #fff7df;
   color: #7c5200;
   padding: 10px 12px;
   font-size: 13px;
   font-weight: 900;
+}
+
+.route-revalidation-note p {
+  margin: 0;
+}
+
+.route-revalidation-note button {
+  border: 1px solid rgba(126, 82, 18, 0.28);
+  border-radius: 999px;
+  background: #162013;
+  color: #fff8ed;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 950;
+  box-shadow: 0 10px 20px rgba(22, 32, 19, 0.16);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.route-revalidation-note button:hover {
+  box-shadow: 0 14px 24px rgba(22, 32, 19, 0.2);
+  transform: translateY(-1px);
 }
 
 .day-itinerary-panel {

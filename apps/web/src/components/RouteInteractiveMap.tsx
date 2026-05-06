@@ -5,10 +5,26 @@ import type { RouteStop } from "@/domain/types";
 import { loadAmapJsApi, type AmapJsApi } from "./amap-js-loader";
 import { RouteMiniMap } from "./RouteMiniMap";
 
+export type StopActionType =
+  | "replace"
+  | "delete"
+  | "add_food_before"
+  | "add_rest_after"
+  | "make_indoor"
+  | "less_walking";
+
+export type StopAction = {
+  type: StopActionType;
+  stopId: string;
+  stopName: string;
+};
+
 type RouteInteractiveMapProps = {
   stops: RouteStop[];
   selectedStopId?: string;
   onSelectStop: (stopId: string) => void;
+  onStopAction?: (action: StopAction) => void;
+  actionsDisabled?: boolean;
   apiKey?: string;
   securityJsCode?: string;
 };
@@ -31,6 +47,14 @@ type ValidStop = {
 
 const defaultApiKey = process.env.NEXT_PUBLIC_AMAP_JS_API_KEY || "";
 const defaultSecurityJsCode = process.env.NEXT_PUBLIC_AMAP_SECURITY_JS_CODE || "";
+const stopActions: { type: StopActionType; label: string }[] = [
+  { type: "replace", label: "替换这个点" },
+  { type: "delete", label: "删除这个点" },
+  { type: "add_food_before", label: "前面加吃饭点" },
+  { type: "add_rest_after", label: "后面加休息点" },
+  { type: "make_indoor", label: "改室内" },
+  { type: "less_walking", label: "这一段少走路" }
+];
 
 function isValidStop(stop: RouteStop): boolean {
   return Number.isFinite(stop.lat) && Number.isFinite(stop.lng);
@@ -42,6 +66,15 @@ function validStopsFor(stops: RouteStop[]): ValidStop[] {
 
 function selectedStopFor(stops: RouteStop[], selectedStopId?: string): RouteStop | undefined {
   return stops.find((stop) => stop.id === selectedStopId) || stops[0];
+}
+
+function safeNavigationUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? url : "";
+  } catch {
+    return "";
+  }
 }
 
 function createMarkerContent(order: number, name: string, selected: boolean): HTMLElement {
@@ -103,6 +136,8 @@ export function RouteInteractiveMap({
   stops,
   selectedStopId,
   onSelectStop,
+  onStopAction,
+  actionsDisabled = false,
   apiKey = defaultApiKey,
   securityJsCode = defaultSecurityJsCode
 }: RouteInteractiveMapProps) {
@@ -112,6 +147,7 @@ export function RouteInteractiveMap({
   const [mapStatus, setMapStatus] = useState(apiKey ? "loading" : "missing-key");
   const validStops = useMemo(() => validStopsFor(stops), [stops]);
   const selectedStop = selectedStopFor(stops, selectedStopId);
+  const navigationUrl = selectedStop ? safeNavigationUrl(selectedStop.mapUrl) : "";
 
   useEffect(() => {
     if (!apiKey || !mapContainerRef.current || !validStops.length) return;
@@ -179,6 +215,36 @@ export function RouteInteractiveMap({
           {selectedStop.address ? <em>{selectedStop.address}</em> : null}
           <p>{selectedStop.reason}</p>
           <small>{selectedStop.risk}</small>
+          {onStopAction ? (
+            <div className="route-stop-actions" aria-label="点位编辑">
+              {stopActions.map((action) => (
+                <button
+                  disabled={actionsDisabled}
+                  key={action.type}
+                  onClick={() =>
+                    onStopAction({
+                      type: action.type,
+                      stopId: selectedStop.id,
+                      stopName: selectedStop.poi
+                    })
+                  }
+                  type="button"
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div className="route-navigation-actions" aria-label="导航方式">
+            <span>导航方式</span>
+            {navigationUrl ? (
+              <a href={navigationUrl} target="_blank" rel="noreferrer">
+                高德导航
+              </a>
+            ) : (
+              <small>导航链接待确认</small>
+            )}
+          </div>
         </aside>
       ) : null}
     </div>

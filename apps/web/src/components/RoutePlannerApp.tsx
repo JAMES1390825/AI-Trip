@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { routeThemes } from "@/domain/theme-catalog";
 import type { RouteCard as RouteCardData, SavedRouteCardSummary, TripPreferenceId } from "@/domain/types";
 import { RouteCard } from "./RouteCard";
+import type { StopAction } from "./RouteInteractiveMap";
 import { PosterShareCard } from "./share/PosterShareCard";
 import { StoryShareCard } from "./share/StoryShareCard";
 
@@ -33,6 +34,19 @@ async function readJson<T>(response: Response): Promise<T> {
     throw new Error(String(payload.message || "请求失败"));
   }
   return response.json() as Promise<T>;
+}
+
+export function stopActionToReviseNote(action: StopAction): string {
+  if (action.type === "replace") return `替换「${action.stopName}」，保持路线真实可走。`;
+  if (action.type === "delete") return `删除「${action.stopName}」，并重新连接前后路线。`;
+  if (action.type === "add_food_before") return `在「${action.stopName}」前面加一个真实可达的吃饭点。`;
+  if (action.type === "add_rest_after") return `在「${action.stopName}」后面加一个适合休息的点。`;
+  if (action.type === "make_indoor") return `把「${action.stopName}」替换成室内或雨天更稳的点。`;
+  return `优化「${action.stopName}」附近路线，减少步行距离。`;
+}
+
+export function reorderedStopsToReviseNote(stops: RouteCardData["stops"]): string {
+  return `用户拖拽调整了当天顺序，请优先按这个顺序重新校验路线时间：${stops.map((stop) => stop.poi).join(" -> ")}`;
 }
 
 export function RoutePlannerApp() {
@@ -126,6 +140,46 @@ export function RoutePlannerApp() {
         setStatus(error instanceof Error ? error.message : String(error));
       }
     });
+  }
+
+  function reviseWithNote(noteText: string) {
+    const trimmedNote = noteText.trim();
+    if (isPending) return;
+    if (!routeCard) {
+      setStatus("请先生成一张路线卡，再调整路线。");
+      return;
+    }
+    if (!trimmedNote) {
+      setStatus("请先写一句调整要求。");
+      return;
+    }
+
+    setRevisionNote(trimmedNote);
+    startTransition(async () => {
+      try {
+        setStatus("正在重新校验路线...");
+        const payload = await readJson<{ routeCard: RouteCardData }>(
+          await fetch("/api/route-cards/revise", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ routeCard, reviseNote: trimmedNote })
+          }),
+        );
+        setRouteCard(payload.routeCard);
+        setRevisionNote("");
+        setStatus("已完成路线校验，可以继续编辑或保存。");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : String(error));
+      }
+    });
+  }
+
+  function handleStopAction(action: StopAction) {
+    reviseWithNote(stopActionToReviseNote(action));
+  }
+
+  function handleRevalidateOrder(stops: RouteCardData["stops"]) {
+    reviseWithNote(reorderedStopsToReviseNote(stops));
   }
 
   function save() {
@@ -386,7 +440,12 @@ export function RoutePlannerApp() {
       <section className="preview-panel">
         {routeCard ? (
           <>
-            <RouteCard routeCard={routeCard} />
+            <RouteCard
+              routeCard={routeCard}
+              onStopAction={handleStopAction}
+              onRevalidateOrder={handleRevalidateOrder}
+              actionsDisabled={isPending}
+            />
             <div className="share-actions">
               <a href={sharePathFor(routeCard)} target="_blank" rel="noreferrer">
                 打开分享页
