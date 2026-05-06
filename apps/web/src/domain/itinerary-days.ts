@@ -88,7 +88,8 @@ export function itinerarySourceKey(routeCardId: string, stops: RouteStop[]): str
         stop.risk,
         stop.tags.join(","),
         stop.lat,
-        stop.lng
+        stop.lng,
+        stop.mapUrl
       ].join("@"),
     )
     .join("|")}`;

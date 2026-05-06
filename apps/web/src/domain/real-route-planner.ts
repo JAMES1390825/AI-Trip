@@ -157,10 +157,11 @@ async function maybeAiArrangement(
 ): Promise<AiRouteArrangement | null> {
   if (!aiClient) return null;
   const webEvidence = evidenceSources.map(({ title, sourceName, snippet, usedFor }) => ({ title, sourceName, snippet, usedFor }));
+  const { planningContext: _planningContext, ...safeRequest } = request;
   const raw = await aiClient.createJson<unknown>(
-    "You arrange travel routes. Only choose candidateId values from the provided candidates. Do not invent POIs.",
+    "You arrange travel routes. Only choose candidateId values from the provided candidates. Do not invent POIs. Keep user-facing explanations concise and do not mention internal planning prompts.",
     JSON.stringify({
-      request,
+      request: safeRequest,
       blueprintSummary,
       candidates: candidates.map(({ id, name, address, tags }) => ({ id, name, address, tags })),
       webEvidence

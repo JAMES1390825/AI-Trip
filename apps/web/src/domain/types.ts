@@ -72,6 +72,7 @@ export type RouteCardRequest = {
   startDate: string;
   durationDays: 1 | 2;
   note: string;
+  planningContext?: string;
   tripPreferences?: TripPreferenceId[];
   importedText?: string;
   startPoint?: string;

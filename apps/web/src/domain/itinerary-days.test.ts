@@ -107,3 +107,16 @@ test("itinerarySourceKey changes when existing stops receive refreshed details",
 
   assert.notEqual(itinerarySourceKey("same-card", originalStops), itinerarySourceKey("same-card", refreshedStops));
 });
+
+test("itinerarySourceKey changes when existing stops receive refreshed navigation urls", () => {
+  const originalStops = [stop("a", 1), stop("b", 1)];
+  const refreshedStops = [
+    {
+      ...originalStops[0],
+      mapUrl: "https://uri.amap.com/marker?position=120.2,30.2&name=refreshed"
+    },
+    originalStops[1]
+  ];
+
+  assert.notEqual(itinerarySourceKey("same-card", originalStops), itinerarySourceKey("same-card", refreshedStops));
+});

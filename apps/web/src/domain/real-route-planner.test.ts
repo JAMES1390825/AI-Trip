@@ -131,6 +131,45 @@ test("generateRealRouteCard accepts valid AI arrangement over candidates", async
   assert.equal(card.skipSuggestion, "太累就跳过城市阳台。");
 });
 
+test("generateRealRouteCard does not expose internal planning context to AI prompt", async () => {
+  let capturedPrompt = "";
+
+  await generateRealRouteCard(
+    {
+      ...request,
+      note: "优化「湖滨步行街」附近路线，减少步行距离。",
+      planningContext: [
+        "原路线意图：适合想要经典初游路线，同时偏好“想拍照，别太累”的轻旅行用户。",
+        "当前路线节点：湖滨步行街 -> 南宋御街小吃 -> 城市阳台",
+        "用户调整要求：优化「湖滨步行街」附近路线，减少步行距离。",
+        "请基于调整要求重新编排路线。"
+      ].join("\n")
+    },
+    {
+      amapClient: { searchPois: async () => realCandidates, estimateWalkingMinutes: async () => 10 },
+      openAiClient: {
+        createJson: async <T,>(_systemPrompt: string, userPrompt: string) => {
+          capturedPrompt = userPrompt;
+          return {
+            selectedStops: [
+              { candidateId: "a", day: 1, reason: "保留湖滨步行街作为轻松起点。" },
+              { candidateId: "b", day: 1, reason: "用南宋御街小吃承接餐食。" },
+              { candidateId: "c", day: 1, reason: "用城市阳台收束。" }
+            ],
+            arrangementReason: "按轻松、餐食、收束排列。",
+            skipSuggestion: "太累就跳过城市阳台。",
+            weatherAlternative: "下雨改去室内展馆。"
+          } as T;
+        }
+      }
+    },
+  );
+
+  assert.match(capturedPrompt, /优化「湖滨步行街」附近路线，减少步行距离。/);
+  assert.doesNotMatch(capturedPrompt, /planningContext/);
+  assert.doesNotMatch(capturedPrompt, /原路线意图|当前路线节点|用户调整要求|请基于调整要求/);
+});
+
 test("generateRealRouteCard attaches configured web evidence without changing Amap facts", async () => {
   const card = await generateRealRouteCard(request, {
     amapClient: { searchPois: async () => realCandidates, estimateWalkingMinutes: async () => 10 },

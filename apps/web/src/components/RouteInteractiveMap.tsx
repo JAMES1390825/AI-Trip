@@ -207,7 +207,7 @@ export function RouteInteractiveMap({
         )}
       </div>
       {selectedStop ? (
-        <aside className="route-selected-stop">
+        <aside className="route-selected-stop" data-selected-stop-id={selectedStop.id} key={`${selectedStop.id}:${selectedStop.mapUrl}`}>
           <span>当前点位</span>
           <strong>
             {selectedStop.time} · {selectedStop.poi}
@@ -238,7 +238,14 @@ export function RouteInteractiveMap({
           <div className="route-navigation-actions" aria-label="导航方式">
             <span>导航方式</span>
             {navigationUrl ? (
-              <a href={navigationUrl} target="_blank" rel="noreferrer">
+              <a
+                aria-label={`用高德导航到${selectedStop.poi}`}
+                data-navigation-stop-id={selectedStop.id}
+                href={navigationUrl}
+                key={`${selectedStop.id}:${navigationUrl}`}
+                target="_blank"
+                rel="noreferrer"
+              >
                 高德导航
               </a>
             ) : (

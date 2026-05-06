@@ -112,3 +112,22 @@ test("route title and summary reflect duration days", () => {
   assert.ok(card.title.includes("2日"));
   assert.ok(card.summary.includes("2日"));
 });
+
+test("revision planning context does not become user-facing preference copy", () => {
+  const card = generateRouteCard({
+    city: "杭州",
+    themeId: "classic",
+    startDate: "2026-05-10",
+    durationDays: 1,
+    note: "优化「中国美术学院象山校区」附近路线，减少步行距离。",
+    planningContext: [
+      "原路线意图：适合想要经典初游路线，同时偏好“想拍照，别太累”的轻旅行用户。",
+      "当前路线节点：中国美术学院象山校区 -> 西湖湖滨 -> 河坊街 -> 中国茶叶博物馆",
+      "用户调整要求：优化「中国美术学院象山校区」附近路线，减少步行距离。"
+    ].join("\n")
+  });
+
+  assert.match(card.summary, /已重新校验：优化「中国美术学院象山校区」附近路线，减少步行距离。/);
+  assert.doesNotMatch(card.summary, /已考虑|原路线意图|当前路线节点|用户调整要求/);
+  assert.equal(card.fitFor, "适合想要经典初游路线、可继续微调节奏的轻旅行用户。");
+});

@@ -121,6 +121,48 @@ test("RouteInteractiveMap always renders Amap navigation for selected stop", () 
   assert.match(markup, /rel="noreferrer"/);
 });
 
+test("RouteInteractiveMap keeps selected stop and navigation url in sync", () => {
+  const stops = [
+    routeStop({ id: "a", poi: "湖滨步行街", mapUrl: "https://uri.amap.com/marker?name=hubin" }),
+    routeStop({ id: "b", poi: "南宋御街", time: "11:00", mapUrl: "https://uri.amap.com/marker?name=nansong" })
+  ];
+  const markup = renderToStaticMarkup(
+    React.createElement(RouteInteractiveMap, {
+      stops,
+      selectedStopId: "missing-after-reorder",
+      onSelectStop: () => undefined,
+      apiKey: "",
+      securityJsCode: ""
+    }),
+  );
+
+  assert.match(markup, /10:00 · 湖滨步行街/);
+  assert.match(markup, /href="https:\/\/uri\.amap\.com\/marker\?name=hubin"/);
+  assert.doesNotMatch(markup, /name=nansong/);
+});
+
+test("RouteInteractiveMap uses the selected stop identity for navigation", () => {
+  const stops = [
+    routeStop({ id: "a", poi: "湖滨步行街", mapUrl: "https://uri.amap.com/marker?name=hubin" }),
+    routeStop({ id: "b", poi: "南宋御街", time: "11:00", mapUrl: "https://uri.amap.com/marker?name=nansong" })
+  ];
+  const markup = renderToStaticMarkup(
+    React.createElement(RouteInteractiveMap, {
+      stops,
+      selectedStopId: "b",
+      onSelectStop: () => undefined,
+      apiKey: "",
+      securityJsCode: ""
+    }),
+  );
+
+  assert.match(markup, /data-selected-stop-id="b"/);
+  assert.match(markup, /data-navigation-stop-id="b"/);
+  assert.match(markup, /aria-label="用高德导航到南宋御街"/);
+  assert.match(markup, /href="https:\/\/uri\.amap\.com\/marker\?name=nansong"/);
+  assert.doesNotMatch(markup, /href="https:\/\/uri\.amap\.com\/marker\?name=hubin"/);
+});
+
 test("RouteInteractiveMap suppresses unsafe selected stop navigation urls", () => {
   const stops = [routeStop({ id: "a", poi: "湖滨步行街", mapUrl: "javascript:alert(1)" })];
   const markup = renderToStaticMarkup(

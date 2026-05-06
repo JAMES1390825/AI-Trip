@@ -33,11 +33,31 @@ test("reviseRouteCard enriches the next request and annotates the revised card",
   assert.ok(capturedRequest);
   assert.equal(capturedRequest.city, original.city);
   assert.equal(capturedRequest.themeId, original.themeId);
-  assert.match(capturedRequest.note, /少走路一点，加一个吃饭点/);
-  assert.match(capturedRequest.note, new RegExp(original.stops[0].poi));
+  assert.equal(capturedRequest.note, "少走路一点，加一个吃饭点");
+  assert.match(capturedRequest.planningContext || "", /少走路一点，加一个吃饭点/);
+  assert.match(capturedRequest.planningContext || "", new RegExp(original.stops[0].poi));
   assert.equal(revised.id, "revised-card");
   assert.equal(revised.revisionNote, "少走路一点，加一个吃饭点");
   assert.match(revised.revisionSummary || "", /少走路一点/);
+});
+
+test("reviseRouteCard keeps internal revision context out of fallback user copy", async () => {
+  const original = generateRouteCard({
+    city: "杭州",
+    themeId: "classic",
+    startDate: "2026-05-10",
+    durationDays: 1,
+    note: "想拍照，别太累"
+  });
+
+  const revised = await reviseRouteCard(
+    { routeCard: original, reviseNote: "优化「河坊街」附近路线，减少步行距离。" },
+    { planner: async (request) => generateRouteCard(request) },
+  );
+
+  assert.match(revised.summary, /优化「河坊街」附近路线/);
+  assert.doesNotMatch(revised.summary, /原路线意图|当前路线节点|用户调整要求|请基于调整要求/);
+  assert.doesNotMatch(revised.fitFor, /原路线意图|当前路线节点|用户调整要求|请基于调整要求/);
 });
 
 test("reviseRouteCard rejects empty revision notes", async () => {
