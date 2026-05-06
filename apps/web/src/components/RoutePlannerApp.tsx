@@ -27,7 +27,13 @@ const preferenceOptions: TripPreferenceId[] = [
   "少走路",
   "预算友好"
 ];
-const generationStages = ["理解旅行需求", "高德搜索真实地点", "Exa 检索公开攻略证据", "校验路线与风险"];
+const generationStages = [
+  "理解你的旅行意图",
+  "高德检索真实地点候选",
+  "Exa 查找公开攻略证据",
+  "AI 编排并校验路线",
+  "生成风险提醒和行前检查"
+];
 
 async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -62,7 +68,7 @@ export function RoutePlannerApp() {
   const [routeCard, setRouteCard] = useState<RouteCardData | null>(null);
   const [saved, setSaved] = useState<SavedRouteCardSummary[]>([]);
   const [routeSeed, setRouteSeed] = useState("initial");
-  const [status, setStatus] = useState("选择城市、日期和偏好，生成你的第一张路线卡。");
+  const [status, setStatus] = useState("选择城市、日期和偏好，生成你的第一份真实旅行计划。");
   const [shareMode, setShareMode] = useState<ShareMode>("poster");
   const [isPending, startTransition] = useTransition();
   const inferredThemeId = inferRouteThemeId({
@@ -95,7 +101,7 @@ export function RoutePlannerApp() {
     }
     startTransition(async () => {
       try {
-        setStatus("正在生成真实行程：理解需求、搜索地点、检索证据、校验路线。");
+        setStatus("正在规划：理解需求、检索真实地点、查找公开证据、校验路线。");
         const payload = await readJson<{ routeCard: RouteCardData }>(
           await fetch("/api/route-cards/generate", {
             method: "POST",
@@ -115,7 +121,7 @@ export function RoutePlannerApp() {
         );
         setRouteCard(payload.routeCard);
         setRouteSeed(String(Date.now()));
-        setStatus("真实行程已生成，可以继续编辑点位或保存。");
+        setStatus("真实行程已生成，可以继续编辑点位、重新校验或保存。");
       } catch (error) {
         setStatus(error instanceof Error ? error.message : String(error));
       }
@@ -387,7 +393,7 @@ export function RoutePlannerApp() {
               <li key={stage}>{stage}</li>
             ))}
           </ol>
-          <p>这些是诚实的规划阶段提示；不展示未接入来源，也不冒充小红书官方搜索。</p>
+          <p>这些是诚实的规划阶段提示；不展示未接入来源，也不冒充小红书官方搜索。如果生成失败，保留输入后直接重试。</p>
         </div>
 
         <div className="revision-panel">
@@ -476,7 +482,17 @@ export function RoutePlannerApp() {
             {shareMode === "poster" ? <PosterShareCard routeCard={routeCard} /> : <StoryShareCard routeCard={routeCard} />}
           </>
         ) : (
-          <div className="empty-preview">生成后这里会出现 B 型可执行路线卡。</div>
+          <div className="empty-preview">
+            <p className="section-kicker">Result Preview</p>
+            <h2>生成后会出现完整旅行工作台</h2>
+            <div className="empty-preview-grid">
+              <span>真实地图路线</span>
+              <span>DAY 行程卡</span>
+              <span>来源证据</span>
+              <span>风险与行前检查</span>
+            </div>
+            <p>你可以点选地图点位、拖拽调整当天顺序、继续让 AI 少走路或加吃饭点。</p>
+          </div>
         )}
       </section>
     </div>

@@ -1135,11 +1135,42 @@ textarea {
 
 .empty-preview {
   display: grid;
-  min-height: 420px;
-  place-items: center;
-  border: 1px dashed var(--line);
+  gap: 16px;
+  min-height: 520px;
+  place-content: center;
+  border: 1px dashed rgba(18, 107, 67, 0.28);
   border-radius: 28px;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(255, 179, 64, 0.2), transparent 30%),
+    linear-gradient(145deg, rgba(255, 248, 237, 0.86), rgba(231, 255, 240, 0.62));
+  padding: 28px;
+  text-align: left;
+}
+
+.empty-preview h2 {
+  margin: 0;
+  font-size: clamp(28px, 5vw, 48px);
+  letter-spacing: -0.06em;
+}
+
+.empty-preview p {
+  margin: 0;
   color: var(--muted);
+  line-height: 1.7;
+}
+
+.empty-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.empty-preview-grid span {
+  border: 1px solid rgba(24, 32, 19, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.76);
+  padding: 14px;
+  font-weight: 950;
 }
 
 .share-card {
