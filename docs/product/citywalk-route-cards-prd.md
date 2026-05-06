@@ -20,7 +20,7 @@ AI Trip should not copy these products wholesale. The near-term wedge is a light
 
 1. Choose city, theme, date, and note.
 2. Generate a B route-first card.
-3. Review timeline, map links, reasons, risk, and confidence.
+3. Review timeline, in-app route preview, Amap navigation links, reasons, risk, and confidence.
 4. Save route cards.
 5. Review saved cards.
 6. Export A poster or C story share wrappers.
@@ -30,6 +30,7 @@ AI Trip should not copy these products wholesale. The near-term wedge is a light
 10. Choose one-day or two-day duration.
 11. Revise a generated route with quick actions or a natural-language adjustment note.
 12. Review a route-specific pretrip checklist for weather, opening, traffic, budget, and pacing risks.
+13. See route stop order and relative spatial layout directly inside the route card before opening Amap.
 
 ## First Themes
 

@@ -8,7 +8,8 @@
 4. Add save/review store.
 5. Add API routes.
 6. Add route-first Web UI.
-7. Add poster/story share wrappers.
+7. Add in-app route mini-map preview from route stop coordinates.
+8. Add poster/story share wrappers.
 
 ## Verification Gates
 

@@ -379,9 +379,6 @@ textarea {
   color: #fff;
   font-size: 11px;
 }
-  color: var(--ink);
-  font-weight: 950;
-}
 
 .route-card-body {
   padding: 20px;

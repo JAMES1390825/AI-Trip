@@ -51,6 +51,12 @@ This keeps the product closer to a route workbench than a chat transcript: users
 
 `pretrip-checklist` derives read-only departure checks from the route card itself. It does not call live weather, booking, or opening-hours services in v1. The checklist is stored as part of the route card JSON, so saved routes and share pages preserve the same trust layer.
 
+## In-App Route Preview
+
+`RouteMiniMap` renders a lightweight SVG route preview from the `RouteCard.stops` coordinates. It is client-independent and can render on the server because it only uses route-card data, React markup, and CSS.
+
+The preview shows relative stop layout and visit order inside AI Trip. It is not a full GIS map in v1: no Amap JS SDK, map tiles, pan/zoom, or walking-route geometry are loaded. Timeline stop links remain the trusted Amap handoff for navigation and live map verification.
+
 ## Persistence
 
 Local SQLite database at `.data/route-cards.sqlite` by default.
