@@ -52,6 +52,6 @@ Copy `.env.example` to `.env` at the repository root if provider keys are needed
 
 The app loads provider keys from the root `.env`. Do not create `apps/web/.env.local` for this project.
 
-The MVP works without provider keys by using local fallback data. Configure `AMAP_WEB_SERVICE_KEY` for real POI candidates and walking estimates, AI provider keys for candidate-only AI arrangement, and `SEARCH_PROVIDER=exa` plus `EXA_API_KEY` for public web evidence.
+The MVP works without provider keys by using local fallback data. Configure `AMAP_WEB_SERVICE_KEY` for real POI candidates and walking estimates, AI provider keys for candidate-only AI arrangement, and keep `SEARCH_PROVIDER=exa` plus a real `EXA_API_KEY` in the root `.env` for public web evidence.
 
 Saved route cards use a local SQLite database by default at `apps/web/.data/route-cards.sqlite`. Set `ROUTE_CARD_DATABASE_FILE` in the root `.env` to use another database file.

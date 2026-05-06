@@ -8,7 +8,7 @@ Generation mode is environment-driven:
 - `AMAP_WEB_SERVICE_KEY` + `AI_PROVIDER=deepseek` + `DEEPSEEK_API_KEY`: uses Amap real POIs, DeepSeek candidate-only arrangement, and Amap walking time.
 - `AMAP_WEB_SERVICE_KEY` + `AI_PROVIDER=bailian` + `BAILIAN_API_KEY`: uses Amap real POIs, Alibaba Cloud Bailian candidate-only arrangement, and Amap walking time.
 - `AMAP_WEB_SERVICE_KEY` only: uses Amap real POIs with deterministic rule arrangement.
-- `SEARCH_PROVIDER=exa` + `EXA_API_KEY`: adds public web evidence for route reasons, risk hints, and source links. Exa evidence never overrides Amap POI facts.
+- `SEARCH_PROVIDER=exa` + `EXA_API_KEY`: adds public web evidence for route reasons, risk hints, and source links. Exa is the default search provider in `.env.example`, but the real key must stay in the root `.env`. Exa evidence never overrides Amap POI facts.
 - No provider keys or provider failure: falls back to local seed data.
 
 If `AI_PROVIDER` is unset, the server defaults to `openai`. AI output is accepted only when it selects known Amap candidate IDs and passes local validation.
