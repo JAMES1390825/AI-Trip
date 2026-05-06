@@ -33,6 +33,14 @@ test("RoutePlannerApp exposes light create entries and planning chips", () => {
   assert.match(markup, /预算友好/);
 });
 
+test("RoutePlannerApp exposes create mode and chip selection state to assistive tech", () => {
+  const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
+
+  assert.match(markup, /<button(?=[^>]*aria-pressed="true")[^>]*>创建新计划<\/button>/);
+  assert.match(markup, /<button(?=[^>]*aria-pressed="true")[^>]*>拍照出片<\/button>/);
+  assert.match(markup, /<button(?=[^>]*disabled)(?=[^>]*(?:title|aria-label)="[^"]*即将支持)/);
+});
+
 test("RoutePlannerApp renders honest generation progress labels", () => {
   const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
 

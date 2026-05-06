@@ -215,6 +215,7 @@ export function RoutePlannerApp() {
           </div>
           <div className="create-entry-actions">
             <button
+              aria-pressed={activeCreateMode === "new"}
               className={activeCreateMode === "new" ? "active" : ""}
               onClick={() => setActiveCreateMode("new")}
               type="button"
@@ -222,13 +223,14 @@ export function RoutePlannerApp() {
               创建新计划
             </button>
             <button
+              aria-pressed={activeCreateMode === "import"}
               className={activeCreateMode === "import" ? "active" : ""}
               onClick={() => setActiveCreateMode("import")}
               type="button"
             >
               智能导入地点/行程
             </button>
-            <button disabled type="button">
+            <button aria-label="采集识别即将支持" disabled title="采集识别即将支持" type="button">
               采集识别
             </button>
           </div>
@@ -279,6 +281,7 @@ export function RoutePlannerApp() {
           <div className="preference-chip-grid">
             {preferenceOptions.map((preference) => (
               <button
+                aria-pressed={tripPreferences.includes(preference)}
                 className={tripPreferences.includes(preference) ? "preference-chip active" : "preference-chip"}
                 key={preference}
                 onClick={() => togglePreference(preference)}
