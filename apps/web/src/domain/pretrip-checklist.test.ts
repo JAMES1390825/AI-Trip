@@ -1,0 +1,108 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { generateRouteCard } from "./planner";
+import { buildPretripChecklist } from "./pretrip-checklist";
+import type { RouteCard } from "./types";
+
+test("buildPretripChecklist creates weather time traffic budget and comfort items from route facts", () => {
+  const card: RouteCard = {
+    ...generateRouteCard({
+      city: "杭州",
+      themeId: "classic",
+      startDate: "2026-05-10",
+      durationDays: 1,
+      note: "想拍照"
+    }),
+    estimatedCostCny: 520,
+    weatherAlternative: "下雨改去室内展馆。",
+    stops: [
+      {
+        id: "1-a",
+        time: "10:00",
+        poiId: "a",
+        poi: "湖滨步行街",
+        tags: ["photo", "walkable"],
+        lat: 30,
+        lng: 120,
+        mapUrl: "https://uri.amap.com/marker",
+        reason: "适合拍照。",
+        risk: "营业时间参考 09:00-17:00，出发前建议再确认。",
+        sourceMode: "provider"
+      },
+      {
+        id: "2-b",
+        time: "12:20",
+        poiId: "b",
+        poi: "城市阳台",
+        tags: ["landmark"],
+        lat: 30.01,
+        lng: 120.01,
+        mapUrl: "https://uri.amap.com/marker",
+        reason: "视野开阔。",
+        risk: "出发前建议确认天气和现场开放状态。",
+        sourceMode: "provider"
+      },
+      {
+        id: "3-c",
+        time: "15:00",
+        poiId: "c",
+        poi: "南宋御街",
+        tags: ["local_food"],
+        lat: 30.02,
+        lng: 120.02,
+        mapUrl: "https://uri.amap.com/marker",
+        reason: "适合吃饭。",
+        risk: "风险较低。",
+        sourceMode: "provider"
+      },
+      {
+        id: "4-d",
+        time: "19:30",
+        poiId: "d",
+        poi: "夜景平台",
+        tags: ["night"],
+        lat: 30.03,
+        lng: 120.03,
+        mapUrl: "https://uri.amap.com/marker",
+        reason: "夜间收束。",
+        risk: "风险较低。",
+        sourceMode: "provider"
+      }
+    ],
+    legs: [
+      { fromPoi: "湖滨步行街", toPoi: "城市阳台", minutes: 35, sourceMode: "provider" },
+      { fromPoi: "城市阳台", toPoi: "南宋御街", minutes: 20, degraded: true, sourceMode: "mixed" },
+      { fromPoi: "南宋御街", toPoi: "夜景平台", minutes: 18, sourceMode: "provider" }
+    ]
+  };
+
+  const checklist = buildPretripChecklist(card);
+  const categories = checklist.map((item) => item.category);
+
+  assert.ok(categories.includes("weather"));
+  assert.ok(categories.includes("time"));
+  assert.ok(categories.includes("traffic"));
+  assert.ok(categories.includes("budget"));
+  assert.ok(categories.includes("comfort"));
+  assert.ok(checklist.length <= 5);
+  assert.ok(checklist.every((item) => item.id && item.title && item.actionLabel));
+});
+
+test("buildPretripChecklist deduplicates category title pairs", () => {
+  const card = generateRouteCard({
+    city: "杭州",
+    themeId: "classic",
+    startDate: "2026-05-10",
+    durationDays: 1,
+    note: "想拍照"
+  });
+
+  const checklist = buildPretripChecklist({
+    ...card,
+    riskTips: [...card.riskTips, ...card.riskTips],
+    providerWarnings: ["地点来自地图服务，营业/预约/交通以出发前实时信息为准。"]
+  });
+  const keys = checklist.map((item) => `${item.category}:${item.title}`);
+
+  assert.equal(new Set(keys).size, keys.length);
+});
