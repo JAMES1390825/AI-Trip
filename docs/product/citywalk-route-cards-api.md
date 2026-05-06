@@ -8,6 +8,7 @@ Generation mode is environment-driven:
 - `AMAP_WEB_SERVICE_KEY` + `AI_PROVIDER=deepseek` + `DEEPSEEK_API_KEY`: uses Amap real POIs, DeepSeek candidate-only arrangement, and Amap walking time.
 - `AMAP_WEB_SERVICE_KEY` + `AI_PROVIDER=bailian` + `BAILIAN_API_KEY`: uses Amap real POIs, Alibaba Cloud Bailian candidate-only arrangement, and Amap walking time.
 - `AMAP_WEB_SERVICE_KEY` only: uses Amap real POIs with deterministic rule arrangement.
+- `SEARCH_PROVIDER=exa` + `EXA_API_KEY`: adds public web evidence for route reasons, risk hints, and source links. Exa evidence never overrides Amap POI facts.
 - No provider keys or provider failure: falls back to local seed data.
 
 If `AI_PROVIDER` is unset, the server defaults to `openai`. AI output is accepted only when it selects known Amap candidate IDs and passes local validation.
@@ -22,7 +23,11 @@ Request:
   "themeId": "easy_citywalk",
   "startDate": "2026-05-10",
   "durationDays": 1,
-  "note": "想拍照，别太累"
+  "note": "想拍照，别太累",
+  "tripPreferences": ["citywalk", "拍照出片", "少走路"],
+  "importedText": "朋友推荐湖滨步行街、南宋御街、城市阳台",
+  "transportPreference": "walk_first",
+  "companion": "friends"
 }
 ```
 
@@ -42,6 +47,8 @@ Response:
   }
 }
 ```
+
+When Exa is configured, the route card may include `evidenceSummary` and `evidenceSources`. These fields are display-safe supporting evidence. They are not POI facts and do not create route stops.
 
 ## `POST /api/route-cards/revise`
 
