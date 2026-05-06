@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { RouteStop } from "./types";
-import { dayTabsFor, filterStopsByDay, reorderStopsWithinDay } from "./itinerary-days";
+import {
+  dayTabsFor,
+  filterStopsByDay,
+  initialItineraryState,
+  itinerarySourceKey,
+  reorderStopsWithinDay,
+  resolveItineraryState
+} from "./itinerary-days";
 
 function stop(id: string, day: 1 | 2): RouteStop {
   return {
@@ -46,4 +53,57 @@ test("reorderStopsWithinDay moves stops only inside the active day", () => {
 
   assert.deepEqual(reordered.map(({ id }) => id), ["e", "b", "a", "d", "c"]);
   assert.deepEqual(stops.map(({ id }) => id), ["a", "b", "c", "d", "e"]);
+});
+
+test("resolveItineraryState resets stale local state when route source changes", () => {
+  const previousStops = [stop("a", 1), stop("b", 1)];
+  const nextStops = [stop("x", 1), stop("y", 2)];
+  const previousState = {
+    sourceKey: itinerarySourceKey("old-card", previousStops),
+    activeTab: "day-1" as const,
+    orderedStops: [previousStops[1], previousStops[0]],
+    selectedStopId: "b",
+    needsRevalidation: true
+  };
+
+  assert.deepEqual(resolveItineraryState(previousState, itinerarySourceKey("new-card", nextStops), nextStops), {
+    sourceKey: itinerarySourceKey("new-card", nextStops),
+    activeTab: "overview",
+    orderedStops: nextStops,
+    selectedStopId: "x",
+    needsRevalidation: false
+  });
+  assert.equal(resolveItineraryState(previousState, previousState.sourceKey, previousStops), previousState);
+  const nextState = resolveItineraryState(previousState, itinerarySourceKey("new-card", nextStops), nextStops);
+  assert.deepEqual(resolveItineraryState(nextState, itinerarySourceKey("old-card", previousStops), previousStops), {
+    sourceKey: itinerarySourceKey("old-card", previousStops),
+    activeTab: "overview",
+    orderedStops: previousStops,
+    selectedStopId: "a",
+    needsRevalidation: false
+  });
+  assert.deepEqual(initialItineraryState("empty-card", []), {
+    sourceKey: "empty-card::",
+    activeTab: "overview",
+    orderedStops: [],
+    selectedStopId: undefined,
+    needsRevalidation: false
+  });
+});
+
+test("itinerarySourceKey changes when existing stops receive refreshed details", () => {
+  const originalStops = [stop("a", 1), stop("b", 1)];
+  const refreshedStops = [
+    {
+      ...originalStops[0],
+      address: "新的地址",
+      providerType: "风景名胜",
+      reason: "新的推荐理由",
+      risk: "新的风险提示",
+      tags: ["photo"]
+    },
+    originalStops[1]
+  ];
+
+  assert.notEqual(itinerarySourceKey("same-card", originalStops), itinerarySourceKey("same-card", refreshedStops));
 });

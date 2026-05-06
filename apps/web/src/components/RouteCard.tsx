@@ -1,7 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { dayForTab, dayTabsFor, filterStopsByDay, reorderStopsWithinDay, type ItineraryTabId } from "@/domain/itinerary-days";
+import { useCallback, useEffect, useState } from "react";
+import {
+  dayForTab,
+  dayTabsFor,
+  filterStopsByDay,
+  initialItineraryState,
+  itinerarySourceKey,
+  reorderStopsWithinDay,
+  resolveItineraryState,
+  type ItineraryState,
+  type ItineraryTabId
+} from "@/domain/itinerary-days";
 import type {
   PretripChecklistCategory,
   PretripChecklistSeverity,
@@ -37,16 +47,17 @@ function isSafeExternalUrl(url: string): boolean {
 }
 
 export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
-  const firstSelectableStopId = routeCard.stops[0]?.id;
-  const [selectedStopId, setSelectedStopId] = useState(firstSelectableStopId);
-  const [activeTab, setActiveTab] = useState<ItineraryTabId>("overview");
-  const [orderedStops, setOrderedStops] = useState(routeCard.stops);
+  const [localItineraryState, setLocalItineraryState] = useState<ItineraryState>(() =>
+    initialItineraryState(routeCard.id, routeCard.stops),
+  );
   const [draggedStopId, setDraggedStopId] = useState<string | null>(null);
-  const [needsRevalidation, setNeedsRevalidation] = useState(false);
+  const sourceKey = itinerarySourceKey(routeCard.id, routeCard.stops);
+  const itineraryState = resolveItineraryState(localItineraryState, sourceKey, routeCard.stops);
+  const { activeTab, orderedStops, selectedStopId, needsRevalidation } = itineraryState;
   const itineraryTabs = dayTabsFor(orderedStops);
   const activeDay = dayForTab(activeTab);
   const visibleStops = filterStopsByDay(orderedStops, activeTab);
-  const activeStopId = selectedStopId || firstSelectableStopId;
+  const activeStopId = visibleStops.some((stop) => stop.id === selectedStopId) ? selectedStopId : visibleStops[0]?.id;
   const totalTransit = routeCard.legs.reduce((sum, leg) => sum + leg.minutes, 0);
   const riskItems = Array.from(new Set([...(routeCard.riskTips || []), ...(routeCard.providerWarnings || [])]));
   const evidenceSources = (routeCard.evidenceSources || []).filter((source) => isSafeExternalUrl(source.url)).slice(0, 4);
@@ -59,32 +70,49 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
   const hasWeatherRisk = checklist.some((item) => item.category === "weather");
 
   useEffect(() => {
-    const nextFirstSelectableStopId = routeCard.stops[0]?.id;
-    setOrderedStops(routeCard.stops);
-    setActiveTab("overview");
+    if (localItineraryState.sourceKey === sourceKey) return;
+    setLocalItineraryState(resolveItineraryState(localItineraryState, sourceKey, routeCard.stops));
     setDraggedStopId(null);
-    setSelectedStopId(nextFirstSelectableStopId);
-    setNeedsRevalidation(false);
-  }, [routeCard]);
+  }, [localItineraryState, routeCard.stops, sourceKey]);
+
+  const selectStop = useCallback(
+    (stopId: string) => {
+      setLocalItineraryState((currentState) => ({
+        ...resolveItineraryState(currentState, sourceKey, routeCard.stops),
+        selectedStopId: stopId
+      }));
+    },
+    [routeCard.stops, sourceKey],
+  );
 
   function selectTab(tabId: ItineraryTabId) {
-    setActiveTab(tabId);
     setDraggedStopId(null);
     const firstVisibleStop = filterStopsByDay(orderedStops, tabId)[0];
-    setSelectedStopId(firstVisibleStop?.id);
+    setLocalItineraryState({
+      ...itineraryState,
+      activeTab: tabId,
+      selectedStopId: firstVisibleStop?.id
+    });
   }
 
   function dropStopOn(targetId: string) {
     if (!activeDay || !draggedStopId) return;
-    setOrderedStops((currentStops) => reorderStopsWithinDay(currentStops, activeDay, draggedStopId, targetId));
+    setLocalItineraryState({
+      ...itineraryState,
+      orderedStops: reorderStopsWithinDay(orderedStops, activeDay, draggedStopId, targetId),
+      needsRevalidation: true
+    });
     setDraggedStopId(null);
-    setNeedsRevalidation(true);
   }
 
   return (
     <article className="route-card">
       <div className="route-map">
-        <RouteInteractiveMap stops={visibleStops} selectedStopId={activeStopId} onSelectStop={setSelectedStopId} />
+        <RouteInteractiveMap
+          stops={visibleStops}
+          selectedStopId={activeStopId}
+          onSelectStop={selectStop}
+        />
       </div>
       <div className="route-card-body">
         <div className="chip-row">
@@ -153,7 +181,7 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
                 event.preventDefault();
                 dropStopOn(stop.id);
               }}
-              onClick={() => setSelectedStopId(stop.id)}
+              onClick={() => selectStop(stop.id)}
               type="button"
             >
               <span className="time">{stop.time}</span>

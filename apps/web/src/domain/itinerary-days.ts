@@ -9,6 +9,14 @@ export type ItineraryTab = {
   stopCount: number;
 };
 
+export type ItineraryState = {
+  sourceKey: string;
+  activeTab: ItineraryTabId;
+  orderedStops: RouteStop[];
+  selectedStopId?: string;
+  needsRevalidation: boolean;
+};
+
 export function dayForTab(tabId: ItineraryTabId): 1 | 2 | undefined {
   if (tabId === "day-1") return 1;
   if (tabId === "day-2") return 2;
@@ -64,4 +72,48 @@ export function reorderStopsWithinDay(stops: RouteStop[], day: 1 | 2, draggedId:
 
   let nextDayStopIndex = 0;
   return stops.map((stop) => (stopDay(stop) === day ? reorderedDayStops[nextDayStopIndex++] : stop));
+}
+
+export function itinerarySourceKey(routeCardId: string, stops: RouteStop[]): string {
+  return `${routeCardId}::${stops
+    .map((stop) =>
+      [
+        stop.id,
+        stopDay(stop),
+        stop.time,
+        stop.poi,
+        stop.address || "",
+        stop.providerType || "",
+        stop.reason,
+        stop.risk,
+        stop.tags.join(","),
+        stop.lat,
+        stop.lng
+      ].join("@"),
+    )
+    .join("|")}`;
+}
+
+export function initialItineraryState(routeCardId: string, stops: RouteStop[]): ItineraryState {
+  return {
+    sourceKey: itinerarySourceKey(routeCardId, stops),
+    activeTab: "overview",
+    orderedStops: stops,
+    selectedStopId: stops[0]?.id,
+    needsRevalidation: false
+  };
+}
+
+export function resolveItineraryState(state: ItineraryState, sourceKey: string, stops: RouteStop[]): ItineraryState {
+  if (state.sourceKey === sourceKey) {
+    return state;
+  }
+
+  return {
+    sourceKey,
+    activeTab: "overview",
+    orderedStops: stops,
+    selectedStopId: stops[0]?.id,
+    needsRevalidation: false
+  };
 }
