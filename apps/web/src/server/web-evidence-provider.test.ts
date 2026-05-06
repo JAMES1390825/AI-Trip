@@ -49,6 +49,41 @@ test("normalizeExaEvidence maps title url source and snippet", () => {
   ]);
 });
 
+test("normalizeExaEvidence drops unsafe urls", () => {
+  const evidence = normalizeExaEvidence(
+    {
+      results: [
+        {
+          title: "Unsafe",
+          url: "javascript:alert(1)",
+          summary: "Should not render."
+        },
+        {
+          title: "Invalid",
+          url: "not a url",
+          summary: "Should not render."
+        },
+        {
+          title: "Safe",
+          url: "https://example.com/safe",
+          summary: "Can render."
+        }
+      ]
+    },
+    "context"
+  );
+
+  assert.deepEqual(evidence, [
+    {
+      title: "Safe",
+      url: "https://example.com/safe",
+      sourceName: "example.com",
+      snippet: "Can render.",
+      usedFor: "context"
+    }
+  ]);
+});
+
 test("ExaWebEvidenceProvider calls Exa Search with x-api-key", async () => {
   const calls: Array<{ url: string; init?: RequestInit }> = [];
   const provider = new ExaWebEvidenceProvider({
@@ -87,6 +122,29 @@ test("ExaWebEvidenceProvider calls Exa Search with x-api-key", async () => {
     contents: { highlights: true, summary: true }
   });
   assert.equal(evidence[0].title, "杭州避坑指南");
+});
+
+test("ExaWebEvidenceProvider returns empty evidence for fetch failures and invalid JSON", async () => {
+  const failingProvider = new ExaWebEvidenceProvider({
+    apiKey: "test-exa-key",
+    fetcher: async () => {
+      throw new Error("network down");
+    }
+  });
+  const invalidJsonProvider = new ExaWebEvidenceProvider({
+    apiKey: "test-exa-key",
+    fetcher: async () => new Response("not json", { status: 200 })
+  });
+
+  const request = {
+    city: "杭州",
+    query: "预约",
+    stopNames: ["西湖"],
+    usedFor: "reservation" as const
+  };
+
+  assert.deepEqual(await failingProvider.searchEvidence(request), []);
+  assert.deepEqual(await invalidJsonProvider.searchEvidence(request), []);
 });
 
 test("createWebEvidenceProvider returns Exa only when configured", () => {

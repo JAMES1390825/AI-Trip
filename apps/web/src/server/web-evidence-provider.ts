@@ -47,25 +47,29 @@ export class ExaWebEvidenceProvider implements WebEvidenceProvider {
       .filter(Boolean)
       .join(" ");
 
-    const response = await this.fetcher(EXA_SEARCH_URL, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": this.apiKey
-      },
-      body: JSON.stringify({
-        query,
-        type: "auto",
-        numResults: 5,
-        contents: { highlights: true, summary: true }
-      })
-    });
+    try {
+      const response = await this.fetcher(EXA_SEARCH_URL, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": this.apiKey
+        },
+        body: JSON.stringify({
+          query,
+          type: "auto",
+          numResults: 5,
+          contents: { highlights: true, summary: true }
+        })
+      });
 
-    if (!response.ok) {
+      if (!response.ok) {
+        return [];
+      }
+
+      return normalizeExaEvidence(await response.json(), input.usedFor);
+    } catch {
       return [];
     }
-
-    return normalizeExaEvidence(await response.json(), input.usedFor);
   }
 }
 
@@ -80,7 +84,7 @@ export function normalizeExaEvidence(payload: unknown, usedFor: EvidenceUseCase)
     }
 
     const title = readString(result.title);
-    const url = readString(result.url);
+    const url = readSafeUrl(result.url);
 
     if (!title || !url) {
       return [];
@@ -127,6 +131,21 @@ function readFirstString(value: unknown): string {
   }
 
   return readString(value.find((item) => readString(item)));
+}
+
+function readSafeUrl(value: unknown): string {
+  const url = readString(value);
+
+  if (!url) {
+    return "";
+  }
+
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? url : "";
+  } catch {
+    return "";
+  }
 }
 
 function readHostname(url: string): string {
