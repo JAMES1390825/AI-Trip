@@ -3,6 +3,7 @@ import { isRouteThemeId } from "@/domain/theme-catalog";
 import { deriveTripDates } from "@/domain/trip-dates";
 import type { CompanionType, RouteCardRequest, TransportPreference, TripPreferenceId } from "@/domain/types";
 import { jsonError, jsonOk } from "@/server/api-response";
+import { loadRootEnv } from "@/server/root-env";
 
 export const dynamic = "force-dynamic";
 
@@ -87,6 +88,7 @@ export function asRequestBody(value: unknown): RouteCardRequest | null {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  loadRootEnv();
   let raw: unknown;
   try {
     raw = await request.json();
