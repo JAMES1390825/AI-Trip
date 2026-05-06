@@ -5,6 +5,7 @@ import { arrangeCandidatesByRule, validateAiArrangement, type AiRouteArrangement
 import { buildFallbackBlueprint, searchSlotsToAmapQueries } from "./route-blueprint";
 import { getRouteTheme } from "./theme-catalog";
 import { generateRouteCard } from "./planner";
+import { buildPretripChecklist } from "./pretrip-checklist";
 import type { RouteCard, RouteCardRequest, RouteLeg, RouteStop } from "./types";
 import { inferUserIntent } from "./user-intent";
 
@@ -91,7 +92,7 @@ function assembleCard(
   const providerWarnings = ["地点来自地图服务，营业/预约/交通以出发前实时信息为准。"];
   if (legs.some((leg) => leg.degraded)) providerWarnings.push("部分路程时间为估算，实际以地图导航为准。");
 
-  return {
+  const card: RouteCard = {
     id: randomUUID(),
     city: request.city,
     themeId: theme.id,
@@ -127,6 +128,8 @@ function assembleCard(
     },
     createdAt: new Date().toISOString()
   };
+
+  return { ...card, pretripChecklist: buildPretripChecklist(card) };
 }
 
 async function maybeAiArrangement(
@@ -177,7 +180,7 @@ export async function generateRealRouteCard(request: RouteCardRequest, deps: Rea
 
   if (candidates.length < 3) {
     const fallback = generateRouteCard(request);
-    return {
+    const fallbackCard: RouteCard = {
       ...fallback,
       planningMode: "fallback_seed",
       degraded: true,
@@ -185,6 +188,7 @@ export async function generateRealRouteCard(request: RouteCardRequest, deps: Rea
       sourceLabel: "本地示例数据",
       providerWarnings: ["当前使用本地示例数据，适合体验产品流程；出发前请核对真实地点。"]
     };
+    return { ...fallbackCard, pretripChecklist: buildPretripChecklist(fallbackCard) };
   }
 
   const aiArrangement = await maybeAiArrangement(aiClient, request, candidates, blueprint.summary);
