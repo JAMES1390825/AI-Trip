@@ -27,12 +27,14 @@ function routeStop(id: string, poi: string): RouteStop {
   };
 }
 
-test("RoutePlannerApp renders duration choices in the main planner form", () => {
+test("RoutePlannerApp renders start and end date pickers instead of duration choices", () => {
   const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
 
-  assert.match(markup, /时长/);
-  assert.match(markup, /1日/);
-  assert.match(markup, /2日/);
+  assert.match(markup, /出发日期/);
+  assert.match(markup, /结束日期/);
+  assert.match(markup, /系统会根据日期范围自动计算行程天数/);
+  assert.doesNotMatch(markup, /<option value="1"/);
+  assert.doesNotMatch(markup, /<option value="2"/);
 });
 
 test("RoutePlannerApp exposes route revision controls in the workbench", () => {

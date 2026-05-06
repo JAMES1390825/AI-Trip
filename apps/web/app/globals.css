@@ -104,6 +104,13 @@ h1 {
   gap: 12px;
 }
 
+.form-hint {
+  margin: 8px 0 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 label {
   display: grid;
   gap: 8px;

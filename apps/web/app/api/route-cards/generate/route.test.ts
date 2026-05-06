@@ -27,7 +27,7 @@ test("asRequestBody preserves lightweight trip planning fields", () => {
     city: "杭州",
     themeId: "easy_citywalk",
     startDate: "2026-05-10",
-    durationDays: 2,
+    endDate: "2026-05-11",
     note: "想轻松一点，有江景",
     tripPreferences: ["citywalk", "拍照出片", "少走路", "未知偏好"],
     importedText: "朋友推荐：湖滨步行街、南宋御街、城市阳台",
@@ -41,6 +41,7 @@ test("asRequestBody preserves lightweight trip planning fields", () => {
     city: "杭州",
     themeId: "easy_citywalk",
     startDate: "2026-05-10",
+    endDate: "2026-05-11",
     durationDays: 2,
     note: "想轻松一点，有江景",
     tripPreferences: ["citywalk", "拍照出片", "少走路"],
@@ -50,6 +51,39 @@ test("asRequestBody preserves lightweight trip planning fields", () => {
     transportPreference: "walk_first",
     companion: "friends"
   });
+});
+
+test("asRequestBody derives duration days from start and end dates", () => {
+  assert.equal(
+    asRequestBody({
+      city: "杭州",
+      themeId: "classic",
+      startDate: "2026-05-10",
+      endDate: "2026-05-10",
+      note: ""
+    })?.durationDays,
+    1,
+  );
+  assert.equal(
+    asRequestBody({
+      city: "杭州",
+      themeId: "classic",
+      startDate: "2026-05-10",
+      endDate: "2026-05-11",
+      note: ""
+    })?.durationDays,
+    2,
+  );
+  assert.equal(
+    asRequestBody({
+      city: "杭州",
+      themeId: "classic",
+      startDate: "2026-05-11",
+      endDate: "2026-05-10",
+      note: ""
+    }),
+    null,
+  );
 });
 
 test("asRequestBody caps lightweight trip planning text fields", () => {

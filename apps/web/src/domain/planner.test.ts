@@ -100,6 +100,21 @@ test("two-day routes include more stops than one-day routes when seed data allow
   assert.ok(twoDay.stops.length <= 6);
 });
 
+test("generateRouteCard can vary fallback stops with a route seed", () => {
+  const baseRequest = {
+    city: "杭州",
+    themeId: "classic" as const,
+    startDate: "2026-05-10",
+    durationDays: 1 as const,
+    note: ""
+  };
+
+  const first = generateRouteCard({ ...baseRequest, routeSeed: "seed-a" });
+  const second = generateRouteCard({ ...baseRequest, routeSeed: "seed-b" });
+
+  assert.notDeepEqual(first.stops.map((stop) => stop.poi), second.stops.map((stop) => stop.poi));
+});
+
 test("route title and summary reflect duration days", () => {
   const card = generateRouteCard({
     city: "成都",

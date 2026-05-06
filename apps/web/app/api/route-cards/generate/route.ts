@@ -1,5 +1,6 @@
 import { generateRealRouteCard } from "@/domain/real-route-planner";
 import { isRouteThemeId } from "@/domain/theme-catalog";
+import { deriveTripDates } from "@/domain/trip-dates";
 import type { CompanionType, RouteCardRequest, TransportPreference, TripPreferenceId } from "@/domain/types";
 import { jsonError, jsonOk } from "@/server/api-response";
 
@@ -57,16 +58,18 @@ export function asRequestBody(value: unknown): RouteCardRequest | null {
   const city = asString(body.city);
   const themeId = asString(body.themeId);
   const startDate = asString(body.startDate);
-  const durationDays = Number(body.durationDays || 1);
+  const endDate = asString(body.endDate) || startDate;
+  const tripDates = deriveTripDates(startDate, endDate);
   const note = asString(body.note);
 
-  if (!city || !isRouteThemeId(themeId) || !startDate || (durationDays !== 1 && durationDays !== 2)) {
+  if (!city || !isRouteThemeId(themeId) || !tripDates) {
     return null;
   }
 
-  const requestBody: RouteCardRequest = { city, themeId, startDate, durationDays, note };
+  const requestBody: RouteCardRequest = { city, themeId, ...tripDates, note };
   const tripPreferences = asTripPreferences(body.tripPreferences);
   const importedText = asCappedString(body.importedText, maxImportedTextLength);
+  const routeSeed = asCappedString(body.routeSeed, maxLocationTextLength);
   const startPoint = asCappedString(body.startPoint, maxLocationTextLength);
   const endPoint = asCappedString(body.endPoint, maxLocationTextLength);
   const transportPreference = asTransportPreference(body.transportPreference);
@@ -74,6 +77,7 @@ export function asRequestBody(value: unknown): RouteCardRequest | null {
 
   if (tripPreferences) requestBody.tripPreferences = tripPreferences;
   if (importedText) requestBody.importedText = importedText;
+  if (routeSeed) requestBody.routeSeed = routeSeed;
   if (startPoint) requestBody.startPoint = startPoint;
   if (endPoint) requestBody.endPoint = endPoint;
   if (transportPreference) requestBody.transportPreference = transportPreference;

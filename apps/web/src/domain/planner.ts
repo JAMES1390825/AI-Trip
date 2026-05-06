@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { fallbackPoiProvider, type PoiProvider } from "./poi-provider";
 import { buildPretripChecklist } from "./pretrip-checklist";
+import { seededScore } from "./seeded-random";
 import { getRouteTheme } from "./theme-catalog";
 import type { PoiSeed, RouteCard, RouteCardRequest, RouteLeg, RouteStop } from "./types";
 
@@ -151,7 +152,11 @@ export function generateRouteCard(request: RouteCardRequest, provider: PoiProvid
   const stopCount = stopCountForDuration(request.durationDays, pool.length);
   const label = durationLabel(request.durationDays);
   const selected = [...pool]
-    .sort((left, right) => scorePoi(right, desiredTags, theme.avoidTags) - scorePoi(left, desiredTags, theme.avoidTags))
+    .sort((left, right) => {
+      const scoreDiff = scorePoi(right, desiredTags, theme.avoidTags) - scorePoi(left, desiredTags, theme.avoidTags);
+      if (Math.abs(scoreDiff) > 12) return scoreDiff;
+      return seededScore(request.routeSeed, right.id) - seededScore(request.routeSeed, left.id);
+    })
     .slice(0, stopCount);
 
   const stops = buildStops(selected, theme.label);
@@ -171,6 +176,7 @@ export function generateRouteCard(request: RouteCardRequest, provider: PoiProvid
     riskTips: buildRiskTips(stops, degraded),
     sourceLabel: provider.getSourceLabel(),
     startDate: request.startDate,
+    endDate: request.endDate,
     durationDays: request.durationDays,
     estimatedCostCny: selected.reduce((sum, poi) => sum + poi.costLevel * 80, 0),
     stops,

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { inferRouteThemeId } from "@/domain/theme-inference";
+import { deriveTripDates } from "@/domain/trip-dates";
 import type { RouteCard as RouteCardData, SavedRouteCardSummary, TripPreferenceId } from "@/domain/types";
 import { RouteCard } from "./RouteCard";
 import type { StopAction } from "./RouteInteractiveMap";
@@ -52,7 +53,7 @@ export function reorderedStopsToReviseNote(stops: RouteCardData["stops"]): strin
 export function RoutePlannerApp() {
   const [city, setCity] = useState("杭州");
   const [startDate, setStartDate] = useState("2026-05-10");
-  const [durationDays, setDurationDays] = useState<1 | 2>(1);
+  const [endDate, setEndDate] = useState("2026-05-10");
   const [note, setNote] = useState("想拍照，别太累");
   const [activeCreateMode, setActiveCreateMode] = useState<"new" | "import">("new");
   const [tripPreferences, setTripPreferences] = useState<TripPreferenceId[]>(["拍照出片", "少走路"]);
@@ -60,7 +61,8 @@ export function RoutePlannerApp() {
   const [revisionNote, setRevisionNote] = useState("少走路一点，加一个吃饭点");
   const [routeCard, setRouteCard] = useState<RouteCardData | null>(null);
   const [saved, setSaved] = useState<SavedRouteCardSummary[]>([]);
-  const [status, setStatus] = useState("选择城市、时长和偏好，生成你的第一张路线卡。");
+  const [routeSeed, setRouteSeed] = useState("initial");
+  const [status, setStatus] = useState("选择城市、日期和偏好，生成你的第一张路线卡。");
   const [shareMode, setShareMode] = useState<ShareMode>("poster");
   const [isPending, startTransition] = useTransition();
   const inferredThemeId = inferRouteThemeId({
@@ -68,6 +70,7 @@ export function RoutePlannerApp() {
     importedText: activeCreateMode === "import" ? importedText : undefined,
     tripPreferences
   });
+  const tripDates = deriveTripDates(startDate, endDate);
 
   async function loadSaved() {
     const payload = await readJson<{ items: SavedRouteCardSummary[] }>(await fetch("/api/route-cards"));
@@ -85,6 +88,11 @@ export function RoutePlannerApp() {
   }
 
   function generate() {
+    const currentTripDates = deriveTripDates(startDate, endDate);
+    if (!currentTripDates) {
+      setStatus("目前先支持 1-2 天行程，请确认结束日期不早于出发日期。");
+      return;
+    }
     startTransition(async () => {
       try {
         setStatus("正在生成真实行程：理解需求、搜索地点、检索证据、校验路线。");
@@ -95,15 +103,18 @@ export function RoutePlannerApp() {
             body: JSON.stringify({
               city,
               themeId: inferredThemeId,
-              startDate,
-              durationDays,
+              startDate: currentTripDates.startDate,
+              endDate: currentTripDates.endDate,
+              durationDays: currentTripDates.durationDays,
               note,
+              routeSeed,
               tripPreferences,
               importedText: activeCreateMode === "import" ? importedText : undefined
             })
           }),
         );
         setRouteCard(payload.routeCard);
+        setRouteSeed(String(Date.now()));
         setStatus("真实行程已生成，可以继续编辑点位或保存。");
       } catch (error) {
         setStatus(error instanceof Error ? error.message : String(error));
@@ -233,7 +244,7 @@ export function RoutePlannerApp() {
         setRouteCard(payload.routeCard);
         setCity(payload.routeCard.city);
         setStartDate(payload.routeCard.startDate);
-        setDurationDays(payload.routeCard.durationDays);
+        setEndDate(payload.routeCard.endDate || payload.routeCard.startDate);
         setStatus("已载入保存的路线卡。");
       } catch (error) {
         setStatus(error instanceof Error ? error.message : String(error));
@@ -303,17 +314,17 @@ export function RoutePlannerApp() {
             </select>
           </label>
           <label>
-            日期
+            出发日期
             <input value={startDate} onChange={(event) => setStartDate(event.target.value)} type="date" />
           </label>
           <label>
-            时长
-            <select value={durationDays} onChange={(event) => setDurationDays(Number(event.target.value) as 1 | 2)}>
-              <option value={1}>1日</option>
-              <option value={2}>2日</option>
-            </select>
+            结束日期
+            <input value={endDate} min={startDate} onChange={(event) => setEndDate(event.target.value)} type="date" />
           </label>
         </div>
+        <p className="form-hint">
+          系统会根据日期范围自动计算行程天数；当前先支持 {tripDates ? `${tripDates.durationDays} 天` : "1-2 天"} 行程。
+        </p>
 
         <div className="preference-chip-panel">
           <div>

@@ -70,8 +70,10 @@ export type RouteCardRequest = {
   city: string;
   themeId: RouteThemeId;
   startDate: string;
+  endDate?: string;
   durationDays: 1 | 2;
   note: string;
+  routeSeed?: string;
   planningContext?: string;
   tripPreferences?: TripPreferenceId[];
   importedText?: string;
@@ -150,6 +152,7 @@ export type RouteCard = {
   evidenceSources?: StopEvidence[];
   pretripChecklist?: PretripChecklistItem[];
   startDate: string;
+  endDate?: string;
   durationDays: 1 | 2;
   estimatedCostCny: number;
   stops: RouteStop[];

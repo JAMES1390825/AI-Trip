@@ -29,6 +29,7 @@ export async function reviseRouteCard(input: ReviseRouteCardInput, deps: ReviseR
     city: input.routeCard.city,
     themeId: input.routeCard.themeId,
     startDate: input.routeCard.startDate,
+    endDate: input.routeCard.endDate,
     durationDays: input.routeCard.durationDays,
     note: reviseNote,
     planningContext: buildRevisionNote(input.routeCard, reviseNote)

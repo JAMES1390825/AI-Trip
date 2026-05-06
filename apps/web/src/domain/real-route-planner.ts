@@ -127,6 +127,7 @@ function assembleCard(
     evidenceSummary,
     evidenceSources,
     startDate: request.startDate,
+    endDate: request.endDate,
     durationDays: request.durationDays,
     estimatedCostCny: stops.length * 80,
     stops,
@@ -253,7 +254,7 @@ export async function generateRealRouteCard(request: RouteCardRequest, deps: Rea
 
   const evidence = await searchEvidenceSafely(evidenceProvider, request, intent.intentSummary, candidates);
   const aiArrangement = await maybeAiArrangement(aiClient, request, candidates, blueprint.summary, evidence.evidenceSources);
-  const arrangement = aiArrangement || arrangeCandidatesByRule(candidates, request.durationDays);
+  const arrangement = aiArrangement || arrangeCandidatesByRule(candidates, request.durationDays, request.routeSeed);
   const mode = aiArrangement ? "ai_amap" : "rule_amap";
   const stops = buildStopsFromArrangement(candidates, arrangement);
   const legs = await buildLegs(stops, amapClient);
