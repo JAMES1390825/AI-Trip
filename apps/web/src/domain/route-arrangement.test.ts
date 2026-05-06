@@ -65,3 +65,13 @@ test("arrangeCandidatesByRule returns day assignments and user-facing explanatio
   assert.match(arrangement.arrangementReason, /真实地点|可走/);
   assert.ok(arrangement.skipSuggestion);
 });
+
+test("arrangeCandidatesByRule can vary candidate order with a route seed", () => {
+  const first = arrangeCandidatesByRule(candidates, 1, "seed-a");
+  const second = arrangeCandidatesByRule(candidates, 1, "seed-b");
+
+  assert.notDeepEqual(
+    first.selectedStops.map((stop) => stop.candidateId),
+    second.selectedStops.map((stop) => stop.candidateId),
+  );
+});

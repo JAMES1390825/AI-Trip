@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { fallbackPoiProvider, type PoiProvider } from "./poi-provider";
 import { buildPretripChecklist } from "./pretrip-checklist";
+import { seededScore } from "./seeded-random";
 import { getRouteTheme } from "./theme-catalog";
 import type { PoiSeed, RouteCard, RouteCardRequest, RouteLeg, RouteStop } from "./types";
 
@@ -106,6 +107,18 @@ function buildFitFor(themeLabel: string, note: string): string {
   return `适合想要${themeLabel}、不想做复杂攻略的轻旅行用户。`;
 }
 
+function buildSummary(label: string, promise: string, request: RouteCardRequest): string {
+  const trimmedNote = request.note.trim();
+  if (!trimmedNote) return `${label}路线：${promise}`;
+  const notePrefix = request.planningContext ? "已重新校验" : "已考虑";
+  return `${label}路线：${promise} ${notePrefix}：${trimmedNote}`;
+}
+
+function fitForRoute(themeLabel: string, request: RouteCardRequest): string {
+  if (request.planningContext) return `适合想要${themeLabel}、可继续微调节奏的轻旅行用户。`;
+  return buildFitFor(themeLabel, request.note);
+}
+
 function buildRiskTips(stops: RouteStop[], degraded: boolean): string[] {
   const tips = new Set<string>();
   if (degraded) tips.add("当前城市暂无种子数据，已用示例城市降级生成，请先核对点位可达性。");
@@ -139,7 +152,11 @@ export function generateRouteCard(request: RouteCardRequest, provider: PoiProvid
   const stopCount = stopCountForDuration(request.durationDays, pool.length);
   const label = durationLabel(request.durationDays);
   const selected = [...pool]
-    .sort((left, right) => scorePoi(right, desiredTags, theme.avoidTags) - scorePoi(left, desiredTags, theme.avoidTags))
+    .sort((left, right) => {
+      const scoreDiff = scorePoi(right, desiredTags, theme.avoidTags) - scorePoi(left, desiredTags, theme.avoidTags);
+      if (Math.abs(scoreDiff) > 12) return scoreDiff;
+      return seededScore(request.routeSeed, right.id) - seededScore(request.routeSeed, left.id);
+    })
     .slice(0, stopCount);
 
   const stops = buildStops(selected, theme.label);
@@ -153,12 +170,13 @@ export function generateRouteCard(request: RouteCardRequest, provider: PoiProvid
     themeId: theme.id,
     themeLabel: theme.label,
     title: `${city}${label}${theme.label}`,
-    summary: `${label}路线：${theme.promise} ${request.note.trim() ? `已考虑：${request.note.trim()}。` : ""}`.trim(),
+    summary: buildSummary(label, theme.promise, request),
     highlights: buildHighlights(stops),
-    fitFor: buildFitFor(theme.label, request.note),
+    fitFor: fitForRoute(theme.label, request),
     riskTips: buildRiskTips(stops, degraded),
     sourceLabel: provider.getSourceLabel(),
     startDate: request.startDate,
+    endDate: request.endDate,
     durationDays: request.durationDays,
     estimatedCostCny: selected.reduce((sum, poi) => sum + poi.costLevel * 80, 0),
     stops,

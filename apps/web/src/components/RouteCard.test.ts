@@ -3,7 +3,7 @@ import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { RouteCard as RouteCardData } from "@/domain/types";
-import { RouteCard } from "./RouteCard";
+import { RouteCard, stopsForRevalidation } from "./RouteCard";
 
 const routeCard: RouteCardData = {
   id: "card-1",
@@ -23,6 +23,16 @@ const routeCard: RouteCardData = {
   skipSuggestion: "太累就跳过第二站。",
   weatherAlternative: "下雨改去室内展馆。",
   providerWarnings: ["地点来自地图服务，营业/预约/交通以出发前实时信息为准。"],
+  evidenceSummary: "公开攻略证据：example.com《杭州拍照路线》",
+  evidenceSources: [
+    {
+      title: "杭州拍照路线",
+      sourceName: "example.com",
+      url: "https://example.com/hangzhou",
+      snippet: "公开攻略证据支持湖滨步行街与江景串联。",
+      usedFor: "reason"
+    }
+  ],
   pretripChecklist: [
     {
       id: "weather-1",
@@ -74,6 +84,21 @@ const routeCard: RouteCardData = {
       reason: "适合看江景。",
       risk: "出发前确认。",
       sourceMode: "provider"
+    },
+    {
+      id: "2-a",
+      time: "09:30",
+      poiId: "c",
+      poi: "南宋御街",
+      address: "中山中路",
+      day: 2,
+      tags: ["food"],
+      lat: 30.01,
+      lng: 120.01,
+      mapUrl: "https://uri.amap.com/marker?position=120.01,30.01&name=%E5%8D%97%E5%AE%8B%E5%BE%A1%E8%A1%97",
+      reason: "适合慢逛吃点心。",
+      risk: "出发前确认。",
+      sourceMode: "provider"
     }
   ],
   legs: [],
@@ -93,6 +118,12 @@ test("RouteCard renders real planning explanation fields", () => {
   assert.match(markup, /这样安排的原因/);
   assert.match(markup, /太累就跳过/);
   assert.match(markup, /天气变化备选/);
+  assert.match(markup, /总览/);
+  assert.match(markup, /DAY1/);
+  assert.match(markup, /DAY2/);
+  assert.match(markup, /每日行程/);
+  assert.match(markup, /公开攻略证据/);
+  assert.match(markup, /example\.com/);
   assert.match(markup, /湖滨路/);
   assert.match(markup, /出发前检查/);
   assert.match(markup, /天气风险/);
@@ -105,7 +136,76 @@ test("RouteCard renders real planning explanation fields", () => {
   assert.match(markup, /10:00 · 湖滨步行街/);
   assert.match(markup, /type="button"/);
   assert.match(markup, /timeline-row timeline-row--selected/);
-  assert.doesNotMatch(markup, /href="https:\/\/uri\.amap\.com\/marker/);
+  assert.match(markup, /导航方式/);
+  assert.match(markup, /高德导航/);
+  assert.match(markup, /href="https:\/\/uri\.amap\.com\/marker/);
   assert.doesNotMatch(markup, /点击站点可打开高德/);
   assert.doesNotMatch(markup, /map-pin/);
+});
+
+test("RouteCard renders stop edit actions when callback is provided", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(RouteCard, {
+      routeCard,
+      onStopAction: () => undefined
+    }),
+  );
+
+  assert.match(markup, /替换这个点/);
+  assert.match(markup, /删除这个点/);
+  assert.match(markup, /前面加吃饭点/);
+  assert.match(markup, /后面加休息点/);
+  assert.match(markup, /改室内/);
+  assert.match(markup, /这一段少走路/);
+});
+
+test("RouteCard forwards disabled state to stop action controls", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(RouteCard, {
+      routeCard,
+      onStopAction: () => undefined,
+      actionsDisabled: true
+    }),
+  );
+
+  assert.match(markup, /<button disabled=""/);
+  assert.match(markup, /替换这个点/);
+});
+
+test("RouteCard does not render unsafe evidence links", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(RouteCard, {
+      routeCard: {
+        ...routeCard,
+        evidenceSources: [
+          {
+            title: "不安全来源",
+            sourceName: "bad",
+            url: "javascript:alert(1)",
+            snippet: "不应渲染。",
+            usedFor: "risk"
+          },
+          {
+            title: "安全来源",
+            sourceName: "example.com",
+            url: "https://example.com/safe",
+            snippet: "可以渲染。",
+            usedFor: "reason"
+          }
+        ]
+      }
+    })
+  );
+
+  assert.doesNotMatch(markup, /javascript:alert/);
+  assert.doesNotMatch(markup, /不安全来源/);
+  assert.match(markup, /https:\/\/example\.com\/safe/);
+  assert.match(markup, /安全来源/);
+});
+
+test("stopsForRevalidation keeps reordered checks scoped to the active day", () => {
+  const dayOneStops = stopsForRevalidation(routeCard.stops, 1);
+
+  assert.deepEqual(dayOneStops.map((stop) => stop.poi), ["湖滨步行街", "城市阳台"]);
+  assert.doesNotMatch(dayOneStops.map((stop) => stop.poi).join(" -> "), /南宋御街/);
 });

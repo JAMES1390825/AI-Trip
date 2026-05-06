@@ -2,6 +2,7 @@ import { reviseRouteCard } from "@/domain/route-revision";
 import { isRouteThemeId } from "@/domain/theme-catalog";
 import type { RouteCard } from "@/domain/types";
 import { jsonError, jsonOk } from "@/server/api-response";
+import { loadRootEnv } from "@/server/root-env";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,7 @@ function asRequestBody(value: unknown): ReviseRequestBody | null {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  loadRootEnv();
   let raw: unknown;
   try {
     raw = await request.json();

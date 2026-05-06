@@ -29,8 +29,10 @@ export async function reviseRouteCard(input: ReviseRouteCardInput, deps: ReviseR
     city: input.routeCard.city,
     themeId: input.routeCard.themeId,
     startDate: input.routeCard.startDate,
+    endDate: input.routeCard.endDate,
     durationDays: input.routeCard.durationDays,
-    note: buildRevisionNote(input.routeCard, reviseNote)
+    note: reviseNote,
+    planningContext: buildRevisionNote(input.routeCard, reviseNote)
   };
   const revised = await planner(request);
   return {

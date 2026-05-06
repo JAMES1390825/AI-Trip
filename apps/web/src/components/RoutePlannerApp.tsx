@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { routeThemes } from "@/domain/theme-catalog";
-import type { RouteCard as RouteCardData, SavedRouteCardSummary } from "@/domain/types";
+import { inferRouteThemeId } from "@/domain/theme-inference";
+import { deriveTripDates } from "@/domain/trip-dates";
+import type { RouteCard as RouteCardData, SavedRouteCardSummary, TripPreferenceId } from "@/domain/types";
 import { RouteCard } from "./RouteCard";
+import type { StopAction } from "./RouteInteractiveMap";
 import { PosterShareCard } from "./share/PosterShareCard";
 import { StoryShareCard } from "./share/StoryShareCard";
 
@@ -11,6 +13,21 @@ type ShareMode = "poster" | "story";
 
 const cityOptions = ["上海", "杭州", "苏州", "成都"];
 const revisionQuickActions = ["少走路", "加吃饭点", "下雨改室内", "更省钱", "去掉寺庙", "压缩成半日"];
+const preferenceOptions: TripPreferenceId[] = [
+  "经典必玩",
+  "吃喝逛",
+  "亲子",
+  "citywalk",
+  "历史古迹",
+  "小众探索",
+  "拍照出片",
+  "自然风光",
+  "文艺展览",
+  "室内备选",
+  "少走路",
+  "预算友好"
+];
+const generationStages = ["理解旅行需求", "高德搜索真实地点", "Exa 检索公开攻略证据", "校验路线与风险"];
 
 async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -20,18 +37,40 @@ async function readJson<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export function stopActionToReviseNote(action: StopAction): string {
+  if (action.type === "replace") return `替换「${action.stopName}」，保持路线真实可走。`;
+  if (action.type === "delete") return `删除「${action.stopName}」，并重新连接前后路线。`;
+  if (action.type === "add_food_before") return `在「${action.stopName}」前面加一个真实可达的吃饭点。`;
+  if (action.type === "add_rest_after") return `在「${action.stopName}」后面加一个适合休息的点。`;
+  if (action.type === "make_indoor") return `把「${action.stopName}」替换成室内或雨天更稳的点。`;
+  return `优化「${action.stopName}」附近路线，减少步行距离。`;
+}
+
+export function reorderedStopsToReviseNote(stops: RouteCardData["stops"]): string {
+  return `用户拖拽调整了当天顺序，请优先按这个顺序重新校验路线时间：${stops.map((stop) => stop.poi).join(" -> ")}`;
+}
+
 export function RoutePlannerApp() {
   const [city, setCity] = useState("杭州");
-  const [themeId, setThemeId] = useState(routeThemes[0].id);
   const [startDate, setStartDate] = useState("2026-05-10");
-  const [durationDays, setDurationDays] = useState<1 | 2>(1);
+  const [endDate, setEndDate] = useState("2026-05-10");
   const [note, setNote] = useState("想拍照，别太累");
+  const [activeCreateMode, setActiveCreateMode] = useState<"new" | "import">("new");
+  const [tripPreferences, setTripPreferences] = useState<TripPreferenceId[]>(["拍照出片", "少走路"]);
+  const [importedText, setImportedText] = useState("");
   const [revisionNote, setRevisionNote] = useState("少走路一点，加一个吃饭点");
   const [routeCard, setRouteCard] = useState<RouteCardData | null>(null);
   const [saved, setSaved] = useState<SavedRouteCardSummary[]>([]);
-  const [status, setStatus] = useState("选择城市和主题，生成你的第一张路线卡。");
+  const [routeSeed, setRouteSeed] = useState("initial");
+  const [status, setStatus] = useState("选择城市、日期和偏好，生成你的第一张路线卡。");
   const [shareMode, setShareMode] = useState<ShareMode>("poster");
   const [isPending, startTransition] = useTransition();
+  const inferredThemeId = inferRouteThemeId({
+    note,
+    importedText: activeCreateMode === "import" ? importedText : undefined,
+    tripPreferences
+  });
+  const tripDates = deriveTripDates(startDate, endDate);
 
   async function loadSaved() {
     const payload = await readJson<{ items: SavedRouteCardSummary[] }>(await fetch("/api/route-cards"));
@@ -42,19 +81,41 @@ export function RoutePlannerApp() {
     void loadSaved().catch((error) => setStatus(error instanceof Error ? error.message : String(error)));
   }, []);
 
+  function togglePreference(preference: TripPreferenceId) {
+    setTripPreferences((current) =>
+      current.includes(preference) ? current.filter((item) => item !== preference) : [...current, preference],
+    );
+  }
+
   function generate() {
+    const currentTripDates = deriveTripDates(startDate, endDate);
+    if (!currentTripDates) {
+      setStatus("目前先支持 1-2 天行程，请确认结束日期不早于出发日期。");
+      return;
+    }
     startTransition(async () => {
       try {
-        setStatus("正在生成路线卡...");
+        setStatus("正在生成真实行程：理解需求、搜索地点、检索证据、校验路线。");
         const payload = await readJson<{ routeCard: RouteCardData }>(
           await fetch("/api/route-cards/generate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ city, themeId, startDate, durationDays, note })
+            body: JSON.stringify({
+              city,
+              themeId: inferredThemeId,
+              startDate: currentTripDates.startDate,
+              endDate: currentTripDates.endDate,
+              durationDays: currentTripDates.durationDays,
+              note,
+              routeSeed,
+              tripPreferences,
+              importedText: activeCreateMode === "import" ? importedText : undefined
+            })
           }),
         );
         setRouteCard(payload.routeCard);
-        setStatus("路线卡已生成，可以保存或切换分享包装。");
+        setRouteSeed(String(Date.now()));
+        setStatus("真实行程已生成，可以继续编辑点位或保存。");
       } catch (error) {
         setStatus(error instanceof Error ? error.message : String(error));
       }
@@ -94,6 +155,46 @@ export function RoutePlannerApp() {
         setStatus(error instanceof Error ? error.message : String(error));
       }
     });
+  }
+
+  function reviseWithNote(noteText: string) {
+    const trimmedNote = noteText.trim();
+    if (isPending) return;
+    if (!routeCard) {
+      setStatus("请先生成一张路线卡，再调整路线。");
+      return;
+    }
+    if (!trimmedNote) {
+      setStatus("请先写一句调整要求。");
+      return;
+    }
+
+    setRevisionNote(trimmedNote);
+    startTransition(async () => {
+      try {
+        setStatus("正在重新校验路线...");
+        const payload = await readJson<{ routeCard: RouteCardData }>(
+          await fetch("/api/route-cards/revise", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ routeCard, reviseNote: trimmedNote })
+          }),
+        );
+        setRouteCard(payload.routeCard);
+        setRevisionNote("");
+        setStatus("已完成路线校验，可以继续编辑或保存。");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : String(error));
+      }
+    });
+  }
+
+  function handleStopAction(action: StopAction) {
+    reviseWithNote(stopActionToReviseNote(action));
+  }
+
+  function handleRevalidateOrder(stops: RouteCardData["stops"]) {
+    reviseWithNote(reorderedStopsToReviseNote(stops));
   }
 
   function save() {
@@ -142,9 +243,8 @@ export function RoutePlannerApp() {
         const payload = await readJson<{ routeCard: RouteCardData }>(await fetch(`/api/route-cards/${id}`));
         setRouteCard(payload.routeCard);
         setCity(payload.routeCard.city);
-        setThemeId(payload.routeCard.themeId);
         setStartDate(payload.routeCard.startDate);
-        setDurationDays(payload.routeCard.durationDays);
+        setEndDate(payload.routeCard.endDate || payload.routeCard.startDate);
         setStatus("已载入保存的路线卡。");
       } catch (error) {
         setStatus(error instanceof Error ? error.message : String(error));
@@ -172,9 +272,37 @@ export function RoutePlannerApp() {
   return (
     <div className="app-grid">
       <section className="planner-panel">
-        <p className="eyebrow">AI Trip · Route Cards</p>
-        <h1>把周末旅行变成一张能走的路线卡。</h1>
-        <p className="hero-copy">B 型路线卡是核心体验：地图、时间线、可信度、保存和分享都围绕它展开。</p>
+        <p className="eyebrow">AI Trip · 我的行程</p>
+        <h1>把一句旅行想法变成可执行行程。</h1>
+        <p className="hero-copy">像在地图纸上做标注：先轻量创建，再用真实地点、公开攻略证据和路线校验生成可编辑路线卡。</p>
+
+        <div className="create-entry-panel">
+          <div>
+            <p className="section-kicker">Create Desk</p>
+            <h3>从哪开始规划？</h3>
+          </div>
+          <div className="create-entry-actions">
+            <button
+              aria-pressed={activeCreateMode === "new"}
+              className={activeCreateMode === "new" ? "active" : ""}
+              onClick={() => setActiveCreateMode("new")}
+              type="button"
+            >
+              创建新计划
+            </button>
+            <button
+              aria-pressed={activeCreateMode === "import"}
+              className={activeCreateMode === "import" ? "active" : ""}
+              onClick={() => setActiveCreateMode("import")}
+              type="button"
+            >
+              智能导入地点/行程
+            </button>
+            <button aria-label="采集识别即将支持" disabled title="采集识别即将支持" type="button">
+              采集识别
+            </button>
+          </div>
+        </div>
 
         <div className="form-grid">
           <label>
@@ -186,31 +314,49 @@ export function RoutePlannerApp() {
             </select>
           </label>
           <label>
-            日期
+            出发日期
             <input value={startDate} onChange={(event) => setStartDate(event.target.value)} type="date" />
           </label>
           <label>
-            时长
-            <select value={durationDays} onChange={(event) => setDurationDays(Number(event.target.value) as 1 | 2)}>
-              <option value={1}>1日</option>
-              <option value={2}>2日</option>
-            </select>
+            结束日期
+            <input value={endDate} min={startDate} onChange={(event) => setEndDate(event.target.value)} type="date" />
           </label>
         </div>
+        <p className="form-hint">
+          系统会根据日期范围自动计算行程天数；当前先支持 {tripDates ? `${tripDates.durationDays} 天` : "1-2 天"} 行程。
+        </p>
 
-        <div className="theme-grid">
-          {routeThemes.map((theme) => (
-            <button
-              className={theme.id === themeId ? "theme-button active" : "theme-button"}
-              key={theme.id}
-              onClick={() => setThemeId(theme.id)}
-              type="button"
-            >
-              <strong>{theme.label}</strong>
-              <span>{theme.promise}</span>
-            </button>
-          ))}
+        <div className="preference-chip-panel">
+          <div>
+            <p className="section-kicker">Planning Chips</p>
+            <h3>点几枚旅行偏好</h3>
+            <p>芯片会参与需求理解和真实地点检索，方便快速表达这趟旅行的风格。</p>
+          </div>
+          <div className="preference-chip-grid">
+            {preferenceOptions.map((preference) => (
+              <button
+                aria-pressed={tripPreferences.includes(preference)}
+                className={tripPreferences.includes(preference) ? "preference-chip active" : "preference-chip"}
+                key={preference}
+                onClick={() => togglePreference(preference)}
+                type="button"
+              >
+                {preference}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {activeCreateMode === "import" ? (
+          <label>
+            智能导入内容
+            <textarea
+              placeholder="粘贴朋友发来的地点清单、旧行程、攻略摘录或备忘录。"
+              value={importedText}
+              onChange={(event) => setImportedText(event.target.value)}
+            />
+          </label>
+        ) : null}
 
         <label>
           补充偏好
@@ -226,6 +372,15 @@ export function RoutePlannerApp() {
           </button>
         </div>
         <p className="status">{status}</p>
+        <div className="generation-progress-panel">
+          <p className="section-kicker">Progress Ledger</p>
+          <ol>
+            {generationStages.map((stage) => (
+              <li key={stage}>{stage}</li>
+            ))}
+          </ol>
+          <p>这些是诚实的规划阶段提示；不展示未接入来源，也不冒充小红书官方搜索。</p>
+        </div>
 
         <div className="revision-panel">
           <div>
@@ -285,7 +440,12 @@ export function RoutePlannerApp() {
       <section className="preview-panel">
         {routeCard ? (
           <>
-            <RouteCard routeCard={routeCard} />
+            <RouteCard
+              routeCard={routeCard}
+              onStopAction={handleStopAction}
+              onRevalidateOrder={handleRevalidateOrder}
+              actionsDisabled={isPending}
+            />
             <div className="share-actions">
               <a href={sharePathFor(routeCard)} target="_blank" rel="noreferrer">
                 打开分享页

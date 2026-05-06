@@ -1,4 +1,5 @@
 import type { RealPoiCandidate } from "@/server/amap-client";
+import { seededShuffle } from "./seeded-random";
 
 export type AiSelectedStop = {
   candidateId: string;
@@ -50,9 +51,9 @@ export function validateAiArrangement(raw: unknown, candidates: RealPoiCandidate
   };
 }
 
-export function arrangeCandidatesByRule(candidates: RealPoiCandidate[], durationDays: 1 | 2): AiRouteArrangement {
+export function arrangeCandidatesByRule(candidates: RealPoiCandidate[], durationDays: 1 | 2, routeSeed?: string): AiRouteArrangement {
   const limit = Math.min(maxStops(durationDays), Math.max(3, candidates.length));
-  const selected = candidates.slice(0, limit);
+  const selected = seededShuffle(candidates, routeSeed).slice(0, limit);
   const splitIndex = durationDays === 2 ? Math.ceil(selected.length / 2) : selected.length;
   const indoorCandidate = selected.find((candidate) => candidate.tags.includes("indoor"));
 

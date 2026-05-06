@@ -36,6 +36,16 @@ The real planner is server-side only.
 
 AI providers are never allowed to invent POI facts. Amap coordinates, addresses, and provider IDs remain the source of truth.
 
+## Web Evidence Boundary
+
+`web-evidence-provider` is optional and server-side only.
+
+The first provider is Exa Search. It searches public web pages for travel guide context, warnings, reservation hints, seasonal notes, and source links.
+
+Evidence is attached to route cards as `evidenceSummary` and `evidenceSources`. It supports explanation and risk assessment but cannot create POIs, change coordinates, or override Amap addresses.
+
+If Exa is not configured or fails, planning continues with Amap facts and AI/rule arrangement.
+
 ## Route Revision Workbench
 
 The revision flow is a thin layer over the same planning pipeline:

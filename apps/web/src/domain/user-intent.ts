@@ -1,4 +1,4 @@
-import type { RouteThemeId } from "./types";
+import type { CompanionType, RouteThemeId, TransportPreference, TripPreferenceId } from "./types";
 
 export type TravelerProfile = "solo" | "couple" | "friends" | "family" | "parents" | "kids" | "unknown";
 export type PhysicalPace = "relaxed" | "normal" | "packed" | "low_walking" | "unknown";
@@ -24,6 +24,7 @@ export type UserIntent = {
   startRhythm: StartRhythm;
   interestWeights: InterestWeights;
   mustHaveConstraints: string[];
+  importedTextHints: string[];
   avoidConstraints: string[];
   confidence: number;
   intentSummary: string;
@@ -32,6 +33,10 @@ export type UserIntent = {
 export type IntentInput = {
   themeId: RouteThemeId;
   note: string;
+  tripPreferences?: TripPreferenceId[];
+  importedText?: string;
+  companion?: CompanionType;
+  transportPreference?: TransportPreference;
 };
 
 const baseWeights: InterestWeights = {
@@ -73,7 +78,10 @@ function includesAny(text: string, words: string[]): boolean {
 export function inferUserIntent(input: IntentInput): UserIntent {
   const note = input.note.trim();
   const weights = withThemeWeights(input.themeId);
+  const preferences = input.tripPreferences || [];
+  const importedText = (input.importedText || "").trim();
   const mustHaveConstraints: string[] = [];
+  const importedTextHints: string[] = [];
   const avoidConstraints: string[] = [];
 
   if (includesAny(note, ["拍照", "出片", "photo"])) weights.photo += 3;
@@ -82,17 +90,29 @@ export function inferUserIntent(input: IntentInput): UserIntent {
   if (includesAny(note, ["雨", "下雨"])) rainSafe(weights);
   if (includesAny(note, ["夜", "夜景", "晚上"])) weights.nightlife += 2;
 
-  const travelerProfile: TravelerProfile = includesAny(note, ["爸妈", "父母", "老人"])
+  if (preferences.includes("拍照出片")) weights.photo += 3;
+  if (preferences.includes("吃喝逛")) weights.food += 3;
+  if (preferences.includes("历史古迹") || preferences.includes("文艺展览")) weights.culture += 3;
+  if (preferences.includes("自然风光")) weights.nature += 3;
+  if (preferences.includes("室内备选")) rainSafe(weights);
+  if (preferences.includes("预算友好")) weights.nature += 1;
+  if (preferences.includes("小众探索")) weights.classic -= 0.5;
+  if (preferences.includes("citywalk")) {
+    weights.photo += 1;
+    weights.coffee += 1;
+  }
+
+  const travelerProfile: TravelerProfile = input.companion === "elderly" || includesAny(note, ["爸妈", "父母", "老人"])
     ? "parents"
-    : includesAny(note, ["孩子", "小孩", "亲子"])
+    : input.companion === "family" || preferences.includes("亲子") || includesAny(note, ["孩子", "小孩", "亲子"])
       ? "kids"
-      : includesAny(note, ["朋友", "闺蜜", "同学"])
+      : input.companion === "friends" || includesAny(note, ["朋友", "闺蜜", "同学"])
         ? "friends"
         : "unknown";
 
-  const physicalPace: PhysicalPace = includesAny(note, ["少走", "少走路"])
+  const physicalPace: PhysicalPace = preferences.includes("少走路") || includesAny(note, ["少走", "少走路"])
     ? "low_walking"
-    : includesAny(note, ["轻松", "别太累", "不赶"])
+    : includesAny(note, ["轻松", "别太累", "不赶", "不要太赶"])
       ? "relaxed"
       : includesAny(note, ["多逛", "充实", "特种兵"])
         ? "packed"
@@ -124,6 +144,12 @@ export function inferUserIntent(input: IntentInput): UserIntent {
       if (note.includes(phrase)) avoidConstraints.push(phrase);
     }
   }
+  if (importedText) importedTextHints.push(importedText.slice(0, 120));
+  if (preferences.includes("亲子")) mustHaveConstraints.push("适合亲子同行");
+  if (preferences.includes("室内备选")) mustHaveConstraints.push("保留室内备选");
+  if (input.transportPreference === "walk_first") avoidConstraints.push("步行优先但避免连续长距离暴走");
+  if (input.transportPreference === "public_transit_ok") avoidConstraints.push("优先公共交通可达");
+  if (input.transportPreference === "taxi_ok") avoidConstraints.push("可用打车减少换乘");
 
   const summaryParts: string[] = [];
   if (physicalPace === "relaxed" || physicalPace === "low_walking") summaryParts.push("轻松");
@@ -139,6 +165,7 @@ export function inferUserIntent(input: IntentInput): UserIntent {
     startRhythm,
     interestWeights: weights,
     mustHaveConstraints,
+    importedTextHints,
     avoidConstraints,
     confidence: note ? 0.74 : 0.52,
     intentSummary: summaryParts.length ? summaryParts.join("，") : "按主题生成基础路线"
