@@ -91,7 +91,7 @@ export function RouteMiniMap({ stops }: { stops: RouteStop[] }) {
           </text>
         ) : null}
       </svg>
-      <p className="route-map-caption">App 内路线预览 · 点击站点可打开高德</p>
+      <p className="route-map-caption">App 内路线预览 · 动态地图不可用时保留路线结构</p>
       <div aria-label="路线站点" className="route-map-stops">
         {stops.map((stop, index) => (
           <span className="route-map-stop-chip" key={stop.id}>

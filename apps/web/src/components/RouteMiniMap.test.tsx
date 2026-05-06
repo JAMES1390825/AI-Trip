@@ -34,7 +34,8 @@ test("RouteMiniMap renders numbered markers and a connected route line", () => {
   const markup = renderToStaticMarkup(React.createElement(RouteMiniMap, { stops }));
 
   assert.match(markup, /route-mini-map/);
-  assert.match(markup, /App 内路线预览 · 点击站点可打开高德/);
+  assert.match(markup, /App 内路线预览/);
+  assert.doesNotMatch(markup, /点击站点可打开高德/);
   assert.match(markup, /class="route-line"/);
   assert.match(markup, /points="[0-9., ]+"/);
   assert.match(markup, />1</);
