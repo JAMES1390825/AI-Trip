@@ -140,3 +140,34 @@ test("RouteCard renders real planning explanation fields", () => {
   assert.doesNotMatch(markup, /点击站点可打开高德/);
   assert.doesNotMatch(markup, /map-pin/);
 });
+
+test("RouteCard does not render unsafe evidence links", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(RouteCard, {
+      routeCard: {
+        ...routeCard,
+        evidenceSources: [
+          {
+            title: "不安全来源",
+            sourceName: "bad",
+            url: "javascript:alert(1)",
+            snippet: "不应渲染。",
+            usedFor: "risk"
+          },
+          {
+            title: "安全来源",
+            sourceName: "example.com",
+            url: "https://example.com/safe",
+            snippet: "可以渲染。",
+            usedFor: "reason"
+          }
+        ]
+      }
+    })
+  );
+
+  assert.doesNotMatch(markup, /javascript:alert/);
+  assert.doesNotMatch(markup, /不安全来源/);
+  assert.match(markup, /https:\/\/example\.com\/safe/);
+  assert.match(markup, /安全来源/);
+});

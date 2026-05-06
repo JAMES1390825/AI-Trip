@@ -219,7 +219,12 @@ async function searchEvidenceSafely(
 export async function generateRealRouteCard(request: RouteCardRequest, deps: RealRoutePlannerDeps = {}): Promise<RouteCard> {
   const amapClient = deps.amapClient || new AmapClient();
   const aiClient = deps.aiClient || deps.openAiClient || createRouteAiClient();
-  const evidenceProvider = deps.evidenceProvider || createWebEvidenceProvider(process.env);
+  const evidenceProvider =
+    deps.evidenceProvider ||
+    createWebEvidenceProvider({
+      SEARCH_PROVIDER: process.env.SEARCH_PROVIDER,
+      EXA_API_KEY: process.env.EXA_API_KEY
+    });
   const intent = inferUserIntent({
     themeId: request.themeId,
     note: request.note,

@@ -27,6 +27,15 @@ function categoryLabel(category: PretripChecklistCategory): string {
   return labels[category];
 }
 
+function isSafeExternalUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
   const firstSelectableStopId = routeCard.stops[0]?.id;
   const [selectedStopId, setSelectedStopId] = useState(firstSelectableStopId);
@@ -40,7 +49,7 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
   const activeStopId = selectedStopId || firstSelectableStopId;
   const totalTransit = routeCard.legs.reduce((sum, leg) => sum + leg.minutes, 0);
   const riskItems = Array.from(new Set([...(routeCard.riskTips || []), ...(routeCard.providerWarnings || [])]));
-  const evidenceSources = (routeCard.evidenceSources || []).slice(0, 4);
+  const evidenceSources = (routeCard.evidenceSources || []).filter((source) => isSafeExternalUrl(source.url)).slice(0, 4);
   const checklist = routeCard.pretripChecklist || [];
   const highestSeverity = checklist.some((item) => item.severity === "critical")
     ? "critical"

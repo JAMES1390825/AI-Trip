@@ -24,7 +24,7 @@ type ExaWebEvidenceProviderOptions = {
 const EXA_SEARCH_URL = "https://api.exa.ai/search";
 
 export class NullWebEvidenceProvider implements WebEvidenceProvider {
-  async searchEvidence(): Promise<StopEvidence[]> {
+  async searchEvidence(_input?: WebEvidenceRequest): Promise<StopEvidence[]> {
     return [];
   }
 }
