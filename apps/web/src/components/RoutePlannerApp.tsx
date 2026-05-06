@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { routeThemes } from "@/domain/theme-catalog";
-import type { RouteCard as RouteCardData, SavedRouteCardSummary } from "@/domain/types";
+import type { RouteCard as RouteCardData, SavedRouteCardSummary, TripPreferenceId } from "@/domain/types";
 import { RouteCard } from "./RouteCard";
 import { PosterShareCard } from "./share/PosterShareCard";
 import { StoryShareCard } from "./share/StoryShareCard";
@@ -11,6 +11,21 @@ type ShareMode = "poster" | "story";
 
 const cityOptions = ["上海", "杭州", "苏州", "成都"];
 const revisionQuickActions = ["少走路", "加吃饭点", "下雨改室内", "更省钱", "去掉寺庙", "压缩成半日"];
+const preferenceOptions: TripPreferenceId[] = [
+  "经典必玩",
+  "吃喝逛",
+  "亲子",
+  "citywalk",
+  "历史古迹",
+  "小众探索",
+  "拍照出片",
+  "自然风光",
+  "文艺展览",
+  "室内备选",
+  "少走路",
+  "预算友好"
+];
+const generationStages = ["理解旅行需求", "高德搜索真实地点", "Exa 检索公开攻略证据", "校验路线与风险"];
 
 async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -26,6 +41,9 @@ export function RoutePlannerApp() {
   const [startDate, setStartDate] = useState("2026-05-10");
   const [durationDays, setDurationDays] = useState<1 | 2>(1);
   const [note, setNote] = useState("想拍照，别太累");
+  const [activeCreateMode, setActiveCreateMode] = useState<"new" | "import">("new");
+  const [tripPreferences, setTripPreferences] = useState<TripPreferenceId[]>(["拍照出片", "少走路"]);
+  const [importedText, setImportedText] = useState("");
   const [revisionNote, setRevisionNote] = useState("少走路一点，加一个吃饭点");
   const [routeCard, setRouteCard] = useState<RouteCardData | null>(null);
   const [saved, setSaved] = useState<SavedRouteCardSummary[]>([]);
@@ -42,19 +60,33 @@ export function RoutePlannerApp() {
     void loadSaved().catch((error) => setStatus(error instanceof Error ? error.message : String(error)));
   }, []);
 
+  function togglePreference(preference: TripPreferenceId) {
+    setTripPreferences((current) =>
+      current.includes(preference) ? current.filter((item) => item !== preference) : [...current, preference],
+    );
+  }
+
   function generate() {
     startTransition(async () => {
       try {
-        setStatus("正在生成路线卡...");
+        setStatus("正在生成真实行程：理解需求、搜索地点、检索证据、校验路线。");
         const payload = await readJson<{ routeCard: RouteCardData }>(
           await fetch("/api/route-cards/generate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ city, themeId, startDate, durationDays, note })
+            body: JSON.stringify({
+              city,
+              themeId,
+              startDate,
+              durationDays,
+              note,
+              tripPreferences,
+              importedText: activeCreateMode === "import" ? importedText : undefined
+            })
           }),
         );
         setRouteCard(payload.routeCard);
-        setStatus("路线卡已生成，可以保存或切换分享包装。");
+        setStatus("真实行程已生成，可以继续编辑点位或保存。");
       } catch (error) {
         setStatus(error instanceof Error ? error.message : String(error));
       }
@@ -172,9 +204,35 @@ export function RoutePlannerApp() {
   return (
     <div className="app-grid">
       <section className="planner-panel">
-        <p className="eyebrow">AI Trip · Route Cards</p>
-        <h1>把周末旅行变成一张能走的路线卡。</h1>
-        <p className="hero-copy">B 型路线卡是核心体验：地图、时间线、可信度、保存和分享都围绕它展开。</p>
+        <p className="eyebrow">AI Trip · 我的行程</p>
+        <h1>把一句旅行想法变成可执行行程。</h1>
+        <p className="hero-copy">像在地图纸上做标注：先轻量创建，再用真实地点、公开攻略证据和路线校验生成可编辑路线卡。</p>
+
+        <div className="create-entry-panel">
+          <div>
+            <p className="section-kicker">Create Desk</p>
+            <h3>从哪开始规划？</h3>
+          </div>
+          <div className="create-entry-actions">
+            <button
+              className={activeCreateMode === "new" ? "active" : ""}
+              onClick={() => setActiveCreateMode("new")}
+              type="button"
+            >
+              创建新计划
+            </button>
+            <button
+              className={activeCreateMode === "import" ? "active" : ""}
+              onClick={() => setActiveCreateMode("import")}
+              type="button"
+            >
+              智能导入地点/行程
+            </button>
+            <button disabled type="button">
+              采集识别
+            </button>
+          </div>
+        </div>
 
         <div className="form-grid">
           <label>
@@ -212,6 +270,37 @@ export function RoutePlannerApp() {
           ))}
         </div>
 
+        <div className="preference-chip-panel">
+          <div>
+            <p className="section-kicker">Planning Chips</p>
+            <h3>点几枚旅行偏好</h3>
+            <p>芯片会参与需求理解和真实地点检索，方便快速表达这趟旅行的风格。</p>
+          </div>
+          <div className="preference-chip-grid">
+            {preferenceOptions.map((preference) => (
+              <button
+                className={tripPreferences.includes(preference) ? "preference-chip active" : "preference-chip"}
+                key={preference}
+                onClick={() => togglePreference(preference)}
+                type="button"
+              >
+                {preference}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {activeCreateMode === "import" ? (
+          <label>
+            智能导入内容
+            <textarea
+              placeholder="粘贴朋友发来的地点清单、旧行程、攻略摘录或备忘录。"
+              value={importedText}
+              onChange={(event) => setImportedText(event.target.value)}
+            />
+          </label>
+        ) : null}
+
         <label>
           补充偏好
           <textarea value={note} onChange={(event) => setNote(event.target.value)} />
@@ -226,6 +315,15 @@ export function RoutePlannerApp() {
           </button>
         </div>
         <p className="status">{status}</p>
+        <div className="generation-progress-panel">
+          <p className="section-kicker">Progress Ledger</p>
+          <ol>
+            {generationStages.map((stage) => (
+              <li key={stage}>{stage}</li>
+            ))}
+          </ol>
+          <p>这些是诚实的规划阶段提示；不展示未接入来源，也不冒充小红书官方搜索。</p>
+        </div>
 
         <div className="revision-panel">
           <div>

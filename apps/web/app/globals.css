@@ -159,6 +159,110 @@ textarea {
   line-height: 1.5;
 }
 
+.create-entry-panel,
+.preference-chip-panel,
+.generation-progress-panel {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0;
+  border: 1px solid rgba(18, 107, 67, 0.16);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(255, 179, 64, 0.2), transparent 32%),
+    linear-gradient(135deg, rgba(255, 248, 237, 0.9), rgba(231, 255, 240, 0.62));
+  padding: 16px;
+}
+
+.create-entry-panel h3,
+.preference-chip-panel h3 {
+  margin: 4px 0 0;
+  font-size: 24px;
+  letter-spacing: -0.04em;
+}
+
+.preference-chip-panel p,
+.generation-progress-panel p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.create-entry-actions,
+.preference-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.create-entry-actions button,
+.preference-chip {
+  border: 1px solid rgba(24, 32, 19, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ink);
+  padding: 10px 13px;
+  font-size: 13px;
+  font-weight: 950;
+  box-shadow: 0 8px 20px rgba(31, 35, 22, 0.06);
+}
+
+.create-entry-actions button.active,
+.preference-chip.active {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #fff;
+}
+
+.create-entry-actions button:disabled {
+  cursor: not-allowed;
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.46);
+  color: rgba(105, 112, 95, 0.72);
+  box-shadow: none;
+}
+
+.generation-progress-panel {
+  background:
+    linear-gradient(90deg, rgba(24, 32, 19, 0.06) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(24, 32, 19, 0.05) 1px, transparent 1px),
+    rgba(255, 252, 242, 0.82);
+  background-size: 28px 28px;
+}
+
+.generation-progress-panel ol {
+  display: grid;
+  gap: 8px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: progress-stage;
+}
+
+.generation-progress-panel li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 900;
+  counter-increment: progress-stage;
+}
+
+.generation-progress-panel li::before {
+  content: counter(progress-stage);
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  place-items: center;
+  border: 1px solid rgba(22, 32, 19, 0.18);
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 950;
+}
+
 .action-row,
 .chip-row {
   display: flex;
