@@ -382,7 +382,7 @@ export function RoutePlannerApp() {
             {isPending ? "规划中..." : "生成真实行程"}
           </button>
           <button disabled={!routeCard || isPending} onClick={save} type="button">
-            保存
+            保存当前行程
           </button>
         </div>
         <p className="status">{status}</p>
@@ -424,7 +424,9 @@ export function RoutePlannerApp() {
         </div>
 
         <div className="saved-list">
-          <h3>已保存</h3>
+          <p className="section-kicker">My Trips</p>
+          <h3>我的行程库</h3>
+          <p className="saved-list-copy">保存后会在这里形成可再次打开的旅行计划。</p>
           {saved.length ? (
             saved.map((item) => (
               <div className="saved-item" key={item.id}>
@@ -460,18 +462,23 @@ export function RoutePlannerApp() {
               onRevalidateOrder={handleRevalidateOrder}
               actionsDisabled={isPending}
             />
-            <div className="share-actions">
+            <div className="result-actions">
+              <button className="primary" disabled={isPending} onClick={save} type="button">
+                保存当前行程
+              </button>
+              <button onClick={generate} type="button" disabled={isPending}>
+                再规划一版
+              </button>
               <a href={sharePathFor(routeCard)} target="_blank" rel="noreferrer">
                 打开分享页
               </a>
               <button onClick={() => void copyShareLink(routeCard)} type="button">
                 复制分享链接
               </button>
-              <button onClick={generate} type="button" disabled={isPending}>
-                再生成一版
-              </button>
             </div>
-            <div className="share-switch">
+            <div className="share-switch" aria-label="分享包装">
+              <p>分享包装</p>
+              <small>分享是附属能力，先把路线规划到能出发。</small>
               <button className={shareMode === "poster" ? "active" : ""} onClick={() => setShareMode("poster")} type="button">
                 海报包装
               </button>
@@ -482,17 +489,18 @@ export function RoutePlannerApp() {
             {shareMode === "poster" ? <PosterShareCard routeCard={routeCard} /> : <StoryShareCard routeCard={routeCard} />}
           </>
         ) : (
-          <div className="empty-preview">
-            <p className="section-kicker">Result Preview</p>
-            <h2>生成后会出现完整旅行工作台</h2>
+            <div className="empty-preview">
+              <p className="section-kicker">Result Preview</p>
+              <h2>生成后会出现完整旅行工作台</h2>
             <div className="empty-preview-grid">
               <span>真实地图路线</span>
               <span>DAY 行程卡</span>
               <span>来源证据</span>
               <span>风险与行前检查</span>
+              </div>
+              <p>你可以点选地图点位、拖拽调整当天顺序、继续让 AI 少走路或加吃饭点。</p>
+              <small>生成后可保存当前行程、再规划一版。分享包装会放在结果后面；分享是附属能力，先把路线规划到能出发。</small>
             </div>
-            <p>你可以点选地图点位、拖拽调整当天顺序、继续让 AI 少走路或加吃饭点。</p>
-          </div>
         )}
       </section>
     </div>

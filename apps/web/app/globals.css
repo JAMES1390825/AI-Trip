@@ -1215,6 +1215,39 @@ textarea {
   color: #fff;
 }
 
+.result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.result-actions a,
+.result-actions button {
+  border: 1px solid rgba(24, 32, 19, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--ink);
+  padding: 11px 14px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.result-actions .primary {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+}
+
+.share-switch p,
+.share-switch small,
+.saved-list-copy {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .share-actions {
   display: flex;
   flex-wrap: wrap;

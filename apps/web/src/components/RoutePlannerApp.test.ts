@@ -122,6 +122,23 @@ test("RoutePlannerApp empty preview explains what the user will get", () => {
   assert.match(markup, /风险与行前检查/);
 });
 
+test("RoutePlannerApp keeps sharing secondary to planning actions", () => {
+  const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
+
+  assert.match(markup, /保存当前行程/);
+  assert.match(markup, /再规划一版/);
+  assert.match(markup, /分享包装/);
+  assert.match(markup, /分享是附属能力，先把路线规划到能出发/);
+});
+
+test("RoutePlannerApp labels saved routes as user trips", () => {
+  const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
+
+  assert.match(markup, /我的行程库/);
+  assert.match(markup, /保存后会在这里形成可再次打开的旅行计划/);
+  assert.doesNotMatch(markup, /已保存<\/h3>/);
+});
+
 test("stopActionToReviseNote maps stop actions to revise notes", () => {
   assert.equal(
     stopActionToReviseNote({ type: "replace", stopId: "a", stopName: "湖滨步行街" }),
