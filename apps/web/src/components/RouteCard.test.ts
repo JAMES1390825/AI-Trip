@@ -80,6 +80,7 @@ test("RouteCard renders real planning explanation fields", () => {
   assert.match(markup, /天气变化备选/);
   assert.match(markup, /湖滨路/);
   assert.match(markup, /出发前检查/);
+  assert.match(markup, /天气风险/);
   assert.match(markup, /保留雨天或高温备选/);
   assert.match(markup, /查看天气/);
   assert.match(markup, /pretrip-item pretrip-item--warning/);

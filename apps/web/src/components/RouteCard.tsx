@@ -31,6 +31,7 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
     : checklist.some((item) => item.severity === "warning")
       ? "warning"
       : "info";
+  const hasWeatherRisk = checklist.some((item) => item.category === "weather");
 
   return (
     <article className="route-card">
@@ -141,6 +142,7 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
               <div className="pretrip-summary">
                 <strong>{checklist.length} 项</strong>
                 <em>{severityLabel(highestSeverity)}</em>
+                {hasWeatherRisk ? <em>天气风险</em> : null}
               </div>
             </div>
             <div className="pretrip-list">
