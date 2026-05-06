@@ -57,6 +57,44 @@ test("generateRealRouteCard uses Amap rule planning when real candidates exist w
   }
 });
 
+test("generateRealRouteCard includes trip preference fields in production intent inference", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalOpenAiKey = process.env.OPENAI_API_KEY;
+  const originalDeepSeekKey = process.env.DEEPSEEK_API_KEY;
+  const originalBailianKey = process.env.BAILIAN_API_KEY;
+  delete process.env.AI_PROVIDER;
+  delete process.env.OPENAI_API_KEY;
+  delete process.env.DEEPSEEK_API_KEY;
+  delete process.env.BAILIAN_API_KEY;
+  try {
+    const card = await generateRealRouteCard(
+      {
+        ...request,
+        note: "",
+        tripPreferences: ["拍照出片", "吃喝逛", "少走路"],
+        companion: "friends",
+        transportPreference: "walk_first"
+      },
+      {
+        amapClient: { searchPois: async () => realCandidates, estimateWalkingMinutes: async () => 12 }
+      },
+    );
+
+    assert.match(card.intentSummary || "", /轻松/);
+    assert.match(card.intentSummary || "", /拍照友好/);
+    assert.match(card.intentSummary || "", /美食优先/);
+  } finally {
+    if (originalProvider === undefined) delete process.env.AI_PROVIDER;
+    else process.env.AI_PROVIDER = originalProvider;
+    if (originalOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = originalOpenAiKey;
+    if (originalDeepSeekKey === undefined) delete process.env.DEEPSEEK_API_KEY;
+    else process.env.DEEPSEEK_API_KEY = originalDeepSeekKey;
+    if (originalBailianKey === undefined) delete process.env.BAILIAN_API_KEY;
+    else process.env.BAILIAN_API_KEY = originalBailianKey;
+  }
+});
+
 test("generateRealRouteCard accepts valid AI arrangement over candidates", async () => {
   const card = await generateRealRouteCard(request, {
     amapClient: { searchPois: async () => realCandidates, estimateWalkingMinutes: async () => 10 },

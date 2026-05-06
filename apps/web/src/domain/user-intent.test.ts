@@ -41,7 +41,8 @@ test("inferUserIntent reads preference chips and imported text", () => {
   assert.equal(intent.physicalPace, "low_walking");
   assert.ok(intent.interestWeights.photo >= 4);
   assert.ok(intent.interestWeights.food >= 4);
-  assert.ok(intent.mustHaveConstraints.includes("朋友收藏了南宋御街和城市阳台"));
+  assert.ok(intent.importedTextHints.includes("朋友收藏了南宋御街和城市阳台"));
+  assert.ok(!intent.mustHaveConstraints.includes("朋友收藏了南宋御街和城市阳台"));
   assert.ok(intent.avoidConstraints.includes("步行优先但避免连续长距离暴走"));
 });
 

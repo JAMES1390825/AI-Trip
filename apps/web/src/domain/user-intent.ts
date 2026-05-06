@@ -24,6 +24,7 @@ export type UserIntent = {
   startRhythm: StartRhythm;
   interestWeights: InterestWeights;
   mustHaveConstraints: string[];
+  importedTextHints: string[];
   avoidConstraints: string[];
   confidence: number;
   intentSummary: string;
@@ -80,6 +81,7 @@ export function inferUserIntent(input: IntentInput): UserIntent {
   const preferences = input.tripPreferences || [];
   const importedText = (input.importedText || "").trim();
   const mustHaveConstraints: string[] = [];
+  const importedTextHints: string[] = [];
   const avoidConstraints: string[] = [];
 
   if (includesAny(note, ["拍照", "出片", "photo"])) weights.photo += 3;
@@ -142,7 +144,7 @@ export function inferUserIntent(input: IntentInput): UserIntent {
       if (note.includes(phrase)) avoidConstraints.push(phrase);
     }
   }
-  if (importedText) mustHaveConstraints.push(importedText.slice(0, 120));
+  if (importedText) importedTextHints.push(importedText.slice(0, 120));
   if (preferences.includes("亲子")) mustHaveConstraints.push("适合亲子同行");
   if (preferences.includes("室内备选")) mustHaveConstraints.push("保留室内备选");
   if (input.transportPreference === "walk_first") avoidConstraints.push("步行优先但避免连续长距离暴走");
@@ -163,6 +165,7 @@ export function inferUserIntent(input: IntentInput): UserIntent {
     startRhythm,
     interestWeights: weights,
     mustHaveConstraints,
+    importedTextHints,
     avoidConstraints,
     confidence: note ? 0.74 : 0.52,
     intentSummary: summaryParts.length ? summaryParts.join("，") : "按主题生成基础路线"

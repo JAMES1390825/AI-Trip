@@ -173,7 +173,14 @@ async function maybeAiArrangement(
 export async function generateRealRouteCard(request: RouteCardRequest, deps: RealRoutePlannerDeps = {}): Promise<RouteCard> {
   const amapClient = deps.amapClient || new AmapClient();
   const aiClient = deps.aiClient || deps.openAiClient || createRouteAiClient();
-  const intent = inferUserIntent({ themeId: request.themeId, note: request.note });
+  const intent = inferUserIntent({
+    themeId: request.themeId,
+    note: request.note,
+    tripPreferences: request.tripPreferences,
+    importedText: request.importedText,
+    companion: request.companion,
+    transportPreference: request.transportPreference
+  });
   const blueprint = buildFallbackBlueprint({ ...request, intent });
   const queries = searchSlotsToAmapQueries(request.city, blueprint.searchSlots);
   const candidates = dedupeCandidates((await Promise.all(queries.map((query) => amapClient.searchPois(query)))).flat());
