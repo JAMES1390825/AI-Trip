@@ -56,6 +56,16 @@ test("RoutePlannerApp exposes light create entries and planning chips", () => {
   assert.match(markup, /预算友好/);
 });
 
+test("RoutePlannerApp keeps route templates out of the light create flow", () => {
+  const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
+
+  assert.match(markup, /点几枚旅行偏好/);
+  assert.doesNotMatch(markup, /经典初游路线/);
+  assert.doesNotMatch(markup, /第一次来这座城市/);
+  assert.doesNotMatch(markup, /雨天备选路线/);
+  assert.doesNotMatch(markup, /美食串联路线/);
+});
+
 test("RoutePlannerApp exposes create mode and chip selection state to assistive tech", () => {
   const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
 

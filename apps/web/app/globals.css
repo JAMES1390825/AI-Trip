@@ -128,37 +128,6 @@ textarea {
   resize: vertical;
 }
 
-.theme-grid {
-  display: grid;
-  gap: 10px;
-  margin: 18px 0;
-}
-
-.theme-button {
-  text-align: left;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: #fff;
-  padding: 14px;
-}
-
-.theme-button.active {
-  border-color: var(--ink);
-  background: #fff2ce;
-}
-
-.theme-button strong,
-.theme-button span {
-  display: block;
-}
-
-.theme-button span {
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
 .create-entry-panel,
 .preference-chip-panel,
 .generation-progress-panel {

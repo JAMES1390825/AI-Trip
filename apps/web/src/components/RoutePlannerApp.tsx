@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { routeThemes } from "@/domain/theme-catalog";
+import { inferRouteThemeId } from "@/domain/theme-inference";
 import type { RouteCard as RouteCardData, SavedRouteCardSummary, TripPreferenceId } from "@/domain/types";
 import { RouteCard } from "./RouteCard";
 import type { StopAction } from "./RouteInteractiveMap";
@@ -51,7 +51,6 @@ export function reorderedStopsToReviseNote(stops: RouteCardData["stops"]): strin
 
 export function RoutePlannerApp() {
   const [city, setCity] = useState("杭州");
-  const [themeId, setThemeId] = useState(routeThemes[0].id);
   const [startDate, setStartDate] = useState("2026-05-10");
   const [durationDays, setDurationDays] = useState<1 | 2>(1);
   const [note, setNote] = useState("想拍照，别太累");
@@ -61,9 +60,14 @@ export function RoutePlannerApp() {
   const [revisionNote, setRevisionNote] = useState("少走路一点，加一个吃饭点");
   const [routeCard, setRouteCard] = useState<RouteCardData | null>(null);
   const [saved, setSaved] = useState<SavedRouteCardSummary[]>([]);
-  const [status, setStatus] = useState("选择城市和主题，生成你的第一张路线卡。");
+  const [status, setStatus] = useState("选择城市、时长和偏好，生成你的第一张路线卡。");
   const [shareMode, setShareMode] = useState<ShareMode>("poster");
   const [isPending, startTransition] = useTransition();
+  const inferredThemeId = inferRouteThemeId({
+    note,
+    importedText: activeCreateMode === "import" ? importedText : undefined,
+    tripPreferences
+  });
 
   async function loadSaved() {
     const payload = await readJson<{ items: SavedRouteCardSummary[] }>(await fetch("/api/route-cards"));
@@ -90,7 +94,7 @@ export function RoutePlannerApp() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               city,
-              themeId,
+              themeId: inferredThemeId,
               startDate,
               durationDays,
               note,
@@ -228,7 +232,6 @@ export function RoutePlannerApp() {
         const payload = await readJson<{ routeCard: RouteCardData }>(await fetch(`/api/route-cards/${id}`));
         setRouteCard(payload.routeCard);
         setCity(payload.routeCard.city);
-        setThemeId(payload.routeCard.themeId);
         setStartDate(payload.routeCard.startDate);
         setDurationDays(payload.routeCard.durationDays);
         setStatus("已载入保存的路线卡。");
@@ -310,20 +313,6 @@ export function RoutePlannerApp() {
               <option value={2}>2日</option>
             </select>
           </label>
-        </div>
-
-        <div className="theme-grid">
-          {routeThemes.map((theme) => (
-            <button
-              className={theme.id === themeId ? "theme-button active" : "theme-button"}
-              key={theme.id}
-              onClick={() => setThemeId(theme.id)}
-              type="button"
-            >
-              <strong>{theme.label}</strong>
-              <span>{theme.promise}</span>
-            </button>
-          ))}
         </div>
 
         <div className="preference-chip-panel">
