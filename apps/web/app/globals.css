@@ -534,11 +534,11 @@ textarea {
   padding: 12px;
 }
 
-.pretrip-item.warning {
+.pretrip-item--warning {
   border-left-color: var(--accent);
 }
 
-.pretrip-item.critical {
+.pretrip-item--critical {
   border-left-color: #d85a3a;
 }
 

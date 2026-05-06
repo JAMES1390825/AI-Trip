@@ -1,13 +1,17 @@
-import type { RouteCard as RouteCardData } from "@/domain/types";
+import type {
+  PretripChecklistCategory,
+  PretripChecklistSeverity,
+  RouteCard as RouteCardData
+} from "@/domain/types";
 
-function severityLabel(severity: string): string {
+function severityLabel(severity: PretripChecklistSeverity): string {
   if (severity === "critical") return "高风险";
   if (severity === "warning") return "需确认";
   return "提醒";
 }
 
-function categoryLabel(category: string): string {
-  const labels: Record<string, string> = {
+function categoryLabel(category: PretripChecklistCategory): string {
+  const labels: Record<PretripChecklistCategory, string> = {
     time: "时间",
     weather: "天气",
     traffic: "交通",
@@ -15,7 +19,7 @@ function categoryLabel(category: string): string {
     budget: "预算",
     comfort: "体力"
   };
-  return labels[category] || category;
+  return labels[category];
 }
 
 export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
@@ -141,7 +145,7 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
             </div>
             <div className="pretrip-list">
               {checklist.map((item) => (
-                <div className={`pretrip-item ${item.severity}`} key={item.id}>
+                <div className={`pretrip-item pretrip-item--${item.severity}`} key={item.id}>
                   <span>{categoryLabel(item.category)}</span>
                   <strong>{item.title}</strong>
                   <p>{item.detail}</p>
