@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { AmapClient, type RealPoiCandidate } from "@/server/amap-client";
 import { createRouteAiClient, type RouteAiJsonClient } from "@/server/route-ai-client";
+import { createWebEvidenceProvider, type WebEvidenceProvider } from "@/server/web-evidence-provider";
 import { arrangeCandidatesByRule, validateAiArrangement, type AiRouteArrangement } from "./route-arrangement";
 import { buildFallbackBlueprint, searchSlotsToAmapQueries } from "./route-blueprint";
 import { getRouteTheme } from "./theme-catalog";
@@ -13,11 +14,18 @@ const stopTimes = ["10:00", "12:20", "15:00", "19:30", "10:00", "12:20", "15:30"
 
 type PlannerAmapClient = Pick<AmapClient, "searchPois" | "estimateWalkingMinutes">;
 type PlannerAiClient = RouteAiJsonClient;
+type EvidenceSources = NonNullable<RouteCard["evidenceSources"]>;
 
 export type RealRoutePlannerDeps = {
   amapClient?: PlannerAmapClient;
   aiClient?: PlannerAiClient;
   openAiClient?: PlannerAiClient;
+  evidenceProvider?: WebEvidenceProvider;
+};
+
+type EvidenceSearchResult = {
+  evidenceSources: EvidenceSources;
+  evidenceWarning?: string;
 };
 
 function dedupeCandidates(candidates: RealPoiCandidate[]): RealPoiCandidate[] {
@@ -86,11 +94,17 @@ function assembleCard(
   intentSummary: string,
   blueprintSummary: string,
   legs: RouteLeg[],
+  evidenceSources: EvidenceSources = [],
+  evidenceWarning?: string,
 ): RouteCard {
   const theme = getRouteTheme(request.themeId);
   const totalTransit = legs.reduce((sum, leg) => sum + leg.minutes, 0);
   const providerWarnings = ["地点来自地图服务，营业/预约/交通以出发前实时信息为准。"];
   if (legs.some((leg) => leg.degraded)) providerWarnings.push("部分路程时间为估算，实际以地图导航为准。");
+  if (evidenceWarning) providerWarnings.push(evidenceWarning);
+  const evidenceSummary = evidenceSources.length
+    ? `公开攻略证据：${evidenceSources.slice(0, 3).map((source) => `${source.sourceName}《${source.title}》`).join("；")}`
+    : undefined;
 
   const card: RouteCard = {
     id: randomUUID(),
@@ -102,7 +116,7 @@ function assembleCard(
     highlights: stops.slice(0, 3).map((stop) => `${stop.poi} 是路线主节点`),
     fitFor: `适合${intentSummary}的轻旅行用户。`,
     riskTips: providerWarnings,
-    sourceLabel: mode === "ai_amap" ? "Amap real map data + AI planning" : "Amap real map data + rule planning",
+    sourceLabel: `${mode === "ai_amap" ? "Amap real map data + AI planning" : "Amap real map data + rule planning"}${evidenceSources.length ? " + web evidence" : ""}`,
     planningMode: mode,
     intentSummary,
     blueprintSummary,
@@ -110,6 +124,8 @@ function assembleCard(
     skipSuggestion: arrangement.skipSuggestion,
     weatherAlternative: arrangement.weatherAlternative,
     providerWarnings,
+    evidenceSummary,
+    evidenceSources,
     startDate: request.startDate,
     durationDays: request.durationDays,
     estimatedCostCny: stops.length * 80,
@@ -137,11 +153,18 @@ async function maybeAiArrangement(
   request: RouteCardRequest,
   candidates: RealPoiCandidate[],
   blueprintSummary: string,
+  evidenceSources: EvidenceSources = [],
 ): Promise<AiRouteArrangement | null> {
   if (!aiClient) return null;
+  const webEvidence = evidenceSources.map(({ title, sourceName, snippet, usedFor }) => ({ title, sourceName, snippet, usedFor }));
   const raw = await aiClient.createJson<unknown>(
     "You arrange travel routes. Only choose candidateId values from the provided candidates. Do not invent POIs.",
-    JSON.stringify({ request, blueprintSummary, candidates: candidates.map(({ id, name, address, tags }) => ({ id, name, address, tags })) }),
+    JSON.stringify({
+      request,
+      blueprintSummary,
+      candidates: candidates.map(({ id, name, address, tags }) => ({ id, name, address, tags })),
+      webEvidence
+    }),
     {
       type: "object",
       properties: {
@@ -170,9 +193,33 @@ async function maybeAiArrangement(
   return validation.ok ? validation.arrangement : null;
 }
 
+async function searchEvidenceSafely(
+  provider: WebEvidenceProvider,
+  request: RouteCardRequest,
+  intentSummary: string,
+  candidates: RealPoiCandidate[],
+): Promise<EvidenceSearchResult> {
+  try {
+    return {
+      evidenceSources: await provider.searchEvidence({
+        city: request.city,
+        query: `${intentSummary} ${request.note}`.trim(),
+        stopNames: candidates.slice(0, 8).map((candidate) => candidate.name),
+        usedFor: "context"
+      })
+    };
+  } catch {
+    return {
+      evidenceSources: [],
+      evidenceWarning: "公开攻略证据暂时不可用，路线仍基于地图候选生成。"
+    };
+  }
+}
+
 export async function generateRealRouteCard(request: RouteCardRequest, deps: RealRoutePlannerDeps = {}): Promise<RouteCard> {
   const amapClient = deps.amapClient || new AmapClient();
   const aiClient = deps.aiClient || deps.openAiClient || createRouteAiClient();
+  const evidenceProvider = deps.evidenceProvider || createWebEvidenceProvider(process.env);
   const intent = inferUserIntent({
     themeId: request.themeId,
     note: request.note,
@@ -198,11 +245,22 @@ export async function generateRealRouteCard(request: RouteCardRequest, deps: Rea
     return { ...fallbackCard, pretripChecklist: buildPretripChecklist(fallbackCard) };
   }
 
-  const aiArrangement = await maybeAiArrangement(aiClient, request, candidates, blueprint.summary);
+  const evidence = await searchEvidenceSafely(evidenceProvider, request, intent.intentSummary, candidates);
+  const aiArrangement = await maybeAiArrangement(aiClient, request, candidates, blueprint.summary, evidence.evidenceSources);
   const arrangement = aiArrangement || arrangeCandidatesByRule(candidates, request.durationDays);
   const mode = aiArrangement ? "ai_amap" : "rule_amap";
   const stops = buildStopsFromArrangement(candidates, arrangement);
   const legs = await buildLegs(stops, amapClient);
 
-  return assembleCard(request, stops, arrangement, mode, intent.intentSummary, blueprint.summary, legs);
+  return assembleCard(
+    request,
+    stops,
+    arrangement,
+    mode,
+    intent.intentSummary,
+    blueprint.summary,
+    legs,
+    evidence.evidenceSources,
+    evidence.evidenceWarning,
+  );
 }
