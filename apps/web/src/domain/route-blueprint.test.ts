@@ -35,3 +35,26 @@ test("searchSlotsToAmapQueries maps slots to city-scoped keyword queries", () =>
   assert.ok(queries.every((query) => query.city === "成都"));
   assert.ok(queries.some((query) => query.keywords.includes("小吃") || query.keywords.includes("美食")));
 });
+
+test("buildFallbackBlueprint includes preference and imported text search hints without inventing fixed route stops", () => {
+  const intent = inferUserIntent({
+    themeId: "classic",
+    note: "想轻松",
+    tripPreferences: ["历史古迹", "吃喝逛"],
+    importedText: "朋友推荐南宋御街和城市阳台"
+  });
+  const blueprint = buildFallbackBlueprint({
+    city: "杭州",
+    themeId: "classic",
+    durationDays: 1,
+    note: "想轻松",
+    tripPreferences: ["历史古迹", "吃喝逛"],
+    importedText: "朋友推荐南宋御街和城市阳台",
+    intent
+  });
+
+  assert.ok(blueprint.searchSlots.some((slot) => slot.query.includes("历史")));
+  assert.ok(blueprint.searchSlots.some((slot) => slot.query.includes("美食") || slot.query.includes("小吃")));
+  assert.ok(blueprint.searchSlots.some((slot) => slot.query.includes("南宋御街")));
+  assert.ok(blueprint.constraints.includes("imported places are search hints, not guaranteed stops"));
+});

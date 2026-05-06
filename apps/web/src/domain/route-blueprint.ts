@@ -18,7 +18,19 @@ export type RouteBlueprint = {
   constraints: string[];
 };
 
-export type BlueprintInput = Pick<RouteCardRequest, "city" | "themeId" | "durationDays" | "note"> & {
+export type BlueprintInput = Pick<
+  RouteCardRequest,
+  | "city"
+  | "themeId"
+  | "durationDays"
+  | "note"
+  | "tripPreferences"
+  | "importedText"
+  | "startPoint"
+  | "endPoint"
+  | "transportPreference"
+  | "companion"
+> & {
   intent: UserIntent;
 };
 
@@ -48,6 +60,32 @@ function intentKeywords(intent: UserIntent): string[] {
   return keywords;
 }
 
+function preferenceKeywords(preferences: RouteCardRequest["tripPreferences"] = []): string[] {
+  const keywords: string[] = [];
+  if (preferences.includes("经典必玩")) keywords.push("经典 景点");
+  if (preferences.includes("吃喝逛")) keywords.push("小吃", "本地 餐厅");
+  if (preferences.includes("亲子")) keywords.push("亲子 适合");
+  if (preferences.includes("citywalk")) keywords.push("步行 街区");
+  if (preferences.includes("历史古迹")) keywords.push("历史 古迹");
+  if (preferences.includes("小众探索")) keywords.push("小众 景点");
+  if (preferences.includes("拍照出片")) keywords.push("拍照 出片");
+  if (preferences.includes("自然风光")) keywords.push("自然 风景");
+  if (preferences.includes("文艺展览")) keywords.push("展览 美术馆");
+  if (preferences.includes("室内备选")) keywords.push("室内 展馆");
+  if (preferences.includes("预算友好")) keywords.push("免费 景点");
+  return keywords;
+}
+
+function importedTextKeywords(importedText?: string): string[] {
+  const text = (importedText || "").trim();
+  if (!text) return [];
+  return text
+    .split(/[，,、\n]/)
+    .map((part) => part.replace(/朋友推荐|收藏了|推荐|想去/g, "").trim())
+    .filter((part) => part.length >= 2)
+    .slice(0, 4);
+}
+
 export function buildFallbackBlueprint(input: BlueprintInput): RouteBlueprint {
   const theme = getRouteTheme(input.themeId);
   const days =
@@ -58,7 +96,12 @@ export function buildFallbackBlueprint(input: BlueprintInput): RouteBlueprint {
         ]
       : [{ day: 1 as const, intent: `${theme.label} executable day route` }];
 
-  const baseQueries = [...themeKeywordMap[input.themeId], ...intentKeywords(input.intent)];
+  const baseQueries = [
+    ...themeKeywordMap[input.themeId],
+    ...intentKeywords(input.intent),
+    ...preferenceKeywords(input.tripPreferences),
+    ...importedTextKeywords(input.importedText)
+  ];
   const uniqueQueries = Array.from(new Set(baseQueries));
   const searchSlots = uniqueQueries.map((query, index): SearchSlot => ({
     id: `slot-${index + 1}`,
@@ -73,7 +116,14 @@ export function buildFallbackBlueprint(input: BlueprintInput): RouteBlueprint {
     summary: `${input.durationDays}日${theme.label}：${input.intent.intentSummary}`,
     days,
     searchSlots,
-    constraints: ["single-day 3-4 main stops", "avoid unnecessary long transfers", "do not invent POIs"]
+    constraints: [
+      "single-day 3-4 main stops",
+      "avoid unnecessary long transfers",
+      "do not invent POIs",
+      ...(input.importedText ? ["imported places are search hints, not guaranteed stops"] : []),
+      ...(input.startPoint ? [`start near ${input.startPoint}`] : []),
+      ...(input.endPoint ? [`end near ${input.endPoint}`] : [])
+    ]
   };
 }
 
