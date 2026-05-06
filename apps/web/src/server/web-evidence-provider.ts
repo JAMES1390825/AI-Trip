@@ -8,7 +8,7 @@ export type WebEvidenceRequest = {
 };
 
 export type WebEvidenceProvider = {
-  search(input: WebEvidenceRequest): Promise<StopEvidence[]>;
+  searchEvidence(input: WebEvidenceRequest): Promise<StopEvidence[]>;
 };
 
 export type WebEvidenceProviderEnv = {
@@ -24,7 +24,7 @@ type ExaWebEvidenceProviderOptions = {
 const EXA_SEARCH_URL = "https://api.exa.ai/search";
 
 export class NullWebEvidenceProvider implements WebEvidenceProvider {
-  async search(): Promise<StopEvidence[]> {
+  async searchEvidence(): Promise<StopEvidence[]> {
     return [];
   }
 }
@@ -38,7 +38,7 @@ export class ExaWebEvidenceProvider implements WebEvidenceProvider {
     this.fetcher = options.fetcher ?? fetch;
   }
 
-  async search(input: WebEvidenceRequest): Promise<StopEvidence[]> {
+  async searchEvidence(input: WebEvidenceRequest): Promise<StopEvidence[]> {
     if (!this.apiKey.trim()) {
       return [];
     }

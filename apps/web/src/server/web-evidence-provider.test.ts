@@ -10,7 +10,7 @@ import {
 test("NullWebEvidenceProvider returns no evidence", async () => {
   const provider = new NullWebEvidenceProvider();
 
-  const evidence = await provider.search({
+  const evidence = await provider.searchEvidence({
     city: "杭州",
     query: "西湖预约",
     stopNames: ["西湖", "灵隐寺"],
@@ -68,7 +68,7 @@ test("ExaWebEvidenceProvider calls Exa Search with x-api-key", async () => {
     }
   });
 
-  const evidence = await provider.search({
+  const evidence = await provider.searchEvidence({
     city: "杭州",
     query: "亲子路线",
     stopNames: ["西湖", "灵隐寺", "河坊街", "中国茶叶博物馆", "良渚博物院"],
