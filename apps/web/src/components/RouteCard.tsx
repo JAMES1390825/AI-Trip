@@ -1,8 +1,32 @@
 import type { RouteCard as RouteCardData } from "@/domain/types";
 
+function severityLabel(severity: string): string {
+  if (severity === "critical") return "高风险";
+  if (severity === "warning") return "需确认";
+  return "提醒";
+}
+
+function categoryLabel(category: string): string {
+  const labels: Record<string, string> = {
+    time: "时间",
+    weather: "天气",
+    traffic: "交通",
+    booking: "预约",
+    budget: "预算",
+    comfort: "体力"
+  };
+  return labels[category] || category;
+}
+
 export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
   const totalTransit = routeCard.legs.reduce((sum, leg) => sum + leg.minutes, 0);
   const riskItems = Array.from(new Set([...(routeCard.riskTips || []), ...(routeCard.providerWarnings || [])]));
+  const checklist = routeCard.pretripChecklist || [];
+  const highestSeverity = checklist.some((item) => item.severity === "critical")
+    ? "critical"
+    : checklist.some((item) => item.severity === "warning")
+      ? "warning"
+      : "info";
 
   return (
     <article className="route-card">
@@ -103,6 +127,30 @@ export function RouteCard({ routeCard }: { routeCard: RouteCardData }) {
             <span key={tip}>{tip}</span>
           ))}
         </div>
+        {checklist.length ? (
+          <section className="pretrip-panel">
+            <div className="pretrip-heading">
+              <div>
+                <span>出发前检查</span>
+                <h3>把不确定性提前处理掉</h3>
+              </div>
+              <div className="pretrip-summary">
+                <strong>{checklist.length} 项</strong>
+                <em>{severityLabel(highestSeverity)}</em>
+              </div>
+            </div>
+            <div className="pretrip-list">
+              {checklist.map((item) => (
+                <div className={`pretrip-item ${item.severity}`} key={item.id}>
+                  <span>{categoryLabel(item.category)}</span>
+                  <strong>{item.title}</strong>
+                  <p>{item.detail}</p>
+                  <em>{item.actionLabel}</em>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
         {routeCard.degraded ? <p className="warning">当前为降级草案：{routeCard.degradedReason}</p> : null}
       </div>
     </article>
