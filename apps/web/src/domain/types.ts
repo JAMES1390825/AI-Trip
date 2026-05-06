@@ -36,12 +36,36 @@ export type RouteTheme = {
   defaultDurationDays: 1 | 2;
 };
 
+export type TripPreferenceId =
+  | "经典必玩"
+  | "吃喝逛"
+  | "亲子"
+  | "citywalk"
+  | "历史古迹"
+  | "小众探索"
+  | "拍照出片"
+  | "自然风光"
+  | "文艺展览"
+  | "室内备选"
+  | "少走路"
+  | "预算友好";
+
+export type TransportPreference = "walk_first" | "public_transit_ok" | "taxi_ok";
+
+export type CompanionType = "solo" | "friends" | "couple" | "family" | "elderly";
+
 export type RouteCardRequest = {
   city: string;
   themeId: RouteThemeId;
   startDate: string;
   durationDays: 1 | 2;
   note: string;
+  tripPreferences?: TripPreferenceId[];
+  importedText?: string;
+  startPoint?: string;
+  endPoint?: string;
+  transportPreference?: TransportPreference;
+  companion?: CompanionType;
 };
 
 export type PoiSeed = {

@@ -1,24 +1,79 @@
 import { generateRealRouteCard } from "@/domain/real-route-planner";
 import { isRouteThemeId } from "@/domain/theme-catalog";
-import type { RouteCardRequest } from "@/domain/types";
+import type { CompanionType, RouteCardRequest, TransportPreference, TripPreferenceId } from "@/domain/types";
 import { jsonError, jsonOk } from "@/server/api-response";
 
 export const dynamic = "force-dynamic";
 
-function asRequestBody(value: unknown): RouteCardRequest | null {
+const allowedTripPreferences = new Set<TripPreferenceId>([
+  "经典必玩",
+  "吃喝逛",
+  "亲子",
+  "citywalk",
+  "历史古迹",
+  "小众探索",
+  "拍照出片",
+  "自然风光",
+  "文艺展览",
+  "室内备选",
+  "少走路",
+  "预算友好"
+]);
+
+const allowedTransportPreferences = new Set<TransportPreference>(["walk_first", "public_transit_ok", "taxi_ok"]);
+const allowedCompanions = new Set<CompanionType>(["solo", "friends", "couple", "family", "elderly"]);
+
+function asString(value: unknown): string {
+  return String(value || "").trim();
+}
+
+function asTripPreferences(value: unknown): TripPreferenceId[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const preferences = value
+    .map((item) => String(item).trim())
+    .filter((item): item is TripPreferenceId => allowedTripPreferences.has(item as TripPreferenceId));
+  return preferences.length ? Array.from(new Set(preferences)) : undefined;
+}
+
+function asTransportPreference(value: unknown): TransportPreference | undefined {
+  const raw = asString(value);
+  return allowedTransportPreferences.has(raw as TransportPreference) ? (raw as TransportPreference) : undefined;
+}
+
+function asCompanion(value: unknown): CompanionType | undefined {
+  const raw = asString(value);
+  return allowedCompanions.has(raw as CompanionType) ? (raw as CompanionType) : undefined;
+}
+
+export function asRequestBody(value: unknown): RouteCardRequest | null {
   if (!value || typeof value !== "object") return null;
   const body = value as Record<string, unknown>;
-  const city = String(body.city || "").trim();
-  const themeId = String(body.themeId || "").trim();
-  const startDate = String(body.startDate || "").trim();
+  const city = asString(body.city);
+  const themeId = asString(body.themeId);
+  const startDate = asString(body.startDate);
   const durationDays = Number(body.durationDays || 1);
-  const note = String(body.note || "").trim();
+  const note = asString(body.note);
 
   if (!city || !isRouteThemeId(themeId) || !startDate || (durationDays !== 1 && durationDays !== 2)) {
     return null;
   }
 
-  return { city, themeId, startDate, durationDays, note };
+  const requestBody: RouteCardRequest = { city, themeId, startDate, durationDays, note };
+  const tripPreferences = asTripPreferences(body.tripPreferences);
+  const importedText = asString(body.importedText);
+  const startPoint = asString(body.startPoint);
+  const endPoint = asString(body.endPoint);
+  const transportPreference = asTransportPreference(body.transportPreference);
+  const companion = asCompanion(body.companion);
+
+  if (tripPreferences) requestBody.tripPreferences = tripPreferences;
+  if (importedText) requestBody.importedText = importedText;
+  if (startPoint) requestBody.startPoint = startPoint;
+  if (endPoint) requestBody.endPoint = endPoint;
+  if (transportPreference) requestBody.transportPreference = transportPreference;
+  if (companion) requestBody.companion = companion;
+
+  return requestBody;
 }
 
 export async function POST(request: Request): Promise<Response> {
