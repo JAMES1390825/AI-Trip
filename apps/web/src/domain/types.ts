@@ -38,6 +38,14 @@ export type PretripChecklistItem = {
   relatedStopId?: string;
 };
 
+export type RouteQualitySummary = {
+  matchScore: number;
+  satisfied: string[];
+  tradeoffs: string[];
+  confirmationNeeded: string[];
+  providerHealth: string[];
+};
+
 export type RouteTheme = {
   id: RouteThemeId;
   label: string;
@@ -156,6 +164,7 @@ export type RouteCard = {
   evidenceSummary?: string;
   evidenceSources?: StopEvidence[];
   pretripChecklist?: PretripChecklistItem[];
+  qualitySummary?: RouteQualitySummary;
   startDate: string;
   endDate?: string;
   durationDays: 1 | 2;
