@@ -58,3 +58,26 @@ test("buildFallbackBlueprint includes preference and imported text search hints 
   assert.ok(blueprint.searchSlots.some((slot) => slot.query.includes("南宋御街")));
   assert.ok(blueprint.constraints.includes("imported places are search hints, not guaranteed stops"));
 });
+
+test("buildFallbackBlueprint includes must visit text as search queries and avoid constraints", () => {
+  const intent = inferUserIntent({
+    themeId: "classic",
+    note: "想轻松",
+    mustVisitText: "西湖、法喜寺",
+    avoidText: "不要太赶，少排队"
+  });
+  const blueprint = buildFallbackBlueprint({
+    city: "杭州",
+    themeId: "classic",
+    durationDays: 1,
+    note: "想轻松",
+    mustVisitText: "西湖、法喜寺",
+    avoidText: "不要太赶，少排队",
+    intent
+  });
+
+  assert.ok(blueprint.searchSlots.some((slot) => slot.query.includes("西湖")));
+  assert.ok(blueprint.searchSlots.some((slot) => slot.query.includes("法喜寺")));
+  assert.ok(blueprint.constraints.some((constraint) => constraint.includes("不要太赶")));
+  assert.ok(blueprint.constraints.some((constraint) => constraint.includes("少排队")));
+});

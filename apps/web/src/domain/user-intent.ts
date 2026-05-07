@@ -1,4 +1,4 @@
-import type { CompanionType, RouteThemeId, TransportPreference, TripPreferenceId } from "./types";
+import type { CompanionType, RouteThemeId, RouteCardRequest, TransportPreference, TripPreferenceId } from "./types";
 
 export type TravelerProfile = "solo" | "couple" | "friends" | "family" | "parents" | "kids" | "unknown";
 export type PhysicalPace = "relaxed" | "normal" | "packed" | "low_walking" | "unknown";
@@ -37,6 +37,9 @@ export type IntentInput = {
   importedText?: string;
   companion?: CompanionType;
   transportPreference?: TransportPreference;
+  budgetRange?: RouteCardRequest["budgetRange"];
+  mustVisitText?: string;
+  avoidText?: string;
 };
 
 const baseWeights: InterestWeights = {
@@ -73,6 +76,14 @@ function rainSafe(weights: InterestWeights) {
 
 function includesAny(text: string, words: string[]): boolean {
   return words.some((word) => text.includes(word));
+}
+
+function splitConstraintText(value?: string): string[] {
+  return (value || "")
+    .split(/[，,、\n；;]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 8);
 }
 
 export function inferUserIntent(input: IntentInput): UserIntent {
@@ -120,9 +131,11 @@ export function inferUserIntent(input: IntentInput): UserIntent {
           ? "relaxed"
           : "normal";
 
-  const budgetPosture: BudgetPosture = includesAny(note, ["预算低", "省钱", "低预算"])
+  const budgetPosture: BudgetPosture = input.budgetRange === "budget_friendly" || includesAny(note, ["预算低", "省钱", "低预算"])
     ? "low"
-    : input.themeId === "low_budget"
+    : input.budgetRange === "flexible"
+      ? "flexible"
+      : input.themeId === "low_budget"
       ? "low"
       : "normal";
 
@@ -145,10 +158,21 @@ export function inferUserIntent(input: IntentInput): UserIntent {
     }
   }
   if (importedText) importedTextHints.push(importedText.slice(0, 120));
+  mustHaveConstraints.push(...splitConstraintText(input.mustVisitText).map((item) => `必去：${item}`));
+  avoidConstraints.push(...splitConstraintText(input.avoidText).map((item) => `避开/注意：${item}`));
+  if (input.budgetRange === "budget_friendly") mustHaveConstraints.push("预算友好优先");
+  if (input.budgetRange === "flexible") mustHaveConstraints.push("体验优先，可接受更高预算");
+  if (input.companion === "family") mustHaveConstraints.push("亲子友好节奏");
+  if (input.companion === "elderly") mustHaveConstraints.push("照顾长辈体力");
+  if (input.companion === "couple") mustHaveConstraints.push("适合情侣同行");
+  if (input.companion === "solo") mustHaveConstraints.push("适合独自出行");
   if (preferences.includes("亲子")) mustHaveConstraints.push("适合亲子同行");
   if (preferences.includes("室内备选")) mustHaveConstraints.push("保留室内备选");
   if (input.transportPreference === "walk_first") avoidConstraints.push("步行优先但避免连续长距离暴走");
-  if (input.transportPreference === "public_transit_ok") avoidConstraints.push("优先公共交通可达");
+  if (input.transportPreference === "public_transit_ok") {
+    mustHaveConstraints.push("公共交通可达");
+    avoidConstraints.push("优先公共交通可达");
+  }
   if (input.transportPreference === "taxi_ok") avoidConstraints.push("可用打车减少换乘");
 
   const summaryParts: string[] = [];

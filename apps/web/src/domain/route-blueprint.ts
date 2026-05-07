@@ -30,6 +30,9 @@ export type BlueprintInput = Pick<
   | "endPoint"
   | "transportPreference"
   | "companion"
+  | "budgetRange"
+  | "mustVisitText"
+  | "avoidText"
 > & {
   intent: UserIntent;
 };
@@ -76,14 +79,22 @@ function preferenceKeywords(preferences: RouteCardRequest["tripPreferences"] = [
   return keywords;
 }
 
-function importedTextKeywords(importedText?: string): string[] {
-  const text = (importedText || "").trim();
+function textKeywords(textValue?: string): string[] {
+  const text = (textValue || "").trim();
   if (!text) return [];
   return text
-    .split(/[，,、\n]/)
+    .split(/[，,、\n；;]+/)
     .map((part) => part.replace(/朋友推荐|收藏了|推荐|想去/g, "").trim())
     .filter((part) => part.length >= 2)
     .slice(0, 4);
+}
+
+function importedTextKeywords(importedText?: string): string[] {
+  return textKeywords(importedText);
+}
+
+function constraintTextItems(textValue?: string): string[] {
+  return textKeywords(textValue).slice(0, 6);
 }
 
 export function buildFallbackBlueprint(input: BlueprintInput): RouteBlueprint {
@@ -100,7 +111,8 @@ export function buildFallbackBlueprint(input: BlueprintInput): RouteBlueprint {
     ...themeKeywordMap[input.themeId],
     ...intentKeywords(input.intent),
     ...preferenceKeywords(input.tripPreferences),
-    ...importedTextKeywords(input.importedText)
+    ...importedTextKeywords(input.importedText),
+    ...textKeywords(input.mustVisitText)
   ];
   const uniqueQueries = Array.from(new Set(baseQueries));
   const searchSlots = uniqueQueries.map((query, index): SearchSlot => ({
@@ -121,6 +133,10 @@ export function buildFallbackBlueprint(input: BlueprintInput): RouteBlueprint {
       "avoid unnecessary long transfers",
       "do not invent POIs",
       ...(input.importedText ? ["imported places are search hints, not guaranteed stops"] : []),
+      ...(input.mustVisitText ? ["must-visit places are search hints and should be included when route quality allows"] : []),
+      ...constraintTextItems(input.avoidText).map((item) => `avoid or reduce: ${item}`),
+      ...(input.budgetRange === "budget_friendly" ? ["prefer low-cost or free stops when quality is comparable"] : []),
+      ...(input.budgetRange === "flexible" ? ["experience quality can take priority over lowest cost"] : []),
       ...(input.startPoint ? [`start near ${input.startPoint}`] : []),
       ...(input.endPoint ? [`end near ${input.endPoint}`] : [])
     ]
