@@ -76,6 +76,20 @@ export type CompanionType = "solo" | "friends" | "couple" | "family" | "elderly"
 
 export type BudgetRange = "budget_friendly" | "balanced" | "flexible";
 
+export type TripImportDraft = {
+  rawText: string;
+  cityHint?: string;
+  placeNames: string[];
+  mustVisitText?: string;
+  avoidText?: string;
+  noteHint?: string;
+  preferenceHints: TripPreferenceId[];
+  startPointHint?: string;
+  endPointHint?: string;
+  confidence: number;
+  parseNotes: string[];
+};
+
 export type RouteCardRequest = {
   city: string;
   themeId: RouteThemeId;
