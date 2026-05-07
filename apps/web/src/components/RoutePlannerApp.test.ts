@@ -123,8 +123,8 @@ test("RoutePlannerApp exposes create mode and chip selection state to assistive 
 test("RoutePlannerApp renders honest generation progress labels", () => {
   const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
 
-  assert.match(markup, /理解你的旅行意图/);
-  assert.match(markup, /高德检索真实地点候选/);
+  assert.match(markup, /理解旅行需求/);
+  assert.match(markup, /高德检索真实地点/);
   assert.match(markup, /Exa 查找公开攻略证据/);
   assert.match(markup, /不展示未接入来源/);
   assert.doesNotMatch(markup, /正在搜索小红书官方/);
@@ -137,11 +137,14 @@ test("RoutePlannerApp renders launch generation stages and retry guidance", () =
   assert.match(markup, /等待开始/);
   assert.match(markup, /进行中/);
   assert.match(markup, /已完成/);
-  assert.match(markup, /理解你的旅行意图/);
-  assert.match(markup, /高德检索真实地点候选/);
+  assert.match(markup, /需确认/);
+  assert.match(markup, /理解旅行需求/);
+  assert.match(markup, /制定搜索策略/);
+  assert.match(markup, /高德检索真实地点/);
   assert.match(markup, /Exa 查找公开攻略证据/);
-  assert.match(markup, /AI 编排并校验路线/);
-  assert.match(markup, /生成风险提醒和行前检查/);
+  assert.match(markup, /路线架构 Agent 编排/);
+  assert.match(markup, /Critic Agent 校验路线/);
+  assert.match(markup, /输出地图 \+ 每日行程/);
   assert.match(markup, /如果生成失败，保留输入后直接重试/);
 });
 

@@ -570,6 +570,19 @@ textarea {
   flex: 1;
 }
 
+.progress-stage-copy {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+}
+
+.progress-stage-copy small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
 .progress-stage em {
   border-radius: 999px;
   background: rgba(24, 32, 19, 0.08);
@@ -602,6 +615,17 @@ textarea {
 .progress-stage--done::before {
   background: var(--green);
   color: #fff;
+}
+
+.progress-stage--warning {
+  border-color: rgba(255, 179, 64, 0.48);
+  background: rgba(255, 246, 218, 0.86);
+}
+
+.progress-stage--warning em,
+.progress-stage--warning::before {
+  background: #ffb340;
+  color: var(--ink);
 }
 
 .progress-stage--error {
