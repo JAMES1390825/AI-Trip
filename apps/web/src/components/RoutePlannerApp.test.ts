@@ -58,6 +58,17 @@ test("RoutePlannerApp exposes light create entries and planning chips", () => {
   assert.match(markup, /预算友好/);
 });
 
+test("RoutePlannerApp exposes smart import draft controls", () => {
+  const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp, { initialCreateMode: "import" }));
+
+  assert.match(markup, /识别导入内容/);
+  assert.match(markup, /导入识别草稿/);
+  assert.match(markup, /应用到规划表单/);
+  assert.match(markup, /识别地点/);
+  assert.match(markup, /识别约束/);
+  assert.match(markup, /粘贴后先识别/);
+});
+
 test("RoutePlannerApp exposes lightweight real trip constraint inputs", () => {
   const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
 

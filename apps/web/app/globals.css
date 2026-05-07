@@ -154,6 +154,7 @@ textarea {
 
 .create-entry-panel,
 .preference-chip-panel,
+.import-workbench,
 .generation-progress-panel {
   display: grid;
   gap: 12px;
@@ -167,6 +168,7 @@ textarea {
 }
 
 .create-entry-panel h3,
+.import-workbench h3,
 .preference-chip-panel h3 {
   margin: 4px 0 0;
   font-size: 24px;
@@ -174,6 +176,7 @@ textarea {
 }
 
 .preference-chip-panel p,
+.import-workbench p,
 .generation-progress-panel p {
   margin: 6px 0 0;
   color: var(--muted);
@@ -181,6 +184,7 @@ textarea {
 }
 
 .create-entry-actions,
+.import-actions,
 .preference-chip-grid {
   display: flex;
   flex-wrap: wrap;
@@ -188,6 +192,7 @@ textarea {
 }
 
 .create-entry-actions button,
+.import-actions button,
 .preference-chip {
   border: 1px solid rgba(24, 32, 19, 0.14);
   border-radius: 999px;
@@ -200,10 +205,104 @@ textarea {
 }
 
 .create-entry-actions button.active,
+.import-actions button:first-child,
 .preference-chip.active {
   border-color: var(--ink);
   background: var(--ink);
   color: #fff;
+}
+
+.import-draft-panel {
+  display: grid;
+  gap: 14px;
+  border: 1px solid rgba(18, 107, 67, 0.14);
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(231, 255, 240, 0.74)),
+    #fff8ed;
+  padding: 14px;
+}
+
+.import-draft-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.import-draft-heading span,
+.import-draft-grid span {
+  display: block;
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.import-draft-heading strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 18px;
+}
+
+.import-confidence {
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--ink);
+  padding: 7px 10px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 950;
+}
+
+.import-draft-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.import-draft-grid > div {
+  border: 1px solid rgba(24, 32, 19, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 12px;
+}
+
+.import-draft-grid p,
+.import-draft-grid ul {
+  margin: 8px 0 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.import-draft-grid li {
+  margin-left: 16px;
+}
+
+.import-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.import-chip {
+  border: 1px solid rgba(18, 107, 67, 0.18);
+  border-radius: 999px;
+  background: #e7fff0;
+  color: var(--green);
+  padding: 6px 9px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 950;
+}
+
+.import-chip--soft {
+  background: #fff7df;
+  color: #7c5200;
 }
 
 .create-entry-actions button:disabled {
@@ -1515,6 +1614,7 @@ textarea {
   .app-grid,
   .form-grid,
   .constraint-grid,
+  .import-draft-grid,
   .quality-columns,
   .trust-panel {
     grid-template-columns: 1fr;
@@ -1542,6 +1642,7 @@ textarea {
   }
 
   .planning-constraints-panel,
+  .import-workbench,
   .route-quality-panel,
   .day-itinerary-panel,
   .pretrip-panel,

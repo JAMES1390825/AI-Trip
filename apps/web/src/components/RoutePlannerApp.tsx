@@ -3,12 +3,14 @@
 import { useEffect, useState, useTransition } from "react";
 import { inferRouteThemeId } from "@/domain/theme-inference";
 import { deriveTripDates } from "@/domain/trip-dates";
+import { parseTripImportText } from "@/domain/trip-import-parser";
 import type {
   BudgetRange,
   CompanionType,
   RouteCard as RouteCardData,
   SavedRouteCardSummary,
   TransportPreference,
+  TripImportDraft,
   TripPreferenceId
 } from "@/domain/types";
 import { RouteCard } from "./RouteCard";
@@ -17,6 +19,9 @@ import { PosterShareCard } from "./share/PosterShareCard";
 import { StoryShareCard } from "./share/StoryShareCard";
 
 type ShareMode = "poster" | "story";
+type RoutePlannerAppProps = {
+  initialCreateMode?: "new" | "import";
+};
 
 const cityOptions = ["上海", "杭州", "苏州", "成都"];
 const budgetOptions: { id: BudgetRange; label: string }[] = [
@@ -80,14 +85,15 @@ export function reorderedStopsToReviseNote(stops: RouteCardData["stops"]): strin
   return `用户拖拽调整了当天顺序，请优先按这个顺序重新校验路线时间：${stops.map((stop) => stop.poi).join(" -> ")}`;
 }
 
-export function RoutePlannerApp() {
+export function RoutePlannerApp({ initialCreateMode = "new" }: RoutePlannerAppProps = {}) {
   const [city, setCity] = useState("杭州");
   const [startDate, setStartDate] = useState("2026-05-10");
   const [endDate, setEndDate] = useState("2026-05-10");
   const [note, setNote] = useState("想拍照，别太累");
-  const [activeCreateMode, setActiveCreateMode] = useState<"new" | "import">("new");
+  const [activeCreateMode, setActiveCreateMode] = useState<"new" | "import">(initialCreateMode);
   const [tripPreferences, setTripPreferences] = useState<TripPreferenceId[]>(["拍照出片", "少走路"]);
   const [importedText, setImportedText] = useState("");
+  const [importDraft, setImportDraft] = useState<TripImportDraft | null>(parseTripImportText(""));
   const [budgetRange, setBudgetRange] = useState<BudgetRange>("balanced");
   const [companion, setCompanion] = useState<CompanionType>("friends");
   const [transportPreference, setTransportPreference] = useState<TransportPreference>("walk_first");
@@ -122,6 +128,41 @@ export function RoutePlannerApp() {
     setTripPreferences((current) =>
       current.includes(preference) ? current.filter((item) => item !== preference) : [...current, preference],
     );
+  }
+
+  function appendFieldValue(current: string, next?: string): string {
+    const trimmedNext = (next || "").trim();
+    if (!trimmedNext) return current;
+    const trimmedCurrent = current.trim();
+    if (!trimmedCurrent) return trimmedNext;
+    if (trimmedCurrent.includes(trimmedNext)) return trimmedCurrent;
+    return `${trimmedCurrent}，${trimmedNext}`;
+  }
+
+  function parseImportedText() {
+    const draft = parseTripImportText(importedText);
+    setImportDraft(draft);
+    if (!draft.rawText) {
+      setStatus("先粘贴朋友发来的地点清单、旧行程或攻略片段，再识别。");
+      return;
+    }
+    setStatus(`已识别导入内容：${draft.placeNames.length} 个地点线索，${Math.round(draft.confidence * 100)}% 草稿可信度。`);
+  }
+
+  function applyImportDraft() {
+    if (!importDraft || !importDraft.rawText) {
+      setStatus("请先识别导入内容，再应用到规划表单。");
+      return;
+    }
+
+    if (importDraft.cityHint && cityOptions.includes(importDraft.cityHint)) setCity(importDraft.cityHint);
+    if (importDraft.startPointHint) setStartPoint(importDraft.startPointHint);
+    if (importDraft.endPointHint) setEndPoint(importDraft.endPointHint);
+    setTripPreferences((current) => Array.from(new Set([...current, ...importDraft.preferenceHints])));
+    setMustVisitText((current) => appendFieldValue(current, importDraft.mustVisitText));
+    setAvoidText((current) => appendFieldValue(current, importDraft.avoidText));
+    setNote((current) => appendFieldValue(current, importDraft.noteHint));
+    setStatus("已应用导入草稿，可以继续微调后生成真实行程。");
   }
 
   function generate() {
@@ -400,14 +441,80 @@ export function RoutePlannerApp() {
         </div>
 
         {activeCreateMode === "import" ? (
-          <label>
-            智能导入内容
-            <textarea
-              placeholder="粘贴朋友发来的地点清单、旧行程、攻略摘录或备忘录。"
-              value={importedText}
-              onChange={(event) => setImportedText(event.target.value)}
-            />
-          </label>
+          <section className="import-workbench" aria-labelledby="import-workbench-title">
+            <div>
+              <p className="section-kicker">Smart Import</p>
+              <h3 id="import-workbench-title">智能导入内容</h3>
+              <p>粘贴后先识别，确认草稿没问题再应用到规划表单。</p>
+            </div>
+            <label>
+              导入文本
+              <textarea
+                placeholder="粘贴朋友发来的地点清单、旧行程、攻略摘录或备忘录。"
+                value={importedText}
+                onChange={(event) => setImportedText(event.target.value)}
+              />
+            </label>
+            <div className="import-actions">
+              <button onClick={parseImportedText} type="button">
+                识别导入内容
+              </button>
+              <button onClick={applyImportDraft} type="button">
+                应用到规划表单
+              </button>
+            </div>
+            <div className="import-draft-panel" aria-label="导入识别草稿">
+              <div className="import-draft-heading">
+                <div>
+                  <span>导入识别草稿</span>
+                  <strong>{importDraft?.rawText ? "已生成可编辑草稿" : "等待粘贴内容"}</strong>
+                </div>
+                <em className="import-confidence">{Math.round((importDraft?.confidence || 0) * 100)}%</em>
+              </div>
+              <div className="import-draft-grid">
+                <div>
+                  <span>识别地点</span>
+                  <div className="import-chip-row">
+                    {importDraft?.placeNames.length ? (
+                      importDraft.placeNames.map((place) => (
+                        <em className="import-chip" key={place}>
+                          {place}
+                        </em>
+                      ))
+                    ) : (
+                      <p>暂无地点，粘贴后先识别。</p>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <span>识别约束</span>
+                  <p>{importDraft?.avoidText || "暂无避开要求，仍可手动补充。"}</p>
+                </div>
+                <div>
+                  <span>偏好线索</span>
+                  <div className="import-chip-row">
+                    {importDraft?.preferenceHints.length ? (
+                      importDraft.preferenceHints.map((preference) => (
+                        <em className="import-chip import-chip--soft" key={preference}>
+                          {preference}
+                        </em>
+                      ))
+                    ) : (
+                      <p>暂无偏好芯片。</p>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <span>解析备注</span>
+                  <ul>
+                    {(importDraft?.parseNotes || []).map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </section>
         ) : null}
 
         <label>
