@@ -1,5 +1,7 @@
+import { createQueuedPlanningTrace, markTraceNode, mergeCompletedPlanningTrace } from "@/domain/planning-trace";
 import { generateRealRouteCard } from "@/domain/real-route-planner";
 import { isRouteThemeId } from "@/domain/theme-catalog";
+import { generateGraphRouteCard } from "@/domain/trip-planning-graph";
 import { deriveTripDates } from "@/domain/trip-dates";
 import type { BudgetRange, CompanionType, RouteCardRequest, TransportPreference, TripPreferenceId } from "@/domain/types";
 import { jsonError, jsonOk } from "@/server/api-response";
@@ -100,6 +102,21 @@ export function asRequestBody(value: unknown): RouteCardRequest | null {
   return requestBody;
 }
 
+async function generateRouteCardWithTrace(body: RouteCardRequest) {
+  try {
+    return await generateGraphRouteCard(body);
+  } catch {
+    const routeCard = await generateRealRouteCard(body);
+    const planningTrace = mergeCompletedPlanningTrace(
+      markTraceNode(createQueuedPlanningTrace(), "composer", "warning", "规划大脑暂不可用，已使用稳定路线生成器。"),
+    );
+    return {
+      routeCard: { ...routeCard, planningTrace },
+      planningTrace
+    };
+  }
+}
+
 export async function POST(request: Request): Promise<Response> {
   loadRootEnv();
   let raw: unknown;
@@ -114,5 +131,6 @@ export async function POST(request: Request): Promise<Response> {
     return jsonError(400, "BAD_REQUEST", "city, themeId, startDate, and durationDays are required.");
   }
 
-  return jsonOk({ routeCard: await generateRealRouteCard(body) });
+  const result = await generateRouteCardWithTrace(body);
+  return jsonOk({ routeCard: result.routeCard, planningTrace: result.planningTrace });
 }
