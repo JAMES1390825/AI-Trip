@@ -1,7 +1,7 @@
 import { generateRealRouteCard } from "@/domain/real-route-planner";
 import { isRouteThemeId } from "@/domain/theme-catalog";
 import { deriveTripDates } from "@/domain/trip-dates";
-import type { CompanionType, RouteCardRequest, TransportPreference, TripPreferenceId } from "@/domain/types";
+import type { BudgetRange, CompanionType, RouteCardRequest, TransportPreference, TripPreferenceId } from "@/domain/types";
 import { jsonError, jsonOk } from "@/server/api-response";
 import { loadRootEnv } from "@/server/root-env";
 
@@ -24,8 +24,10 @@ const allowedTripPreferences = new Set<TripPreferenceId>([
 
 const allowedTransportPreferences = new Set<TransportPreference>(["walk_first", "public_transit_ok", "taxi_ok"]);
 const allowedCompanions = new Set<CompanionType>(["solo", "friends", "couple", "family", "elderly"]);
+const allowedBudgetRanges = new Set<BudgetRange>(["budget_friendly", "balanced", "flexible"]);
 const maxImportedTextLength = 600;
 const maxLocationTextLength = 80;
+const maxConstraintTextLength = 240;
 
 function asString(value: unknown): string {
   return String(value || "").trim();
@@ -53,6 +55,11 @@ function asCompanion(value: unknown): CompanionType | undefined {
   return allowedCompanions.has(raw as CompanionType) ? (raw as CompanionType) : undefined;
 }
 
+function asBudgetRange(value: unknown): BudgetRange | undefined {
+  const raw = asString(value);
+  return allowedBudgetRanges.has(raw as BudgetRange) ? (raw as BudgetRange) : undefined;
+}
+
 export function asRequestBody(value: unknown): RouteCardRequest | null {
   if (!value || typeof value !== "object") return null;
   const body = value as Record<string, unknown>;
@@ -73,8 +80,11 @@ export function asRequestBody(value: unknown): RouteCardRequest | null {
   const routeSeed = asCappedString(body.routeSeed, maxLocationTextLength);
   const startPoint = asCappedString(body.startPoint, maxLocationTextLength);
   const endPoint = asCappedString(body.endPoint, maxLocationTextLength);
+  const mustVisitText = asCappedString(body.mustVisitText, maxConstraintTextLength);
+  const avoidText = asCappedString(body.avoidText, maxConstraintTextLength);
   const transportPreference = asTransportPreference(body.transportPreference);
   const companion = asCompanion(body.companion);
+  const budgetRange = asBudgetRange(body.budgetRange);
 
   if (tripPreferences) requestBody.tripPreferences = tripPreferences;
   if (importedText) requestBody.importedText = importedText;
@@ -83,6 +93,9 @@ export function asRequestBody(value: unknown): RouteCardRequest | null {
   if (endPoint) requestBody.endPoint = endPoint;
   if (transportPreference) requestBody.transportPreference = transportPreference;
   if (companion) requestBody.companion = companion;
+  if (budgetRange) requestBody.budgetRange = budgetRange;
+  if (mustVisitText) requestBody.mustVisitText = mustVisitText;
+  if (avoidText) requestBody.avoidText = avoidText;
 
   return requestBody;
 }

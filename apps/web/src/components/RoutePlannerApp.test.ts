@@ -58,6 +58,19 @@ test("RoutePlannerApp exposes light create entries and planning chips", () => {
   assert.match(markup, /预算友好/);
 });
 
+test("RoutePlannerApp exposes lightweight real trip constraint inputs", () => {
+  const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
+
+  assert.match(markup, /补充真实旅行约束/);
+  assert.match(markup, /预算范围/);
+  assert.match(markup, /同行人/);
+  assert.match(markup, /交通偏好/);
+  assert.match(markup, /起点区域/);
+  assert.match(markup, /结束区域/);
+  assert.match(markup, /必去地点/);
+  assert.match(markup, /想避开\/不想去/);
+});
+
 test("RoutePlannerApp presents a launchable planning-first first screen", () => {
   const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
 

@@ -34,7 +34,10 @@ test("asRequestBody preserves lightweight trip planning fields", () => {
     startPoint: "杭州东站",
     endPoint: "湖滨银泰",
     transportPreference: "walk_first",
-    companion: "friends"
+    companion: "friends",
+    budgetRange: "balanced",
+    mustVisitText: "西湖、法喜寺",
+    avoidText: "不要太赶，少排队"
   });
 
   assert.deepEqual(body, {
@@ -49,7 +52,10 @@ test("asRequestBody preserves lightweight trip planning fields", () => {
     startPoint: "杭州东站",
     endPoint: "湖滨银泰",
     transportPreference: "walk_first",
-    companion: "friends"
+    companion: "friends",
+    budgetRange: "balanced",
+    mustVisitText: "西湖、法喜寺",
+    avoidText: "不要太赶，少排队"
   });
 });
 
@@ -90,6 +96,8 @@ test("asRequestBody caps lightweight trip planning text fields", () => {
   const importedText = "行".repeat(650);
   const startPoint = "起".repeat(100);
   const endPoint = "终".repeat(100);
+  const mustVisitText = "去".repeat(260);
+  const avoidText = "避".repeat(260);
 
   const body = asRequestBody({
     city: "杭州",
@@ -99,10 +107,14 @@ test("asRequestBody caps lightweight trip planning text fields", () => {
     note: "想轻松一点",
     importedText,
     startPoint,
-    endPoint
+    endPoint,
+    mustVisitText,
+    avoidText
   });
 
   assert.equal(body?.importedText, importedText.slice(0, 600));
   assert.equal(body?.startPoint, startPoint.slice(0, 80));
   assert.equal(body?.endPoint, endPoint.slice(0, 80));
+  assert.equal(body?.mustVisitText, mustVisitText.slice(0, 240));
+  assert.equal(body?.avoidText, avoidText.slice(0, 240));
 });

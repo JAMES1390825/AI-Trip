@@ -3,7 +3,14 @@
 import { useEffect, useState, useTransition } from "react";
 import { inferRouteThemeId } from "@/domain/theme-inference";
 import { deriveTripDates } from "@/domain/trip-dates";
-import type { RouteCard as RouteCardData, SavedRouteCardSummary, TripPreferenceId } from "@/domain/types";
+import type {
+  BudgetRange,
+  CompanionType,
+  RouteCard as RouteCardData,
+  SavedRouteCardSummary,
+  TransportPreference,
+  TripPreferenceId
+} from "@/domain/types";
 import { RouteCard } from "./RouteCard";
 import type { StopAction } from "./RouteInteractiveMap";
 import { PosterShareCard } from "./share/PosterShareCard";
@@ -12,6 +19,23 @@ import { StoryShareCard } from "./share/StoryShareCard";
 type ShareMode = "poster" | "story";
 
 const cityOptions = ["上海", "杭州", "苏州", "成都"];
+const budgetOptions: { id: BudgetRange; label: string }[] = [
+  { id: "budget_friendly", label: "预算友好" },
+  { id: "balanced", label: "均衡舒适" },
+  { id: "flexible", label: "体验优先" }
+];
+const companionOptions: { id: CompanionType; label: string }[] = [
+  { id: "solo", label: "独自出行" },
+  { id: "friends", label: "朋友同行" },
+  { id: "couple", label: "情侣出行" },
+  { id: "family", label: "亲子家庭" },
+  { id: "elderly", label: "带长辈" }
+];
+const transportOptions: { id: TransportPreference; label: string }[] = [
+  { id: "walk_first", label: "优先步行" },
+  { id: "public_transit_ok", label: "公交地铁可接受" },
+  { id: "taxi_ok", label: "可打车衔接" }
+];
 const revisionQuickActions = ["少走路", "加吃饭点", "下雨改室内", "更省钱", "去掉寺庙", "压缩成半日"];
 const preferenceOptions: TripPreferenceId[] = [
   "经典必玩",
@@ -64,6 +88,13 @@ export function RoutePlannerApp() {
   const [activeCreateMode, setActiveCreateMode] = useState<"new" | "import">("new");
   const [tripPreferences, setTripPreferences] = useState<TripPreferenceId[]>(["拍照出片", "少走路"]);
   const [importedText, setImportedText] = useState("");
+  const [budgetRange, setBudgetRange] = useState<BudgetRange>("balanced");
+  const [companion, setCompanion] = useState<CompanionType>("friends");
+  const [transportPreference, setTransportPreference] = useState<TransportPreference>("walk_first");
+  const [startPoint, setStartPoint] = useState("");
+  const [endPoint, setEndPoint] = useState("");
+  const [mustVisitText, setMustVisitText] = useState("");
+  const [avoidText, setAvoidText] = useState("少走路，不要太赶");
   const [revisionNote, setRevisionNote] = useState("少走路一点，加一个吃饭点");
   const [routeCard, setRouteCard] = useState<RouteCardData | null>(null);
   const [saved, setSaved] = useState<SavedRouteCardSummary[]>([]);
@@ -72,7 +103,7 @@ export function RoutePlannerApp() {
   const [shareMode, setShareMode] = useState<ShareMode>("poster");
   const [isPending, startTransition] = useTransition();
   const inferredThemeId = inferRouteThemeId({
-    note,
+    note: [note, mustVisitText, avoidText].filter(Boolean).join("，"),
     importedText: activeCreateMode === "import" ? importedText : undefined,
     tripPreferences
   });
@@ -115,7 +146,14 @@ export function RoutePlannerApp() {
               note,
               routeSeed,
               tripPreferences,
-              importedText: activeCreateMode === "import" ? importedText : undefined
+              importedText: activeCreateMode === "import" ? importedText : undefined,
+              budgetRange,
+              companion,
+              transportPreference,
+              startPoint,
+              endPoint,
+              mustVisitText,
+              avoidText
             })
           }),
         );
@@ -376,6 +414,81 @@ export function RoutePlannerApp() {
           补充偏好
           <textarea value={note} onChange={(event) => setNote(event.target.value)} />
         </label>
+
+        <section className="planning-constraints-panel" aria-labelledby="planning-constraints-title">
+          <div>
+            <p className="section-kicker">Planning Details</p>
+            <h3 id="planning-constraints-title">补充真实旅行约束</h3>
+            <p className="constraint-copy">不用填满，写几个关键点就能让路线更像真实计划。</p>
+          </div>
+          <div className="constraint-grid">
+            <label>
+              预算范围
+              <select value={budgetRange} onChange={(event) => setBudgetRange(event.target.value as BudgetRange)}>
+                {budgetOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              同行人
+              <select value={companion} onChange={(event) => setCompanion(event.target.value as CompanionType)}>
+                {companionOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              交通偏好
+              <select
+                value={transportPreference}
+                onChange={(event) => setTransportPreference(event.target.value as TransportPreference)}
+              >
+                {transportOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              起点区域
+              <input
+                placeholder="例如：杭州东站 / 酒店附近"
+                value={startPoint}
+                onChange={(event) => setStartPoint(event.target.value)}
+              />
+            </label>
+            <label>
+              结束区域
+              <input
+                placeholder="例如：西湖边 / 火车站"
+                value={endPoint}
+                onChange={(event) => setEndPoint(event.target.value)}
+              />
+            </label>
+            <label className="constraint-wide">
+              必去地点
+              <textarea
+                placeholder="例如：西湖、法喜寺、朋友推荐的咖啡店"
+                value={mustVisitText}
+                onChange={(event) => setMustVisitText(event.target.value)}
+              />
+            </label>
+            <label className="constraint-wide">
+              想避开/不想去
+              <textarea
+                placeholder="例如：不要太赶、少排队、不想去寺庙、尽量室内"
+                value={avoidText}
+                onChange={(event) => setAvoidText(event.target.value)}
+              />
+            </label>
+          </div>
+        </section>
 
         <div className="action-row">
           <button className="primary" disabled={isPending} onClick={generate} type="button">

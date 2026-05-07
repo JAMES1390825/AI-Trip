@@ -66,6 +66,8 @@ export type TransportPreference = "walk_first" | "public_transit_ok" | "taxi_ok"
 
 export type CompanionType = "solo" | "friends" | "couple" | "family" | "elderly";
 
+export type BudgetRange = "budget_friendly" | "balanced" | "flexible";
+
 export type RouteCardRequest = {
   city: string;
   themeId: RouteThemeId;
@@ -81,6 +83,9 @@ export type RouteCardRequest = {
   endPoint?: string;
   transportPreference?: TransportPreference;
   companion?: CompanionType;
+  budgetRange?: BudgetRange;
+  mustVisitText?: string;
+  avoidText?: string;
 };
 
 export type PoiSeed = {
