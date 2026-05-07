@@ -51,6 +51,9 @@ test("RoutePlannerApp exposes light create entries and planning chips", () => {
   const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
 
   assert.match(markup, /我的行程/);
+  assert.match(markup, /\+ 创建新行程/);
+  assert.match(markup, /最近行程/);
+  assert.match(markup, /轻创建面板/);
   assert.match(markup, /创建新计划/);
   assert.match(markup, /智能导入地点\/行程/);
   assert.match(markup, /采集识别/);
@@ -90,7 +93,7 @@ test("RoutePlannerApp presents a launchable planning-first first screen", () => 
   assert.match(markup, /AI 旅行规划/);
   assert.match(markup, /真实地点/);
   assert.match(markup, /公开攻略证据/);
-  assert.match(markup, /先规划，再保存和调整/);
+  assert.match(markup, /规划完成后再保存、调整和分享/);
   assert.match(markup, /高德真实地点/);
   assert.match(markup, /AI 路线编排/);
   assert.match(markup, /Exa 公开证据/);
@@ -130,6 +133,10 @@ test("RoutePlannerApp renders honest generation progress labels", () => {
 test("RoutePlannerApp renders launch generation stages and retry guidance", () => {
   const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
 
+  assert.match(markup, /规划进度流/);
+  assert.match(markup, /等待开始/);
+  assert.match(markup, /进行中/);
+  assert.match(markup, /已完成/);
   assert.match(markup, /理解你的旅行意图/);
   assert.match(markup, /高德检索真实地点候选/);
   assert.match(markup, /Exa 查找公开攻略证据/);
@@ -141,6 +148,8 @@ test("RoutePlannerApp renders launch generation stages and retry guidance", () =
 test("RoutePlannerApp empty preview explains what the user will get", () => {
   const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
 
+  assert.match(markup, /地图 \+ 每日行程/);
+  assert.match(markup, /当前旅行工作台/);
   assert.match(markup, /生成后会出现完整旅行工作台/);
   assert.match(markup, /真实地图路线/);
   assert.match(markup, /DAY 行程卡/);

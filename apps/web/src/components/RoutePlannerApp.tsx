@@ -19,8 +19,10 @@ import { PosterShareCard } from "./share/PosterShareCard";
 import { StoryShareCard } from "./share/StoryShareCard";
 
 type ShareMode = "poster" | "story";
+type PlanningStageState = "queued" | "active" | "done" | "error";
 export type RoutePlannerAppProps = {
   initialCreateMode?: "new" | "import";
+  initialCreatePanelOpen?: boolean;
 };
 
 const cityOptions = ["上海", "杭州", "苏州", "成都"];
@@ -64,6 +66,13 @@ const generationStages = [
   "生成风险提醒和行前检查"
 ];
 
+function planningStageStatusLabel(state: PlanningStageState): string {
+  if (state === "active") return "进行中";
+  if (state === "done") return "已完成";
+  if (state === "error") return "需重试";
+  return "等待开始";
+}
+
 async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
@@ -87,6 +96,7 @@ export function reorderedStopsToReviseNote(stops: RouteCardData["stops"]): strin
 
 export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
   const { initialCreateMode = "new" } = props;
+  const [createPanelOpen, setCreatePanelOpen] = useState(props.initialCreatePanelOpen ?? false);
   const [city, setCity] = useState("杭州");
   const [startDate, setStartDate] = useState("2026-05-10");
   const [endDate, setEndDate] = useState("2026-05-10");
@@ -108,6 +118,8 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
   const [routeSeed, setRouteSeed] = useState("initial");
   const [status, setStatus] = useState("选择城市、日期和偏好，生成你的第一份真实旅行计划。");
   const [shareMode, setShareMode] = useState<ShareMode>("poster");
+  const [planningStageIndex, setPlanningStageIndex] = useState(-1);
+  const [planningStageError, setPlanningStageError] = useState(false);
   const [isPending, startTransition] = useTransition();
   const inferredThemeId = inferRouteThemeId({
     note: [note, mustVisitText, avoidText].filter(Boolean).join("，"),
@@ -138,6 +150,13 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
     if (!trimmedCurrent) return trimmedNext;
     if (trimmedCurrent.includes(trimmedNext)) return trimmedCurrent;
     return `${trimmedCurrent}，${trimmedNext}`;
+  }
+
+  function planningStageState(index: number): PlanningStageState {
+    if (planningStageError && index === Math.min(planningStageIndex, generationStages.length - 1)) return "error";
+    if (planningStageIndex >= generationStages.length || index < planningStageIndex) return "done";
+    if (index === planningStageIndex) return "active";
+    return "queued";
   }
 
   function parseImportedText() {
@@ -173,8 +192,15 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
       return;
     }
     startTransition(async () => {
+      let progressTimer: number | undefined;
       try {
+        setCreatePanelOpen(false);
+        setPlanningStageError(false);
+        setPlanningStageIndex(0);
         setStatus("正在规划：理解需求、检索真实地点、查找公开证据、校验路线。");
+        progressTimer = window.setInterval(() => {
+          setPlanningStageIndex((current) => Math.min(current + 1, generationStages.length - 1));
+        }, 520);
         const payload = await readJson<{ routeCard: RouteCardData }>(
           await fetch("/api/route-cards/generate", {
             method: "POST",
@@ -199,10 +225,15 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
             })
           }),
         );
+        if (progressTimer) window.clearInterval(progressTimer);
+        setPlanningStageIndex(generationStages.length);
         setRouteCard(payload.routeCard);
         setRouteSeed(String(Date.now()));
         setStatus("真实行程已生成，可以继续编辑点位、重新校验或保存。");
       } catch (error) {
+        if (progressTimer) window.clearInterval(progressTimer);
+        setPlanningStageError(true);
+        setPlanningStageIndex((current) => (current < 0 ? 0 : Math.min(current, generationStages.length - 1)));
         setStatus(error instanceof Error ? error.message : String(error));
       }
     });
@@ -331,6 +362,7 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
         setCity(payload.routeCard.city);
         setStartDate(payload.routeCard.startDate);
         setEndDate(payload.routeCard.endDate || payload.routeCard.startDate);
+        setCreatePanelOpen(false);
         setStatus("已载入保存的路线卡。");
       } catch (error) {
         setStatus(error instanceof Error ? error.message : String(error));
@@ -358,45 +390,87 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
   return (
     <div className="app-grid">
       <section className="planner-panel">
-        <p className="eyebrow">AI 旅行规划 · 我的行程</p>
-        <h1>一句想法，生成真实可走的旅行路线。</h1>
-        <p className="hero-copy">
-          先规划，再保存和调整。AI Trip 会结合真实地点、路线校验和公开攻略证据，帮你把周末 citywalk 或短途旅行变成可执行行程。
-        </p>
-        <div className="trust-strip" aria-label="规划可信来源">
-          <span>高德真实地点</span>
-          <span>AI 路线编排</span>
-          <span>Exa 公开证据</span>
-          <span>异常时本地兜底</span>
-        </div>
-
-        <div className="create-entry-panel">
+        <section className="app-home" aria-label="我的行程首页">
           <div>
-            <p className="section-kicker">Create Desk</p>
-            <h3>从哪开始规划？</h3>
+            <p className="eyebrow">AI 旅行规划 · 我的行程</p>
+            <h1>我的行程</h1>
+            <p className="hero-copy">
+              从一个想法、朋友发来的地点，生成可走的地图路线和每日行程卡。规划完成后再保存、调整和分享。
+            </p>
           </div>
-          <div className="create-entry-actions">
-            <button
-              aria-pressed={activeCreateMode === "new"}
-              className={activeCreateMode === "new" ? "active" : ""}
-              onClick={() => setActiveCreateMode("new")}
-              type="button"
-            >
-              创建新计划
-            </button>
-            <button
-              aria-pressed={activeCreateMode === "import"}
-              className={activeCreateMode === "import" ? "active" : ""}
-              onClick={() => setActiveCreateMode("import")}
-              type="button"
-            >
-              智能导入地点/行程
-            </button>
-            <button aria-label="采集识别即将支持" disabled title="采集识别即将支持" type="button">
-              采集识别
+          <button className="create-dock" onClick={() => setCreatePanelOpen(true)} type="button">
+            <strong>+ 创建新行程</strong>
+            <span>自然语言、智能导入或从偏好 chips 开始</span>
+          </button>
+          <div className="trust-strip" aria-label="规划可信来源">
+            <span>高德真实地点</span>
+            <span>AI 路线编排</span>
+            <span>Exa 公开证据</span>
+            <span>异常时本地兜底</span>
+          </div>
+          <div className="home-trip-section">
+            <div className="home-section-heading">
+              <p className="section-kicker">Recent Trips</p>
+              <h3>最近行程</h3>
+            </div>
+            {saved.length ? (
+              saved.slice(0, 3).map((item) => (
+                <div className="home-trip-card" key={item.id}>
+                  <strong>{item.title}</strong>
+                  <span>
+                    {item.city} · {item.themeLabel} · {Math.round(item.confidence * 100)}%
+                  </span>
+                  <button onClick={() => loadSavedPreview(item.id)} type="button" disabled={isPending}>
+                    打开行程
+                  </button>
+                </div>
+              ))
+            ) : (
+              <div className="home-trip-empty">
+                <strong>还没有行程</strong>
+                <span>点下面的大加号创建第一份地图 + 每日行程。</span>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className={createPanelOpen ? "create-panel create-panel--open" : "create-panel"} aria-label="轻创建面板">
+          <div className="create-panel-heading">
+            <div>
+              <p className="section-kicker">Create Desk</p>
+              <h3>轻创建面板</h3>
+            </div>
+            <button onClick={() => setCreatePanelOpen(false)} type="button">
+              回到我的行程
             </button>
           </div>
-        </div>
+          <div className="create-entry-panel">
+            <div>
+              <p className="section-kicker">Create Mode</p>
+              <h3>从哪开始规划？</h3>
+            </div>
+            <div className="create-entry-actions">
+              <button
+                aria-pressed={activeCreateMode === "new"}
+                className={activeCreateMode === "new" ? "active" : ""}
+                onClick={() => setActiveCreateMode("new")}
+                type="button"
+              >
+                创建新计划
+              </button>
+              <button
+                aria-pressed={activeCreateMode === "import"}
+                className={activeCreateMode === "import" ? "active" : ""}
+                onClick={() => setActiveCreateMode("import")}
+                type="button"
+              >
+                智能导入地点/行程
+              </button>
+              <button aria-label="采集识别即将支持" disabled title="采集识别即将支持" type="button">
+                采集识别
+              </button>
+            </div>
+          </div>
 
         <div className="form-grid">
           <label>
@@ -607,12 +681,28 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
           </button>
         </div>
         <p className="status">{status}</p>
-        <div className="generation-progress-panel">
-          <p className="section-kicker">Progress Ledger</p>
+        <div className="planning-progress-stream" aria-label="规划进度流">
+          <div className="progress-stream-heading">
+            <div>
+              <p className="section-kicker">Progress Ledger</p>
+              <h3>规划进度流</h3>
+            </div>
+            <div className="progress-legend" aria-label="进度状态图例">
+              <span>等待开始</span>
+              <span>进行中</span>
+              <span>已完成</span>
+            </div>
+          </div>
           <ol>
-            {generationStages.map((stage) => (
-              <li key={stage}>{stage}</li>
-            ))}
+            {generationStages.map((stage, index) => {
+              const stageState = planningStageState(index);
+              return (
+                <li className={`progress-stage progress-stage--${stageState}`} key={stage}>
+                  <span>{stage}</span>
+                  <em>{planningStageStatusLabel(stageState)}</em>
+                </li>
+              );
+            })}
           </ol>
           <p>这些是诚实的规划阶段提示；不展示未接入来源，也不冒充小红书官方搜索。如果生成失败，保留输入后直接重试。</p>
         </div>
@@ -672,11 +762,17 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
             <p>还没有保存的路线卡。</p>
           )}
         </div>
+        </section>
       </section>
 
       <section className="preview-panel">
         {routeCard ? (
           <>
+            <div className="result-workspace-heading">
+              <p className="section-kicker">Current Trip Workspace</p>
+              <h2>地图 + 每日行程</h2>
+              <p>当前旅行工作台会把真实地图点位、每日行程卡、来源证据和风险提醒放在同一个可调整视图里。</p>
+            </div>
             <RouteCard
               routeCard={routeCard}
               onStopAction={handleStopAction}
@@ -712,14 +808,14 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
         ) : (
             <div className="empty-preview">
               <p className="section-kicker">Result Preview</p>
-              <h2>生成后会出现完整旅行工作台</h2>
+              <h2>地图 + 每日行程会在这里展开</h2>
             <div className="empty-preview-grid">
               <span>真实地图路线</span>
               <span>DAY 行程卡</span>
               <span>来源证据</span>
               <span>风险与行前检查</span>
               </div>
-              <p>你可以点选地图点位、拖拽调整当天顺序、继续让 AI 少走路或加吃饭点。</p>
+              <p>生成后会出现完整旅行工作台；当前旅行工作台支持点选地图点位、拖拽调整当天顺序、继续让 AI 少走路或加吃饭点。</p>
               <small>生成后可保存当前行程、再规划一版。分享包装会放在结果后面；分享是附属能力，先把路线规划到能出发。</small>
             </div>
         )}
