@@ -115,121 +115,62 @@ h1 {
   padding: 24px;
 }
 
-.app-home {
+.trip-creation-panel {
   display: grid;
-  gap: 18px;
+  gap: 16px;
 }
 
-.app-home h1 {
-  margin-top: 14px;
-}
-
-.create-dock {
-  display: grid;
-  gap: 6px;
-  width: 100%;
-  border: 1px solid rgba(22, 32, 19, 0.18);
-  border-radius: 28px;
-  background:
-    radial-gradient(circle at 12% 18%, rgba(255, 179, 64, 0.35), transparent 34%),
-    linear-gradient(135deg, #162013, #315f3d);
-  color: #fff8ed;
-  padding: 22px;
-  text-align: left;
-  box-shadow: 0 20px 46px rgba(22, 32, 19, 0.22);
-}
-
-.create-dock strong {
-  font-size: 28px;
-  letter-spacing: -0.04em;
-}
-
-.create-dock span {
-  color: rgba(255, 248, 237, 0.78);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.home-trip-section {
+.creation-hero {
   display: grid;
   gap: 10px;
   border: 1px solid rgba(18, 107, 67, 0.14);
-  border-radius: 26px;
-  background: rgba(255, 252, 242, 0.72);
-  padding: 16px;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 179, 64, 0.24), transparent 34%),
+    linear-gradient(135deg, rgba(255, 248, 237, 0.92), rgba(231, 255, 240, 0.64));
+  padding: 18px;
 }
 
-.home-section-heading h3 {
+.creation-hero h1 {
   margin: 4px 0 0;
-  font-size: 24px;
-  letter-spacing: -0.04em;
+  font-size: clamp(40px, 5vw, 64px);
 }
 
-.home-trip-card,
-.home-trip-empty {
+.creation-hero .hero-copy {
+  margin: 0;
+}
+
+.create-mode-tabs {
   display: grid;
-  gap: 6px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
   border: 1px solid rgba(24, 32, 19, 0.1);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.72);
-  padding: 14px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.58);
+  padding: 8px;
 }
 
-.home-trip-card span,
-.home-trip-empty span {
+.create-mode-tabs button {
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: transparent;
   color: var(--muted);
+  padding: 11px 10px;
   font-size: 13px;
-  line-height: 1.5;
-}
-
-.home-trip-card button {
-  width: fit-content;
-  border: 1px solid rgba(18, 107, 67, 0.18);
-  border-radius: 999px;
-  background: #e7fff0;
-  color: var(--green);
-  padding: 8px 11px;
-  font-size: 12px;
   font-weight: 950;
 }
 
-.create-panel {
-  display: grid;
-  gap: 12px;
-  margin-top: 22px;
-  border: 1px solid rgba(24, 32, 19, 0.12);
-  border-radius: 30px;
-  background: rgba(255, 255, 255, 0.52);
-  padding: 16px;
-  opacity: 0.82;
+.create-mode-tabs button.active {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #fff8ed;
+  box-shadow: 0 10px 24px rgba(22, 32, 19, 0.14);
 }
 
-.create-panel--open {
-  opacity: 1;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
-}
-
-.create-panel-heading {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.create-panel-heading h3 {
-  margin: 4px 0 0;
-  font-size: 28px;
-  letter-spacing: -0.05em;
-}
-
-.create-panel-heading button {
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
-  color: var(--ink);
-  padding: 9px 12px;
-  font-size: 12px;
-  font-weight: 950;
+.create-mode-tabs button:disabled {
+  cursor: not-allowed;
+  border-color: rgba(24, 32, 19, 0.08);
+  color: rgba(105, 112, 95, 0.54);
 }
 
 .form-grid {
@@ -269,10 +210,9 @@ textarea {
   resize: vertical;
 }
 
-.create-entry-panel,
 .preference-chip-panel,
 .import-workbench,
-.generation-progress-panel,
+.natural-language-panel,
 .planning-progress-stream {
   display: grid;
   gap: 12px;
@@ -285,8 +225,8 @@ textarea {
   padding: 16px;
 }
 
-.create-entry-panel h3,
 .import-workbench h3,
+.natural-language-panel h3,
 .preference-chip-panel h3 {
   margin: 4px 0 0;
   font-size: 24px;
@@ -295,14 +235,13 @@ textarea {
 
 .preference-chip-panel p,
 .import-workbench p,
-.generation-progress-panel p,
+.natural-language-panel p,
 .planning-progress-stream p {
   margin: 6px 0 0;
   color: var(--muted);
   line-height: 1.55;
 }
 
-.create-entry-actions,
 .import-actions,
 .preference-chip-grid {
   display: flex;
@@ -310,7 +249,6 @@ textarea {
   gap: 9px;
 }
 
-.create-entry-actions button,
 .import-actions button,
 .preference-chip {
   border: 1px solid rgba(24, 32, 19, 0.14);
@@ -323,7 +261,6 @@ textarea {
   box-shadow: 0 8px 20px rgba(31, 35, 22, 0.06);
 }
 
-.create-entry-actions button.active,
 .import-actions button:first-child,
 .preference-chip.active {
   border-color: var(--ink);
@@ -424,14 +361,6 @@ textarea {
   color: #7c5200;
 }
 
-.create-entry-actions button:disabled {
-  cursor: not-allowed;
-  border-style: dashed;
-  background: rgba(255, 255, 255, 0.46);
-  color: rgba(105, 112, 95, 0.72);
-  box-shadow: none;
-}
-
 .planning-constraints-panel {
   display: grid;
   gap: 16px;
@@ -470,15 +399,6 @@ textarea {
   min-height: 82px;
 }
 
-.generation-progress-panel {
-  background:
-    linear-gradient(90deg, rgba(24, 32, 19, 0.06) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(24, 32, 19, 0.05) 1px, transparent 1px),
-    rgba(255, 252, 242, 0.82);
-  background-size: 28px 28px;
-}
-
-.generation-progress-panel ol,
 .planning-progress-stream ol {
   display: grid;
   gap: 8px;
@@ -488,7 +408,6 @@ textarea {
   counter-reset: progress-stage;
 }
 
-.generation-progress-panel li,
 .progress-stage {
   display: flex;
   align-items: center;
@@ -499,7 +418,6 @@ textarea {
   counter-increment: progress-stage;
 }
 
-.generation-progress-panel li::before,
 .progress-stage::before {
   content: counter(progress-stage);
   display: grid;
@@ -570,6 +488,19 @@ textarea {
   flex: 1;
 }
 
+.progress-stage-copy {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+}
+
+.progress-stage-copy small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
 .progress-stage em {
   border-radius: 999px;
   background: rgba(24, 32, 19, 0.08);
@@ -604,6 +535,17 @@ textarea {
   color: #fff;
 }
 
+.progress-stage--warning {
+  border-color: rgba(255, 179, 64, 0.48);
+  background: rgba(255, 246, 218, 0.86);
+}
+
+.progress-stage--warning em,
+.progress-stage--warning::before {
+  background: #ffb340;
+  color: var(--ink);
+}
+
 .progress-stage--error {
   border-color: rgba(216, 90, 58, 0.35);
   background: rgba(255, 234, 226, 0.78);
@@ -636,6 +578,16 @@ textarea {
   border-color: var(--ink);
   background: var(--ink);
   color: #fff;
+}
+
+.create-action-row {
+  margin-top: 6px;
+}
+
+.create-action-row .primary {
+  min-height: 54px;
+  padding-inline: 22px;
+  box-shadow: 0 18px 34px rgba(22, 32, 19, 0.18);
 }
 
 .status,
@@ -716,6 +668,19 @@ textarea {
 
 .saved-list {
   margin-top: 24px;
+}
+
+.workspace-sidebar {
+  border: 1px solid rgba(24, 32, 19, 0.1);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.62);
+  padding: 16px;
+}
+
+.workspace-sidebar h3 {
+  margin: 4px 0 8px;
+  font-size: 24px;
+  letter-spacing: -0.04em;
 }
 
 .saved-item {

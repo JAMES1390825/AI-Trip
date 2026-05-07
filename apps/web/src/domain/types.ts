@@ -12,6 +12,28 @@ export type ConfidenceTier = "high" | "medium" | "needs_confirmation";
 
 export type PlanningMode = "ai_amap" | "rule_amap" | "fallback_seed";
 
+export type PlanningTraceNodeId =
+  | "intent_agent"
+  | "research_planner"
+  | "poi_search_agent"
+  | "evidence_agent"
+  | "route_architect_agent"
+  | "critic_agent"
+  | "repair_agent"
+  | "pretrip_agent"
+  | "composer";
+
+export type PlanningTraceStatus = "queued" | "active" | "done" | "warning" | "error";
+
+export type PlanningTraceEvent = {
+  nodeId: PlanningTraceNodeId;
+  label: string;
+  status: PlanningTraceStatus;
+  detail?: string;
+  startedAt?: string;
+  finishedAt?: string;
+};
+
 export type PretripChecklistCategory = "time" | "weather" | "traffic" | "booking" | "budget" | "comfort";
 
 export type PretripChecklistSeverity = "info" | "warning" | "critical";
@@ -179,6 +201,7 @@ export type RouteCard = {
   evidenceSources?: StopEvidence[];
   pretripChecklist?: PretripChecklistItem[];
   qualitySummary?: RouteQualitySummary;
+  planningTrace?: PlanningTraceEvent[];
   startDate: string;
   endDate?: string;
   durationDays: 1 | 2;

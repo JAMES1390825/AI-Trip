@@ -13,9 +13,9 @@ import { inferUserIntent } from "./user-intent";
 
 const stopTimes = ["10:00", "12:20", "15:00", "19:30", "10:00", "12:20", "15:30", "19:30"];
 
-type PlannerAmapClient = Pick<AmapClient, "searchPois" | "estimateWalkingMinutes">;
-type PlannerAiClient = RouteAiJsonClient;
-type EvidenceSources = NonNullable<RouteCard["evidenceSources"]>;
+export type PlannerAmapClient = Pick<AmapClient, "searchPois" | "estimateWalkingMinutes">;
+export type PlannerAiClient = RouteAiJsonClient;
+export type EvidenceSources = NonNullable<RouteCard["evidenceSources"]>;
 
 export type RealRoutePlannerDeps = {
   amapClient?: PlannerAmapClient;
@@ -29,7 +29,7 @@ type EvidenceSearchResult = {
   evidenceWarning?: string;
 };
 
-function dedupeCandidates(candidates: RealPoiCandidate[]): RealPoiCandidate[] {
+export function dedupeCandidates(candidates: RealPoiCandidate[]): RealPoiCandidate[] {
   const seen = new Set<string>();
   const results: RealPoiCandidate[] = [];
   for (const candidate of candidates) {
@@ -44,7 +44,7 @@ function mapUrlFor(candidate: RealPoiCandidate): string {
   return `https://uri.amap.com/marker?position=${candidate.lng},${candidate.lat}&name=${encodeURIComponent(candidate.name)}`;
 }
 
-async function buildLegs(stops: RouteStop[], amapClient: PlannerAmapClient): Promise<RouteLeg[]> {
+export async function buildLegs(stops: RouteStop[], amapClient: PlannerAmapClient): Promise<RouteLeg[]> {
   const legs: RouteLeg[] = [];
   for (let index = 1; index < stops.length; index += 1) {
     const minutes = await amapClient.estimateWalkingMinutes({
@@ -62,7 +62,7 @@ async function buildLegs(stops: RouteStop[], amapClient: PlannerAmapClient): Pro
   return legs;
 }
 
-function buildStopsFromArrangement(candidates: RealPoiCandidate[], arrangement: AiRouteArrangement): RouteStop[] {
+export function buildStopsFromArrangement(candidates: RealPoiCandidate[], arrangement: AiRouteArrangement): RouteStop[] {
   const selectedById = new Map(candidates.map((candidate) => [candidate.id, candidate]));
   return arrangement.selectedStops.map((selected, index) => {
     const candidate = selectedById.get(selected.candidateId);
@@ -87,7 +87,7 @@ function buildStopsFromArrangement(candidates: RealPoiCandidate[], arrangement: 
   });
 }
 
-function assembleCard(
+export function assembleCard(
   request: RouteCardRequest,
   stops: RouteStop[],
   arrangement: AiRouteArrangement,
@@ -158,7 +158,7 @@ function assembleCard(
   return { ...card, pretripChecklist: buildPretripChecklist(card) };
 }
 
-async function maybeAiArrangement(
+export async function maybeAiArrangement(
   aiClient: PlannerAiClient | undefined,
   request: RouteCardRequest,
   candidates: RealPoiCandidate[],
@@ -204,7 +204,7 @@ async function maybeAiArrangement(
   return validation.ok ? validation.arrangement : null;
 }
 
-async function searchEvidenceSafely(
+export async function searchEvidenceSafely(
   provider: WebEvidenceProvider,
   request: RouteCardRequest,
   intentSummary: string,

@@ -20,6 +20,9 @@ test("POST /api/route-cards/generate returns a generated route card", async () =
   const payload = await response.json();
   assert.equal(payload.routeCard.city, "杭州");
   assert.ok(payload.routeCard.stops.length >= 3);
+  assert.ok(Array.isArray(payload.planningTrace));
+  assert.ok(payload.planningTrace.some((event: { nodeId: string; status: string }) => event.nodeId === "composer" && event.status === "done"));
+  assert.equal(payload.routeCard.planningTrace.length, payload.planningTrace.length);
 });
 
 test("asRequestBody preserves lightweight trip planning fields", () => {
