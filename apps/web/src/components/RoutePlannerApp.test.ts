@@ -6,6 +6,7 @@ import type { RouteStop } from "@/domain/types";
 import {
   reorderedStopsToReviseNote,
   RoutePlannerApp,
+  type RoutePlannerAppProps,
   stopActionToReviseNote
 } from "./RoutePlannerApp";
 
@@ -59,7 +60,8 @@ test("RoutePlannerApp exposes light create entries and planning chips", () => {
 });
 
 test("RoutePlannerApp exposes smart import draft controls", () => {
-  const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp, { initialCreateMode: "import" }));
+  const ImportPlanner = RoutePlannerApp as React.ComponentType<RoutePlannerAppProps>;
+  const markup = renderToStaticMarkup(React.createElement(ImportPlanner, { initialCreateMode: "import" }));
 
   assert.match(markup, /识别导入内容/);
   assert.match(markup, /导入识别草稿/);

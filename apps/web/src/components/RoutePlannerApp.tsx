@@ -19,7 +19,7 @@ import { PosterShareCard } from "./share/PosterShareCard";
 import { StoryShareCard } from "./share/StoryShareCard";
 
 type ShareMode = "poster" | "story";
-type RoutePlannerAppProps = {
+export type RoutePlannerAppProps = {
   initialCreateMode?: "new" | "import";
 };
 
@@ -85,7 +85,8 @@ export function reorderedStopsToReviseNote(stops: RouteCardData["stops"]): strin
   return `用户拖拽调整了当天顺序，请优先按这个顺序重新校验路线时间：${stops.map((stop) => stop.poi).join(" -> ")}`;
 }
 
-export function RoutePlannerApp({ initialCreateMode = "new" }: RoutePlannerAppProps = {}) {
+export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
+  const { initialCreateMode = "new" } = props;
   const [city, setCity] = useState("杭州");
   const [startDate, setStartDate] = useState("2026-05-10");
   const [endDate, setEndDate] = useState("2026-05-10");
