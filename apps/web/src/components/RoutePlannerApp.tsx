@@ -24,7 +24,6 @@ type ShareMode = "poster" | "story";
 type PlanningStageState = PlanningTraceEvent["status"];
 export type RoutePlannerAppProps = {
   initialCreateMode?: "new" | "import";
-  initialCreatePanelOpen?: boolean;
 };
 
 const cityOptions = ["上海", "杭州", "苏州", "成都"];
@@ -98,7 +97,6 @@ export function reorderedStopsToReviseNote(stops: RouteCardData["stops"]): strin
 
 export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
   const { initialCreateMode = "new" } = props;
-  const [createPanelOpen, setCreatePanelOpen] = useState(props.initialCreatePanelOpen ?? false);
   const [city, setCity] = useState("杭州");
   const [startDate, setStartDate] = useState("2026-05-10");
   const [endDate, setEndDate] = useState("2026-05-10");
@@ -205,7 +203,6 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
     startTransition(async () => {
       let progressTimer: number | undefined;
       try {
-        setCreatePanelOpen(false);
         setPlanningStageError(false);
         setPlanningStageIndex(0);
         setPlanningTrace(createQueuedPlanningTrace());
@@ -380,7 +377,6 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
         setCity(payload.routeCard.city);
         setStartDate(payload.routeCard.startDate);
         setEndDate(payload.routeCard.endDate || payload.routeCard.startDate);
-        setCreatePanelOpen(false);
         setStatus("已载入保存的路线卡。");
       } catch (error) {
         setStatus(error instanceof Error ? error.message : String(error));
@@ -407,88 +403,40 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
 
   return (
     <div className="app-grid">
-      <section className="planner-panel">
-        <section className="app-home" aria-label="我的行程首页">
-          <div>
-            <p className="eyebrow">AI 旅行规划 · 我的行程</p>
-            <h1>我的行程</h1>
-            <p className="hero-copy">
-              从一个想法、朋友发来的地点，生成可走的地图路线和每日行程卡。规划完成后再保存、调整和分享。
-            </p>
-          </div>
-          <button className="create-dock" onClick={() => setCreatePanelOpen(true)} type="button">
-            <strong>+ 创建新行程</strong>
-            <span>自然语言、智能导入或从偏好 chips 开始</span>
-          </button>
+      <section className="planner-panel trip-creation-panel" aria-label="创建真实行程">
+        <div className="creation-hero">
+          <p className="eyebrow">AI 旅行规划</p>
+          <h1>一句话开始规划</h1>
+          <p className="hero-copy">选城市和日期，点几枚偏好，再用一句自然语言补充这趟旅行。结果、保存和调整都放在右侧工作台。</p>
           <div className="trust-strip" aria-label="规划可信来源">
             <span>高德真实地点</span>
             <span>AI 路线编排</span>
             <span>Exa 公开证据</span>
             <span>异常时本地兜底</span>
           </div>
-          <div className="home-trip-section">
-            <div className="home-section-heading">
-              <p className="section-kicker">Recent Trips</p>
-              <h3>最近行程</h3>
-            </div>
-            {saved.length ? (
-              saved.slice(0, 3).map((item) => (
-                <div className="home-trip-card" key={item.id}>
-                  <strong>{item.title}</strong>
-                  <span>
-                    {item.city} · {item.themeLabel} · {Math.round(item.confidence * 100)}%
-                  </span>
-                  <button onClick={() => loadSavedPreview(item.id)} type="button" disabled={isPending}>
-                    打开行程
-                  </button>
-                </div>
-              ))
-            ) : (
-              <div className="home-trip-empty">
-                <strong>还没有行程</strong>
-                <span>点下面的大加号创建第一份地图 + 每日行程。</span>
-              </div>
-            )}
-          </div>
-        </section>
+        </div>
 
-        <section className={createPanelOpen ? "create-panel create-panel--open" : "create-panel"} aria-label="轻创建面板">
-          <div className="create-panel-heading">
-            <div>
-              <p className="section-kicker">Create Desk</p>
-              <h3>轻创建面板</h3>
-            </div>
-            <button onClick={() => setCreatePanelOpen(false)} type="button">
-              回到我的行程
-            </button>
-          </div>
-          <div className="create-entry-panel">
-            <div>
-              <p className="section-kicker">Create Mode</p>
-              <h3>从哪开始规划？</h3>
-            </div>
-            <div className="create-entry-actions">
-              <button
-                aria-pressed={activeCreateMode === "new"}
-                className={activeCreateMode === "new" ? "active" : ""}
-                onClick={() => setActiveCreateMode("new")}
-                type="button"
-              >
-                创建新计划
-              </button>
-              <button
-                aria-pressed={activeCreateMode === "import"}
-                className={activeCreateMode === "import" ? "active" : ""}
-                onClick={() => setActiveCreateMode("import")}
-                type="button"
-              >
-                智能导入地点/行程
-              </button>
-              <button aria-label="采集识别即将支持" disabled title="采集识别即将支持" type="button">
-                采集识别
-              </button>
-            </div>
-          </div>
+        <div className="create-mode-tabs" aria-label="创建方式">
+          <button
+            aria-pressed={activeCreateMode === "new"}
+            className={activeCreateMode === "new" ? "active" : ""}
+            onClick={() => setActiveCreateMode("new")}
+            type="button"
+          >
+            创建新计划
+          </button>
+          <button
+            aria-pressed={activeCreateMode === "import"}
+            className={activeCreateMode === "import" ? "active" : ""}
+            onClick={() => setActiveCreateMode("import")}
+            type="button"
+          >
+            智能导入地点/行程
+          </button>
+          <button aria-label="采集识别即将支持" disabled title="采集识别即将支持" type="button">
+            采集识别
+          </button>
+        </div>
 
         <div className="form-grid">
           <label>
@@ -532,6 +480,18 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
             ))}
           </div>
         </div>
+
+        <section className="natural-language-panel" aria-labelledby="natural-language-title">
+          <div>
+            <p className="section-kicker">Natural Brief</p>
+            <h3 id="natural-language-title">补充偏好</h3>
+            <p>把“不想太累、想拍照、带朋友、想吃本地小吃”这类自然话写在这里就好。</p>
+          </div>
+          <label>
+            一句话描述
+            <textarea value={note} onChange={(event) => setNote(event.target.value)} />
+          </label>
+        </section>
 
         {activeCreateMode === "import" ? (
           <section className="import-workbench" aria-labelledby="import-workbench-title">
@@ -610,15 +570,10 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
           </section>
         ) : null}
 
-        <label>
-          补充偏好
-          <textarea value={note} onChange={(event) => setNote(event.target.value)} />
-        </label>
-
-        <section className="planning-constraints-panel" aria-labelledby="planning-constraints-title">
+        <section className="planning-constraints-panel advanced-fields-panel" aria-labelledby="planning-constraints-title">
           <div>
             <p className="section-kicker">Planning Details</p>
-            <h3 id="planning-constraints-title">补充真实旅行约束</h3>
+            <h3 id="planning-constraints-title">可选：补充真实约束</h3>
             <p className="constraint-copy">不用填满，写几个关键点就能让路线更像真实计划。</p>
           </div>
           <div className="constraint-grid">
@@ -690,12 +645,9 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
           </div>
         </section>
 
-        <div className="action-row">
+        <div className="action-row create-action-row">
           <button className="primary" disabled={isPending} onClick={generate} type="button">
             {isPending ? "规划中..." : "生成真实行程"}
-          </button>
-          <button disabled={!routeCard || isPending} onClick={save} type="button">
-            保存当前行程
           </button>
         </div>
         <p className="status">{status}</p>
@@ -728,63 +680,6 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
           </ol>
           <p>这些是诚实的规划阶段提示；不展示未接入来源，也不冒充小红书官方搜索。如果生成失败，保留输入后直接重试。</p>
         </div>
-
-        <div className="revision-panel">
-          <div>
-            <p className="section-kicker">Route Workbench</p>
-            <h3>调整路线</h3>
-            <p>生成后不用重填需求，可以继续要求它少走路、加饭点、改室内或压缩行程。</p>
-          </div>
-          <div className="revision-quick-actions">
-            {revisionQuickActions.map((action) => (
-              <button key={action} onClick={() => applyRevisionQuickAction(action)} type="button">
-                {action}
-              </button>
-            ))}
-          </div>
-          <label>
-            调整要求
-            <textarea
-              placeholder="例如：少走路一点，中午加一个本地吃饭点，下午尽量室内"
-              value={revisionNote}
-              onChange={(event) => setRevisionNote(event.target.value)}
-            />
-          </label>
-          <button className="revision-submit" disabled={!routeCard || isPending} onClick={reviseRoute} type="button">
-            重新调整路线
-          </button>
-          {routeCard?.revisionSummary ? <p className="revision-summary">{routeCard.revisionSummary}</p> : null}
-        </div>
-
-        <div className="saved-list">
-          <p className="section-kicker">My Trips</p>
-          <h3>我的行程库</h3>
-          <p className="saved-list-copy">保存后会在这里形成可再次打开的旅行计划。</p>
-          {saved.length ? (
-            saved.map((item) => (
-              <div className="saved-item" key={item.id}>
-                <strong>{item.title}</strong>
-                <span>
-                  {item.city} · {item.themeLabel} · {Math.round(item.confidence * 100)}%
-                </span>
-                <div className="saved-actions">
-                  <button onClick={() => loadSavedPreview(item.id)} type="button" disabled={isPending}>
-                    预览
-                  </button>
-                  <a href={item.sharePath} target="_blank" rel="noreferrer">
-                    打开 / 分享
-                  </a>
-                  <button onClick={() => deleteSaved(item.id)} type="button" disabled={isPending}>
-                    删除
-                  </button>
-                </div>
-              </div>
-            ))
-          ) : (
-            <p>还没有保存的路线卡。</p>
-          )}
-        </div>
-        </section>
       </section>
 
       <section className="preview-panel">
@@ -815,6 +710,32 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
                 复制分享链接
               </button>
             </div>
+            <div className="revision-panel">
+              <div>
+                <p className="section-kicker">Route Workbench</p>
+                <h3>调整路线</h3>
+                <p>生成后不用重填需求，可以继续要求它少走路、加饭点、改室内或压缩行程。</p>
+              </div>
+              <div className="revision-quick-actions">
+                {revisionQuickActions.map((action) => (
+                  <button key={action} onClick={() => applyRevisionQuickAction(action)} type="button">
+                    {action}
+                  </button>
+                ))}
+              </div>
+              <label>
+                调整要求
+                <textarea
+                  placeholder="例如：少走路一点，中午加一个本地吃饭点，下午尽量室内"
+                  value={revisionNote}
+                  onChange={(event) => setRevisionNote(event.target.value)}
+                />
+              </label>
+              <button className="revision-submit" disabled={isPending} onClick={reviseRoute} type="button">
+                重新调整路线
+              </button>
+              {routeCard.revisionSummary ? <p className="revision-summary">{routeCard.revisionSummary}</p> : null}
+            </div>
             <div className="share-switch" aria-label="分享包装">
               <p>分享包装</p>
               <small>分享是附属能力，先把路线规划到能出发。</small>
@@ -830,7 +751,8 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
         ) : (
             <div className="empty-preview">
               <p className="section-kicker">Result Preview</p>
-              <h2>地图 + 每日行程会在这里展开</h2>
+              <h2>你的行程结果会出现在这里</h2>
+              <p>地图 + 每日行程会在这里展开；生成前先保持清爽，不提前展示无效的保存和调整动作。</p>
             <div className="empty-preview-grid">
               <span>真实地图路线</span>
               <span>DAY 行程卡</span>
@@ -838,9 +760,37 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
               <span>风险与行前检查</span>
               </div>
               <p>生成后会出现完整旅行工作台；当前旅行工作台支持点选地图点位、拖拽调整当天顺序、继续让 AI 少走路或加吃饭点。</p>
-              <small>生成后可保存当前行程、再规划一版。分享包装会放在结果后面；分享是附属能力，先把路线规划到能出发。</small>
+              <small>右侧只负责结果预览和已保存行程，左侧只负责创建。</small>
             </div>
         )}
+        <div className="saved-list workspace-sidebar">
+          <p className="section-kicker">My Trips</p>
+          <h3>我的行程库</h3>
+          <p className="saved-list-copy">保存后会在这里形成可再次打开的旅行计划。</p>
+          {saved.length ? (
+            saved.map((item) => (
+              <div className="saved-item" key={item.id}>
+                <strong>{item.title}</strong>
+                <span>
+                  {item.city} · {item.themeLabel} · {Math.round(item.confidence * 100)}%
+                </span>
+                <div className="saved-actions">
+                  <button onClick={() => loadSavedPreview(item.id)} type="button" disabled={isPending}>
+                    预览
+                  </button>
+                  <a href={item.sharePath} target="_blank" rel="noreferrer">
+                    打开 / 分享
+                  </a>
+                  <button onClick={() => deleteSaved(item.id)} type="button" disabled={isPending}>
+                    删除
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p>还没有保存的路线卡。</p>
+          )}
+        </div>
       </section>
     </div>
   );
