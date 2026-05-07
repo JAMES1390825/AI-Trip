@@ -169,6 +169,53 @@ export function RouteCard({ routeCard, onStopAction, onRevalidateOrder, actionsD
             <strong>{checklist.length ? `${checklist.length} 项` : "无额外提醒"}</strong>
           </div>
         </section>
+        {routeCard.qualitySummary ? (
+          <section className="route-quality-panel" aria-label="路线质量说明">
+            <div className="quality-score">
+              <span>匹配度</span>
+              <strong>{routeCard.qualitySummary.matchScore}</strong>
+              <em>基于需求、真实地点、证据和降级状态计算</em>
+            </div>
+            <div className="quality-columns">
+              {routeCard.qualitySummary.satisfied.length ? (
+                <div className="quality-list">
+                  <span>已满足</span>
+                  <ul>
+                    {routeCard.qualitySummary.satisfied.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {routeCard.qualitySummary.tradeoffs.length ? (
+                <div className="quality-list">
+                  <span>取舍</span>
+                  <ul>
+                    {routeCard.qualitySummary.tradeoffs.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {routeCard.qualitySummary.confirmationNeeded.length ? (
+                <div className="quality-list">
+                  <span>需要确认</span>
+                  <ul>
+                    {routeCard.qualitySummary.confirmationNeeded.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+            <div className="provider-health-row" aria-label="Provider Health">
+              <span>Provider Health</span>
+              {routeCard.qualitySummary.providerHealth.map((item) => (
+                <em key={item}>{item}</em>
+              ))}
+            </div>
+          </section>
+        ) : null}
         {routeCard.intentSummary || routeCard.arrangementReason || routeCard.skipSuggestion || routeCard.weatherAlternative ? (
           <div className="explain-panel">
             {routeCard.intentSummary ? (

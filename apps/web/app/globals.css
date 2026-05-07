@@ -972,6 +972,92 @@ textarea {
   line-height: 1.35;
 }
 
+.route-quality-panel {
+  display: grid;
+  gap: 18px;
+  margin: 16px 0;
+  border: 1px solid rgba(15, 35, 20, 0.12);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 6% 0%, rgba(255, 179, 64, 0.24), transparent 30%),
+    linear-gradient(135deg, rgba(255, 255, 246, 0.9), rgba(231, 255, 240, 0.72));
+  padding: 20px;
+}
+
+.quality-score {
+  display: grid;
+  gap: 4px;
+}
+
+.quality-score span,
+.quality-list span,
+.provider-health-row > span {
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.quality-score strong {
+  color: var(--ink);
+  font-size: clamp(2.8rem, 9vw, 4.6rem);
+  line-height: 0.9;
+  letter-spacing: -0.08em;
+}
+
+.quality-score em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.45;
+}
+
+.quality-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.quality-list {
+  border: 1px solid rgba(24, 32, 19, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 12px;
+}
+
+.quality-list ul {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quality-list li {
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.provider-health-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.provider-health-row em {
+  border: 1px solid rgba(18, 107, 67, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.76);
+  color: #315f3d;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 950;
+}
+
 .warning {
   border-radius: 16px;
   background: #fff3d1;
@@ -1429,11 +1515,64 @@ textarea {
   .app-grid,
   .form-grid,
   .constraint-grid,
+  .quality-columns,
   .trust-panel {
     grid-template-columns: 1fr;
   }
 
   .route-trust-summary {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .page-shell {
+    width: min(100% - 18px, 1180px);
+    padding: 18px 0 44px;
+  }
+
+  .planner-panel,
+  .preview-panel {
+    border-radius: 26px;
+    padding: 16px;
+  }
+
+  .route-card-body {
+    padding: 16px;
+  }
+
+  .planning-constraints-panel,
+  .route-quality-panel,
+  .day-itinerary-panel,
+  .pretrip-panel,
+  .evidence-panel {
+    border-radius: 22px;
+    padding: 16px;
+  }
+
+  .route-trust-summary,
+  .empty-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .result-actions {
+    position: sticky;
+    bottom: 10px;
+    z-index: 4;
+    border: 1px solid rgba(24, 32, 19, 0.1);
+    border-radius: 24px;
+    background: rgba(255, 248, 237, 0.88);
+    padding: 10px;
+    backdrop-filter: blur(12px);
+  }
+
+  .result-actions a,
+  .result-actions button {
+    flex: 1 1 128px;
+    text-align: center;
+  }
+
+  .route-amap-canvas {
+    height: 280px;
   }
 }
