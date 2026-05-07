@@ -147,10 +147,75 @@ export function RouteCard({ routeCard, onStopAction, onRevalidateOrder, actionsD
               <span>{tab.label}</span>
               <small>{tab.stopCount} 站</small>
             </button>
-          ))}
+        ))}
         </div>
         <h2>{routeCard.title}</h2>
         <p className="route-summary">{routeCard.summary}</p>
+        <section className="route-trust-summary" aria-label="路线可信摘要">
+          <div>
+            <span>路线可信摘要</span>
+            <strong>{Math.round(routeCard.confidence * 100)}% 可信度</strong>
+          </div>
+          <div>
+            <span>来源</span>
+            <strong>{routeCard.sourceLabel}</strong>
+          </div>
+          <div>
+            <span>公开证据</span>
+            <strong>{evidenceSources.length ? `${evidenceSources.length} 条` : "未附加"}</strong>
+          </div>
+          <div>
+            <span>行前检查</span>
+            <strong>{checklist.length ? `${checklist.length} 项` : "无额外提醒"}</strong>
+          </div>
+        </section>
+        {routeCard.qualitySummary ? (
+          <section className="route-quality-panel" aria-label="路线质量说明">
+            <div className="quality-score">
+              <span>匹配度</span>
+              <strong>{routeCard.qualitySummary.matchScore}</strong>
+              <em>基于需求、真实地点、证据和降级状态计算</em>
+            </div>
+            <div className="quality-columns">
+              {routeCard.qualitySummary.satisfied.length ? (
+                <div className="quality-list">
+                  <span>已满足</span>
+                  <ul>
+                    {routeCard.qualitySummary.satisfied.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {routeCard.qualitySummary.tradeoffs.length ? (
+                <div className="quality-list">
+                  <span>取舍</span>
+                  <ul>
+                    {routeCard.qualitySummary.tradeoffs.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {routeCard.qualitySummary.confirmationNeeded.length ? (
+                <div className="quality-list">
+                  <span>需要确认</span>
+                  <ul>
+                    {routeCard.qualitySummary.confirmationNeeded.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+            <div className="provider-health-row" aria-label="Provider Health">
+              <span>Provider Health</span>
+              {routeCard.qualitySummary.providerHealth.map((item) => (
+                <em key={item}>{item}</em>
+              ))}
+            </div>
+          </section>
+        ) : null}
         {routeCard.intentSummary || routeCard.arrangementReason || routeCard.skipSuggestion || routeCard.weatherAlternative ? (
           <div className="explain-panel">
             {routeCard.intentSummary ? (
@@ -321,7 +386,13 @@ export function RouteCard({ routeCard, onStopAction, onRevalidateOrder, actionsD
             </div>
           </section>
         ) : null}
-        {routeCard.degraded ? <p className="warning">当前为降级草案：{routeCard.degradedReason}</p> : null}
+        {routeCard.degraded ? (
+          <div className="warning warning-panel">
+            <strong>当前为可体验草案</strong>
+            <p>{routeCard.degradedReason}</p>
+            <span>出发前请复核真实地点和营业时间。</span>
+          </div>
+        ) : null}
       </div>
     </article>
   );

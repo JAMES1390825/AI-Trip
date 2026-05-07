@@ -51,6 +51,13 @@ const routeCard: RouteCardData = {
       actionLabel: "打开地图复核"
     }
   ],
+  qualitySummary: {
+    matchScore: 88,
+    satisfied: ["预算：已按「预算友好」作为筛选倾向。", "必去线索：已优先检索 西湖。"],
+    tradeoffs: ["必去地点会优先进入检索，但仍会受真实候选、顺路性和开放状态影响。"],
+    confirmationNeeded: ["地点来自地图服务，营业/预约/交通以出发前实时信息为准。"],
+    providerHealth: ["高德地点候选", "AI 编排", "Exa 公开证据"]
+  },
   startDate: "2026-05-10",
   durationDays: 1,
   estimatedCostCny: 240,
@@ -141,6 +148,47 @@ test("RouteCard renders real planning explanation fields", () => {
   assert.match(markup, /href="https:\/\/uri\.amap\.com\/marker/);
   assert.doesNotMatch(markup, /点击站点可打开高德/);
   assert.doesNotMatch(markup, /map-pin/);
+});
+
+test("RouteCard renders launch trust summary above route details", () => {
+  const markup = renderToStaticMarkup(React.createElement(RouteCard, { routeCard }));
+
+  assert.match(markup, /路线可信摘要/);
+  assert.match(markup, /来源/);
+  assert.match(markup, /Amap real map data \+ AI planning/);
+  assert.match(markup, /公开证据/);
+  assert.match(markup, /行前检查/);
+});
+
+test("RouteCard renders route quality summary", () => {
+  const markup = renderToStaticMarkup(React.createElement(RouteCard, { routeCard }));
+
+  assert.match(markup, /路线质量说明/);
+  assert.match(markup, /匹配度/);
+  assert.match(markup, /88/);
+  assert.match(markup, /已满足/);
+  assert.match(markup, /预算友好/);
+  assert.match(markup, /取舍/);
+  assert.match(markup, /需要确认/);
+  assert.match(markup, /Provider Health/);
+  assert.match(markup, /高德地点候选/);
+});
+
+test("RouteCard makes degraded plans explicit and actionable", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(RouteCard, {
+      routeCard: {
+        ...routeCard,
+        degraded: true,
+        degradedReason: "Amap provider unavailable; used local fallback data.",
+        sourceLabel: "Local fallback data"
+      }
+    })
+  );
+
+  assert.match(markup, /当前为可体验草案/);
+  assert.match(markup, /Amap provider unavailable/);
+  assert.match(markup, /出发前请复核真实地点和营业时间/);
 });
 
 test("RouteCard renders stop edit actions when callback is provided", () => {

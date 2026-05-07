@@ -6,6 +6,7 @@ import type { RouteStop } from "@/domain/types";
 import {
   reorderedStopsToReviseNote,
   RoutePlannerApp,
+  type RoutePlannerAppProps,
   stopActionToReviseNote
 } from "./RoutePlannerApp";
 
@@ -50,12 +51,55 @@ test("RoutePlannerApp exposes light create entries and planning chips", () => {
   const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
 
   assert.match(markup, /我的行程/);
+  assert.match(markup, /\+ 创建新行程/);
+  assert.match(markup, /最近行程/);
+  assert.match(markup, /轻创建面板/);
   assert.match(markup, /创建新计划/);
   assert.match(markup, /智能导入地点\/行程/);
   assert.match(markup, /采集识别/);
   assert.match(markup, /拍照出片/);
   assert.match(markup, /历史古迹/);
   assert.match(markup, /预算友好/);
+});
+
+test("RoutePlannerApp exposes smart import draft controls", () => {
+  const ImportPlanner = RoutePlannerApp as React.ComponentType<RoutePlannerAppProps>;
+  const markup = renderToStaticMarkup(React.createElement(ImportPlanner, { initialCreateMode: "import" }));
+
+  assert.match(markup, /识别导入内容/);
+  assert.match(markup, /导入识别草稿/);
+  assert.match(markup, /应用到规划表单/);
+  assert.match(markup, /识别地点/);
+  assert.match(markup, /识别约束/);
+  assert.match(markup, /粘贴后先识别/);
+});
+
+test("RoutePlannerApp exposes lightweight real trip constraint inputs", () => {
+  const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
+
+  assert.match(markup, /补充真实旅行约束/);
+  assert.match(markup, /预算范围/);
+  assert.match(markup, /同行人/);
+  assert.match(markup, /交通偏好/);
+  assert.match(markup, /起点区域/);
+  assert.match(markup, /结束区域/);
+  assert.match(markup, /必去地点/);
+  assert.match(markup, /想避开\/不想去/);
+});
+
+test("RoutePlannerApp presents a launchable planning-first first screen", () => {
+  const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
+
+  assert.match(markup, /AI 旅行规划/);
+  assert.match(markup, /真实地点/);
+  assert.match(markup, /公开攻略证据/);
+  assert.match(markup, /规划完成后再保存、调整和分享/);
+  assert.match(markup, /高德真实地点/);
+  assert.match(markup, /AI 路线编排/);
+  assert.match(markup, /Exa 公开证据/);
+  assert.match(markup, /异常时本地兜底/);
+  assert.match(markup, /生成真实行程/);
+  assert.doesNotMatch(markup, /生成路线卡/);
 });
 
 test("RoutePlannerApp keeps route templates out of the light create flow", () => {
@@ -79,11 +123,55 @@ test("RoutePlannerApp exposes create mode and chip selection state to assistive 
 test("RoutePlannerApp renders honest generation progress labels", () => {
   const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
 
-  assert.match(markup, /理解旅行需求/);
-  assert.match(markup, /高德搜索真实地点/);
-  assert.match(markup, /Exa 检索公开攻略证据/);
+  assert.match(markup, /理解你的旅行意图/);
+  assert.match(markup, /高德检索真实地点候选/);
+  assert.match(markup, /Exa 查找公开攻略证据/);
   assert.match(markup, /不展示未接入来源/);
   assert.doesNotMatch(markup, /正在搜索小红书官方/);
+});
+
+test("RoutePlannerApp renders launch generation stages and retry guidance", () => {
+  const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
+
+  assert.match(markup, /规划进度流/);
+  assert.match(markup, /等待开始/);
+  assert.match(markup, /进行中/);
+  assert.match(markup, /已完成/);
+  assert.match(markup, /理解你的旅行意图/);
+  assert.match(markup, /高德检索真实地点候选/);
+  assert.match(markup, /Exa 查找公开攻略证据/);
+  assert.match(markup, /AI 编排并校验路线/);
+  assert.match(markup, /生成风险提醒和行前检查/);
+  assert.match(markup, /如果生成失败，保留输入后直接重试/);
+});
+
+test("RoutePlannerApp empty preview explains what the user will get", () => {
+  const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
+
+  assert.match(markup, /地图 \+ 每日行程/);
+  assert.match(markup, /当前旅行工作台/);
+  assert.match(markup, /生成后会出现完整旅行工作台/);
+  assert.match(markup, /真实地图路线/);
+  assert.match(markup, /DAY 行程卡/);
+  assert.match(markup, /来源证据/);
+  assert.match(markup, /风险与行前检查/);
+});
+
+test("RoutePlannerApp keeps sharing secondary to planning actions", () => {
+  const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
+
+  assert.match(markup, /保存当前行程/);
+  assert.match(markup, /再规划一版/);
+  assert.match(markup, /分享包装/);
+  assert.match(markup, /分享是附属能力，先把路线规划到能出发/);
+});
+
+test("RoutePlannerApp labels saved routes as user trips", () => {
+  const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
+
+  assert.match(markup, /我的行程库/);
+  assert.match(markup, /保存后会在这里形成可再次打开的旅行计划/);
+  assert.doesNotMatch(markup, /已保存<\/h3>/);
 });
 
 test("stopActionToReviseNote maps stop actions to revise notes", () => {

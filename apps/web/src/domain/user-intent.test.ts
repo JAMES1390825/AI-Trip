@@ -60,3 +60,24 @@ test("inferUserIntent maps family and elderly request fields", () => {
   assert.ok(familyIntent.mustHaveConstraints.includes("适合亲子同行"));
   assert.ok(familyIntent.avoidConstraints.includes("优先公共交通可达"));
 });
+
+test("inferUserIntent includes explicit budget and constraint text", () => {
+  const intent = inferUserIntent({
+    themeId: "classic",
+    note: "想拍照",
+    tripPreferences: ["自然风光"],
+    budgetRange: "budget_friendly",
+    mustVisitText: "西湖、法喜寺",
+    avoidText: "不要太赶，少排队",
+    companion: "family",
+    transportPreference: "public_transit_ok"
+  });
+
+  assert.equal(intent.budgetPosture, "low");
+  assert.ok(intent.mustHaveConstraints.some((item) => item.includes("西湖")));
+  assert.ok(intent.mustHaveConstraints.some((item) => item.includes("法喜寺")));
+  assert.ok(intent.avoidConstraints.some((item) => item.includes("不要太赶")));
+  assert.ok(intent.avoidConstraints.some((item) => item.includes("少排队")));
+  assert.ok(intent.mustHaveConstraints.some((item) => item.includes("亲子")));
+  assert.ok(intent.mustHaveConstraints.some((item) => item.includes("公共交通")));
+});

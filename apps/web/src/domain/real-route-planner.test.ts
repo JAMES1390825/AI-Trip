@@ -32,6 +32,8 @@ test("generateRealRouteCard falls back to local seed planner when Amap has no ca
 
   assert.equal(card.planningMode, "fallback_seed");
   assert.equal(card.degraded, true);
+  assert.ok(card.qualitySummary);
+  assert.ok(card.qualitySummary.providerHealth.some((item) => item.includes("本地兜底")));
   assert.ok(card.pretripChecklist);
   assert.ok(card.pretripChecklist.length >= 1);
 });
@@ -86,7 +88,10 @@ test("generateRealRouteCard includes trip preference fields in production intent
         note: "",
         tripPreferences: ["拍照出片", "吃喝逛", "少走路"],
         companion: "friends",
-        transportPreference: "walk_first"
+        transportPreference: "walk_first",
+        budgetRange: "budget_friendly",
+        mustVisitText: "西湖",
+        avoidText: "不要太赶"
       },
       {
         amapClient: { searchPois: async () => realCandidates, estimateWalkingMinutes: async () => 12 }
@@ -96,6 +101,10 @@ test("generateRealRouteCard includes trip preference fields in production intent
     assert.match(card.intentSummary || "", /轻松/);
     assert.match(card.intentSummary || "", /拍照友好/);
     assert.match(card.intentSummary || "", /美食优先/);
+    assert.match(card.intentSummary || "", /低预算/);
+    assert.ok(card.qualitySummary);
+    assert.ok(card.qualitySummary.satisfied.some((item) => item.includes("西湖")));
+    assert.ok(card.qualitySummary.satisfied.some((item) => item.includes("预算")));
   } finally {
     if (originalProvider === undefined) delete process.env.AI_PROVIDER;
     else process.env.AI_PROVIDER = originalProvider;

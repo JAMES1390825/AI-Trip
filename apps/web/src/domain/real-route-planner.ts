@@ -7,6 +7,7 @@ import { buildFallbackBlueprint, searchSlotsToAmapQueries } from "./route-bluepr
 import { getRouteTheme } from "./theme-catalog";
 import { generateRouteCard } from "./planner";
 import { buildPretripChecklist } from "./pretrip-checklist";
+import { buildRouteQualitySummary } from "./route-quality";
 import type { RouteCard, RouteCardRequest, RouteLeg, RouteStop } from "./types";
 import { inferUserIntent } from "./user-intent";
 
@@ -126,6 +127,14 @@ function assembleCard(
     providerWarnings,
     evidenceSummary,
     evidenceSources,
+    qualitySummary: buildRouteQualitySummary({
+      request,
+      planningMode: mode,
+      sourceLabel: `${mode === "ai_amap" ? "Amap real map data + AI planning" : "Amap real map data + rule planning"}${evidenceSources.length ? " + web evidence" : ""}`,
+      evidenceSources,
+      providerWarnings,
+      degradedLegCount: legs.filter((leg) => leg.degraded).length
+    }),
     startDate: request.startDate,
     endDate: request.endDate,
     durationDays: request.durationDays,
@@ -233,7 +242,10 @@ export async function generateRealRouteCard(request: RouteCardRequest, deps: Rea
     tripPreferences: request.tripPreferences,
     importedText: request.importedText,
     companion: request.companion,
-    transportPreference: request.transportPreference
+    transportPreference: request.transportPreference,
+    budgetRange: request.budgetRange,
+    mustVisitText: request.mustVisitText,
+    avoidText: request.avoidText
   });
   const blueprint = buildFallbackBlueprint({ ...request, intent });
   const queries = searchSlotsToAmapQueries(request.city, blueprint.searchSlots);
@@ -249,6 +261,14 @@ export async function generateRealRouteCard(request: RouteCardRequest, deps: Rea
       sourceLabel: "本地示例数据",
       providerWarnings: ["当前使用本地示例数据，适合体验产品流程；出发前请核对真实地点。"]
     };
+    fallbackCard.qualitySummary = buildRouteQualitySummary({
+      request,
+      planningMode: "fallback_seed",
+      sourceLabel: fallbackCard.sourceLabel,
+      evidenceSources: [],
+      providerWarnings: fallbackCard.providerWarnings,
+      degradedLegCount: fallbackCard.legs.filter((leg) => leg.degraded).length
+    });
     return { ...fallbackCard, pretripChecklist: buildPretripChecklist(fallbackCard) };
   }
 

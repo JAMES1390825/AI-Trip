@@ -38,6 +38,14 @@ export type PretripChecklistItem = {
   relatedStopId?: string;
 };
 
+export type RouteQualitySummary = {
+  matchScore: number;
+  satisfied: string[];
+  tradeoffs: string[];
+  confirmationNeeded: string[];
+  providerHealth: string[];
+};
+
 export type RouteTheme = {
   id: RouteThemeId;
   label: string;
@@ -66,6 +74,22 @@ export type TransportPreference = "walk_first" | "public_transit_ok" | "taxi_ok"
 
 export type CompanionType = "solo" | "friends" | "couple" | "family" | "elderly";
 
+export type BudgetRange = "budget_friendly" | "balanced" | "flexible";
+
+export type TripImportDraft = {
+  rawText: string;
+  cityHint?: string;
+  placeNames: string[];
+  mustVisitText?: string;
+  avoidText?: string;
+  noteHint?: string;
+  preferenceHints: TripPreferenceId[];
+  startPointHint?: string;
+  endPointHint?: string;
+  confidence: number;
+  parseNotes: string[];
+};
+
 export type RouteCardRequest = {
   city: string;
   themeId: RouteThemeId;
@@ -81,6 +105,9 @@ export type RouteCardRequest = {
   endPoint?: string;
   transportPreference?: TransportPreference;
   companion?: CompanionType;
+  budgetRange?: BudgetRange;
+  mustVisitText?: string;
+  avoidText?: string;
 };
 
 export type PoiSeed = {
@@ -151,6 +178,7 @@ export type RouteCard = {
   evidenceSummary?: string;
   evidenceSources?: StopEvidence[];
   pretripChecklist?: PretripChecklistItem[];
+  qualitySummary?: RouteQualitySummary;
   startDate: string;
   endDate?: string;
   durationDays: 1 | 2;
