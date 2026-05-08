@@ -5,8 +5,7 @@ without breaking the current local planning experience.
 
 **Scope:**
 
-- Add a route-card store factory so route cards can use SQLite by default or
-  PostgreSQL through `ROUTE_CARD_STORE=postgres`.
+- Make route-card persistence PostgreSQL-only on the runtime path.
 - Add a Prisma client singleton for production-backed repositories.
 - Add a planning job repository/service boundary.
 - Add `POST /api/planning-jobs` and `GET /api/planning-jobs/:id`.
@@ -15,7 +14,7 @@ without breaking the current local planning experience.
 
 **Non-goals:**
 
-- Do not remove the SQLite transition store yet.
+- Do not keep a SQLite runtime fallback.
 - Do not start a RocketMQ consumer in the web process.
 - Do not migrate the UI to async job polling in this slice.
 

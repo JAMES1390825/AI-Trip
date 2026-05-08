@@ -91,7 +91,7 @@ Returns saved route-card summaries.
 
 Each summary includes `sharePath`, such as `/share/<id>`, for opening the saved share page.
 
-Saved route cards are persisted in SQLite. Set `ROUTE_CARD_DATABASE_FILE` to override the default local database path.
+Saved route cards are persisted in PostgreSQL through Prisma.
 
 ## `POST /api/route-cards`
 
