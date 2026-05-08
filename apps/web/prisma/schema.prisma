@@ -1,0 +1,281 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id             String          @id @default(uuid())
+  displayName    String?         @map("display_name")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  deviceSessions DeviceSession[]
+  trips          Trip[]
+  memories       UserMemory[]
+
+  @@map("users")
+}
+
+model DeviceSession {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  deviceKey String   @unique @map("device_key")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  trips     Trip[]
+
+  @@index([userId])
+  @@map("device_sessions")
+}
+
+model Trip {
+  id                 String             @id @default(uuid())
+  userId             String?            @map("user_id")
+  deviceSessionId    String?            @map("device_session_id")
+  city               String
+  title              String
+  startDate          DateTime?          @map("start_date")
+  endDate            DateTime?          @map("end_date")
+  status             String             @default("draft")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+  user               User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  deviceSession      DeviceSession?     @relation(fields: [deviceSessionId], references: [id], onDelete: SetNull)
+  itineraryVersions  ItineraryVersion[]
+  planningJobs       PlanningJob[]
+  vectorReferences   VectorReference[]
+
+  @@index([userId, createdAt])
+  @@index([deviceSessionId, createdAt])
+  @@map("trips")
+}
+
+model ItineraryVersion {
+  id               String             @id @default(uuid())
+  tripId           String             @map("trip_id")
+  version          Int
+  title            String
+  summary          String
+  payload          Json
+  createdAt        DateTime           @default(now()) @map("created_at")
+  trip             Trip               @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  routeCard        RouteCard?
+  routeStops       RouteStop[]
+  routeLegs        RouteLeg[]
+  evidenceSources  EvidenceSource[]
+  planningJobs     PlanningJob[]
+  vectorReferences VectorReference[]
+
+  @@unique([tripId, version])
+  @@index([tripId, createdAt])
+  @@map("itinerary_versions")
+}
+
+model RouteCard {
+  id                 String           @id
+  itineraryVersionId String?          @unique @map("itinerary_version_id")
+  city               String
+  themeLabel         String           @map("theme_label")
+  title              String
+  startDate          String           @map("start_date")
+  confidence         Float
+  createdAt          DateTime         @map("created_at")
+  payload            Json
+  itineraryVersion   ItineraryVersion? @relation(fields: [itineraryVersionId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([city, createdAt])
+  @@map("route_cards")
+}
+
+model RouteStop {
+  id                 String            @id @default(uuid())
+  itineraryVersionId String            @map("itinerary_version_id")
+  poiSnapshotId      String?           @map("poi_snapshot_id")
+  day                Int
+  position           Int
+  name               String
+  lat                Float?
+  lng                Float?
+  payload            Json
+  itineraryVersion   ItineraryVersion  @relation(fields: [itineraryVersionId], references: [id], onDelete: Cascade)
+  poiSnapshot        PoiSnapshot?      @relation(fields: [poiSnapshotId], references: [id], onDelete: SetNull)
+
+  @@index([itineraryVersionId, day, position])
+  @@index([poiSnapshotId])
+  @@map("route_stops")
+}
+
+model RouteLeg {
+  id                 String           @id @default(uuid())
+  itineraryVersionId String           @map("itinerary_version_id")
+  fromStopId         String?          @map("from_stop_id")
+  toStopId           String?          @map("to_stop_id")
+  position           Int
+  transportMode      String           @map("transport_mode")
+  durationMinutes    Int?             @map("duration_minutes")
+  distanceMeters     Int?             @map("distance_meters")
+  degraded           Boolean          @default(false)
+  payload            Json
+  itineraryVersion   ItineraryVersion @relation(fields: [itineraryVersionId], references: [id], onDelete: Cascade)
+
+  @@index([itineraryVersionId, position])
+  @@map("route_legs")
+}
+
+model PoiSnapshot {
+  id               String            @id @default(uuid())
+  provider         String
+  providerId       String            @map("provider_id")
+  city             String
+  name             String
+  address          String?
+  type             String?
+  lat              Float?
+  lng              Float?
+  rawPayload       Json              @map("raw_payload")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  routeStops       RouteStop[]
+  vectorReferences VectorReference[]
+
+  @@unique([provider, providerId])
+  @@index([city, name])
+  @@map("poi_snapshots")
+}
+
+model EvidenceSource {
+  id                 String            @id @default(uuid())
+  itineraryVersionId String?           @map("itinerary_version_id")
+  provider           String
+  url                String
+  title              String
+  snippet            String?
+  confidence         Float?
+  fetchedAt          DateTime          @default(now()) @map("fetched_at")
+  payload            Json?
+  itineraryVersion   ItineraryVersion? @relation(fields: [itineraryVersionId], references: [id], onDelete: SetNull)
+  vectorReferences   VectorReference[]
+
+  @@index([itineraryVersionId])
+  @@index([provider, fetchedAt])
+  @@map("evidence_sources")
+}
+
+model PlanningJob {
+  id                 String               @id @default(uuid())
+  tripId             String?              @map("trip_id")
+  itineraryVersionId String?              @map("itinerary_version_id")
+  status             String               @default("queued")
+  requestPayload     Json                 @map("request_payload")
+  resultPayload      Json?                @map("result_payload")
+  errorCode          String?              @map("error_code")
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+  startedAt          DateTime?            @map("started_at")
+  finishedAt         DateTime?            @map("finished_at")
+  trip               Trip?                @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  itineraryVersion   ItineraryVersion?    @relation(fields: [itineraryVersionId], references: [id], onDelete: SetNull)
+  traceEvents        PlanningTraceEvent[]
+  agentRuns          AgentRun[]
+  providerRequests   ProviderRequest[]
+
+  @@index([status, createdAt])
+  @@index([tripId, createdAt])
+  @@map("planning_jobs")
+}
+
+model PlanningTraceEvent {
+  id            String      @id @default(uuid())
+  planningJobId String      @map("planning_job_id")
+  nodeId        String      @map("node_id")
+  label         String
+  status        String
+  detail        String?
+  sequence      Int
+  startedAt     DateTime?   @map("started_at")
+  finishedAt    DateTime?   @map("finished_at")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  planningJob   PlanningJob @relation(fields: [planningJobId], references: [id], onDelete: Cascade)
+
+  @@unique([planningJobId, sequence])
+  @@index([planningJobId, nodeId])
+  @@map("planning_trace_events")
+}
+
+model AgentRun {
+  id             String      @id @default(uuid())
+  planningJobId  String      @map("planning_job_id")
+  agentNodeId    String      @map("agent_node_id")
+  status         String
+  inputPayload   Json?       @map("input_payload")
+  outputPayload  Json?       @map("output_payload")
+  errorCode      String?     @map("error_code")
+  startedAt      DateTime    @default(now()) @map("started_at")
+  finishedAt     DateTime?   @map("finished_at")
+  planningJob    PlanningJob @relation(fields: [planningJobId], references: [id], onDelete: Cascade)
+
+  @@index([planningJobId, agentNodeId])
+  @@map("agent_runs")
+}
+
+model ProviderRequest {
+  id             String       @id @default(uuid())
+  planningJobId  String?      @map("planning_job_id")
+  provider       String
+  operation      String
+  cacheKey       String?      @map("cache_key")
+  status         String
+  requestHash    String       @map("request_hash")
+  responsePayload Json?       @map("response_payload")
+  errorCode      String?      @map("error_code")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  planningJob    PlanningJob? @relation(fields: [planningJobId], references: [id], onDelete: SetNull)
+
+  @@index([provider, operation, createdAt])
+  @@index([cacheKey])
+  @@map("provider_requests")
+}
+
+model UserMemory {
+  id               String            @id @default(uuid())
+  userId           String?           @map("user_id")
+  memoryType       String            @map("memory_type")
+  summary          String
+  confidence       Float             @default(0.5)
+  sourceTripId     String?           @map("source_trip_id")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  user             User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  vectorReferences VectorReference[]
+
+  @@index([userId, memoryType])
+  @@map("user_memories")
+}
+
+model VectorReference {
+  id                 String            @id @default(uuid())
+  collectionName     String            @map("collection_name")
+  vectorId           String            @map("vector_id")
+  evidenceSourceId   String?           @map("evidence_source_id")
+  poiSnapshotId      String?           @map("poi_snapshot_id")
+  userMemoryId       String?           @map("user_memory_id")
+  tripId             String?           @map("trip_id")
+  itineraryVersionId String?           @map("itinerary_version_id")
+  metadata           Json?
+  createdAt          DateTime          @default(now()) @map("created_at")
+  evidenceSource     EvidenceSource?   @relation(fields: [evidenceSourceId], references: [id], onDelete: Cascade)
+  poiSnapshot        PoiSnapshot?      @relation(fields: [poiSnapshotId], references: [id], onDelete: Cascade)
+  userMemory         UserMemory?       @relation(fields: [userMemoryId], references: [id], onDelete: Cascade)
+  trip               Trip?             @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  itineraryVersion   ItineraryVersion? @relation(fields: [itineraryVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionName, vectorId])
+  @@index([evidenceSourceId])
+  @@index([poiSnapshotId])
+  @@index([userMemoryId])
+  @@map("vector_references")
+}

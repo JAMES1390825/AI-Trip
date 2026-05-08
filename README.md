@@ -1,6 +1,7 @@
 # AI Trip
 
-AI Trip is a Node/TypeScript web full-stack MVP for C-end personal travel planning.
+AI Trip is a Node/TypeScript AI travel planning product for C-end personal
+travel.
 
 The product helps users turn a lightweight travel idea into an executable route workbench:
 
@@ -14,6 +15,7 @@ The product helps users turn a lightweight travel idea into an executable route 
 
 - Web app: `apps/web`
 - Product docs: `docs/product`
+- Production platform base: PostgreSQL, Redis, Milvus, RocketMQ, LangGraph
 
 Retired from the current mainline:
 
@@ -47,13 +49,52 @@ npm run build
 npm run verify
 ```
 
+Infrastructure boundary verification:
+
+```bash
+cd apps/web
+npm run db:generate
+npm run verify:infra
+```
+
+## Local Production Platform
+
+The production backend direction is not SQLite or local files. The local stack
+now includes PostgreSQL, Redis, RocketMQ, and Milvus so planning workers,
+retrieval memory, provider caches, and durable job traces can be developed
+against real middleware.
+
+Start the platform services:
+
+```bash
+docker compose up -d postgres redis rocketmq-namesrv rocketmq-broker rocketmq-proxy milvus-standalone
+```
+
+Generate the Prisma client:
+
+```bash
+cd apps/web
+npm run db:generate
+```
+
+Push the schema to a local PostgreSQL database when you want to inspect tables:
+
+```bash
+cd apps/web
+npm run db:push
+```
+
 ## Environment
 
 Copy `.env.example` to `.env` at the repository root if provider keys are needed.
 
 The app loads provider keys from the root `.env`. Do not create `apps/web/.env.local` for this project.
 
-The MVP works without provider keys by using local fallback data. Configure `AMAP_WEB_SERVICE_KEY` for real POI candidates and walking estimates, AI provider keys for candidate-only AI arrangement, and keep `SEARCH_PROVIDER=exa` plus a real `EXA_API_KEY` in the root `.env` for public web evidence.
+The app still works without provider keys by using local fallback data.
+Configure `AMAP_WEB_SERVICE_KEY` for real POI candidates and walking estimates,
+AI provider keys for candidate-only AI arrangement, and keep
+`SEARCH_PROVIDER=exa` plus a real `EXA_API_KEY` in the root `.env` for public
+web evidence.
 
 Required for the best launch-like local experience:
 
@@ -63,6 +104,10 @@ Required for the best launch-like local experience:
 - `AI_PROVIDER=bailian` plus `BAILIAN_API_KEY`, or another supported AI provider.
 - `SEARCH_PROVIDER=exa` plus `EXA_API_KEY`: public web evidence.
 
-If any provider is missing or fails, the app keeps the planning flow usable through Amap-only or local fallback behavior and shows provider warnings in the route card.
+If any provider is missing or fails, the app keeps the planning flow usable
+through Amap-only or local fallback behavior and shows provider warnings in the
+route card.
 
-Saved route cards use a local SQLite database by default at `apps/web/.data/route-cards.sqlite`. Set `ROUTE_CARD_DATABASE_FILE` in the root `.env` to use another database file.
+Saved route cards still use the legacy local SQLite store by default until the
+PostgreSQL switch is wired through the API. The production store boundary and
+Prisma schema already exist for the next migration step.

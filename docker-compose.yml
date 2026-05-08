@@ -1,0 +1,140 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-trip-postgres
+    environment:
+      POSTGRES_DB: ai_trip
+      POSTGRES_USER: ai_trip
+      POSTGRES_PASSWORD: ai_trip
+    ports:
+      - "5432:5432"
+    volumes:
+      - ai-trip-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_trip -d ai_trip"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-trip-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - ai-trip-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rocketmq-namesrv:
+    image: apache/rocketmq:5.3.2
+    container_name: ai-trip-rocketmq-namesrv
+    command: sh mqnamesrv
+    ports:
+      - "9876:9876"
+    volumes:
+      - ai-trip-rocketmq-namesrv:/home/rocketmq/logs
+
+  rocketmq-broker:
+    image: apache/rocketmq:5.3.2
+    container_name: ai-trip-rocketmq-broker
+    command: sh mqbroker -n rocketmq-namesrv:9876 --enable-proxy
+    environment:
+      NAMESRV_ADDR: rocketmq-namesrv:9876
+    ports:
+      - "10909:10909"
+      - "10911:10911"
+      - "10912:10912"
+    volumes:
+      - ai-trip-rocketmq-broker:/home/rocketmq/store
+    depends_on:
+      - rocketmq-namesrv
+
+  rocketmq-proxy:
+    image: apache/rocketmq:5.3.2
+    container_name: ai-trip-rocketmq-proxy
+    command: sh mqproxy
+    environment:
+      NAMESRV_ADDR: rocketmq-namesrv:9876
+    ports:
+      - "8081:8081"
+    depends_on:
+      - rocketmq-broker
+      - rocketmq-namesrv
+
+  milvus-etcd:
+    image: quay.io/coreos/etcd:v3.5.25
+    container_name: ai-trip-milvus-etcd
+    command: >
+      etcd
+      -advertise-client-urls=http://milvus-etcd:2379
+      -listen-client-urls http://0.0.0.0:2379
+      --data-dir /etcd
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
+      ETCD_SNAPSHOT_COUNT: "50000"
+    volumes:
+      - ai-trip-milvus-etcd:/etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  milvus-minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    container_name: ai-trip-milvus-minio
+    command: minio server /minio_data --console-address ":9001"
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ai-trip-milvus-minio:/minio_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  milvus-standalone:
+    image: milvusdb/milvus:v2.6.15
+    container_name: ai-trip-milvus-standalone
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_ENDPOINTS: milvus-etcd:2379
+      MINIO_ADDRESS: milvus-minio:9000
+      MQ_TYPE: woodpecker
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    volumes:
+      - ai-trip-milvus:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      start_period: 90s
+      timeout: 20s
+      retries: 3
+    depends_on:
+      - milvus-etcd
+      - milvus-minio
+
+volumes:
+  ai-trip-postgres:
+  ai-trip-redis:
+  ai-trip-rocketmq-namesrv:
+  ai-trip-rocketmq-broker:
+  ai-trip-milvus-etcd:
+  ai-trip-milvus-minio:
+  ai-trip-milvus:
