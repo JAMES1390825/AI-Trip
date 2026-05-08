@@ -1,5 +1,6 @@
 import type { PlanningQueue } from "./planning-queue";
 import { createRocketMqPlanningQueue, createRocketMqProducerFromEnv } from "./planning-queue";
+import { createPlanningJobExecutor } from "./planning-job-executor";
 import type { PlanningJobRecord, PlanningJobStore, PrismaPlanningJobStoreClient } from "./planning-job-store";
 import { createPrismaPlanningJobStore } from "./planning-job-store";
 import { readProductionEnv } from "./production-env";
@@ -19,16 +20,23 @@ export type CreatePlanningJobResult = {
 export type PlanningJobService = {
   createJob(request: CreatePlanningJobRequest): Promise<CreatePlanningJobResult>;
   getJob(id: string): Promise<PlanningJobRecord | null>;
+  runJob(id: string): Promise<PlanningJobRecord | null>;
+};
+
+export type PlanningJobRunner = {
+  executeJob(id: string): Promise<PlanningJobRecord | null>;
 };
 
 export type PlanningJobServiceOptions = {
   jobStore: PlanningJobStore;
   planningQueue: PlanningQueue;
+  runner?: PlanningJobRunner;
   now?: () => Date;
 };
 
 export function createPlanningJobService(options: PlanningJobServiceOptions): PlanningJobService {
   const now = options.now || (() => new Date());
+  const runner = options.runner || createPlanningJobExecutor({ jobStore: options.jobStore });
 
   return {
     async createJob(request) {
@@ -52,6 +60,9 @@ export function createPlanningJobService(options: PlanningJobServiceOptions): Pl
     },
     async getJob(id) {
       return options.jobStore.get(id);
+    },
+    async runJob(id) {
+      return runner.executeJob(id);
     }
   };
 }

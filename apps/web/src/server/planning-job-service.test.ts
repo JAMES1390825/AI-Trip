@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { PlanningQueue } from "./planning-queue";
 import type { PlanningJobRecord, PlanningJobStore } from "./planning-job-store";
-import { createPlanningJobService } from "./planning-job-service";
+import { createPlanningJobService, type PlanningJobRunner } from "./planning-job-service";
 
 class FakePlanningJobStore implements PlanningJobStore {
   public createdInputs: unknown[] = [];
@@ -21,6 +21,18 @@ class FakePlanningJobStore implements PlanningJobStore {
 
   async get(): Promise<PlanningJobRecord | null> {
     return null;
+  }
+
+  async markRunning(): Promise<PlanningJobRecord> {
+    throw new Error("not used");
+  }
+
+  async markCompleted(): Promise<PlanningJobRecord> {
+    throw new Error("not used");
+  }
+
+  async markFailed(): Promise<PlanningJobRecord> {
+    throw new Error("not used");
   }
 }
 
@@ -90,4 +102,33 @@ test("createPlanningJobService keeps the job queued when queue publishing fails"
   assert.equal(result.job.status, "queued");
   assert.equal(result.queueMessageId, undefined);
   assert.equal(result.queueWarning, "planning_queue_unavailable");
+});
+
+test("createPlanningJobService can run a planning job through an executor", async () => {
+  const runner: PlanningJobRunner = {
+    async executeJob(id) {
+      return {
+        id,
+        status: "completed",
+        requestPayload: {},
+        resultPayload: {
+          routeCard: { id: "card-1" }
+        },
+        createdAt: "2026-05-08T10:00:00.000Z",
+        updatedAt: "2026-05-08T10:02:00.000Z"
+      };
+    }
+  };
+  const service = createPlanningJobService({
+    jobStore: new FakePlanningJobStore(),
+    planningQueue: new FakePlanningQueue(),
+    runner
+  });
+
+  const result = await service.runJob("job-1");
+
+  assert.equal(result?.status, "completed");
+  assert.deepEqual(result?.resultPayload, {
+    routeCard: { id: "card-1" }
+  });
 });

@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 type PlanningJobRequestBody = {
   tripId?: string;
   request?: unknown;
+  runImmediately?: unknown;
 };
 
 function asTrimmedString(value: unknown): string | undefined {
@@ -41,6 +42,11 @@ export function createPlanningJobsHandlers(service: PlanningJobService) {
         idempotencyKey: asTrimmedString(request.headers.get("Idempotency-Key")),
         requestPayload: body.request
       });
+
+      if (body.runImmediately === true) {
+        const job = await service.runJob(result.job.id);
+        return jsonOk({ ...result, job: job || result.job }, 202);
+      }
 
       return jsonOk(result, 202);
     }

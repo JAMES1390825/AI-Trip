@@ -19,6 +19,19 @@ const fakeService: PlanningJobService = {
   },
   async getJob() {
     return null;
+  },
+  async runJob(id) {
+    return {
+      id,
+      status: "completed",
+      requestPayload: {},
+      resultPayload: {
+        routeCard: { id: "card-1" },
+        planningTrace: []
+      },
+      createdAt: "2026-05-08T10:00:00.000Z",
+      updatedAt: "2026-05-08T10:02:00.000Z"
+    };
   }
 };
 
@@ -59,4 +72,26 @@ test("POST /api/planning-jobs rejects missing request payload", async () => {
   );
 
   assert.equal(response.status, 400);
+});
+
+test("POST /api/planning-jobs can run the job immediately for web fallback execution", async () => {
+  const { POST } = createPlanningJobsHandlers(fakeService);
+
+  const response = await POST(
+    new Request("http://localhost/api/planning-jobs", {
+      method: "POST",
+      body: JSON.stringify({
+        request: {
+          city: "杭州",
+          note: "少走路"
+        },
+        runImmediately: true
+      })
+    }),
+  );
+
+  assert.equal(response.status, 202);
+  const payload = await response.json();
+  assert.equal(payload.job.status, "completed");
+  assert.equal(payload.job.resultPayload.routeCard.id, "card-1");
 });
