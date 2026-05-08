@@ -108,6 +108,11 @@ If any provider is missing or fails, the app keeps the planning flow usable
 through Amap-only or local fallback behavior and shows provider warnings in the
 route card.
 
-Saved route cards still use the legacy local SQLite store by default until the
-PostgreSQL switch is wired through the API. The production store boundary and
-Prisma schema already exist for the next migration step.
+Saved route cards use the local SQLite transition store by default. Set
+`ROUTE_CARD_STORE=postgres` after running `npm run db:generate` and `npm run
+db:push` to persist route cards through PostgreSQL instead.
+
+The production planning entrypoint is `POST /api/planning-jobs`. It creates a
+queued planning job in PostgreSQL and publishes a `planning.job.created`
+RocketMQ event. `GET /api/planning-jobs/:id` returns the durable job status for
+polling and future worker progress UI.

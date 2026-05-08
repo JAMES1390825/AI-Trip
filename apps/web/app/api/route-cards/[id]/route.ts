@@ -1,9 +1,9 @@
 import { jsonError, jsonOk } from "@/server/api-response";
-import { createRouteCardStore } from "@/server/route-card-store";
+import { createConfiguredRouteCardStore } from "@/server/route-card-store-factory";
 
 export const dynamic = "force-dynamic";
 
-const store = createRouteCardStore();
+const store = createConfiguredRouteCardStore();
 
 type RouteContext = {
   params: Promise<{ id: string }>;

@@ -8,7 +8,8 @@ loadEnvConfig(repoRoot);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  poweredByHeader: false
+  poweredByHeader: false,
+  serverExternalPackages: ["rocketmq-client-nodejs"]
 };
 
 export default nextConfig;

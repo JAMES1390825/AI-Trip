@@ -1,10 +1,10 @@
 import type { RouteCard } from "@/domain/types";
 import { jsonError, jsonOk } from "@/server/api-response";
-import { createRouteCardStore } from "@/server/route-card-store";
+import { createConfiguredRouteCardStore } from "@/server/route-card-store-factory";
 
 export const dynamic = "force-dynamic";
 
-const store = createRouteCardStore();
+const store = createConfiguredRouteCardStore();
 
 function isRouteCard(value: unknown): value is RouteCard {
   if (!value || typeof value !== "object") return false;
