@@ -11,8 +11,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
-    "verify:infra": "npm run typecheck && npm test -- src/server/production-env.test.ts src/server/redis-cache.test.ts src/server/vector-store.test.ts src/server/planning-queue.test.ts src/server/postgres-route-card-store.test.ts",
-    "verify": "npm run typecheck && npm test && npm run build"
+    "verify:infra": "npm run db:generate && npm run typecheck && npm test -- src/server/production-env.test.ts src/server/redis-cache.test.ts src/server/vector-store.test.ts src/server/planning-queue.test.ts src/server/postgres-route-card-store.test.ts",
+    "verify": "npm run db:generate && npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
     "@langchain/langgraph": "^1.3.0",
