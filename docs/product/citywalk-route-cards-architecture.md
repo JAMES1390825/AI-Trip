@@ -21,6 +21,8 @@ no longer designed as an MVP-only local app. See
    processes.
 6. Retrieval memory: target Milvus vector collections for evidence,
    POI semantics, user memory, and itinerary recall.
+7. Cache and progress plane: target Redis for provider caches, short-lived
+   idempotency, rate limits, and planning progress snapshots.
 
 ## Planning Model
 
@@ -107,6 +109,17 @@ browser map credentials.
 
 SQLite is a legacy local persistence layer from the route-card prototype and
 is not the production target.
+
+Production platform V1 now adds concrete engineering boundaries:
+
+- `docker-compose.yml` runs PostgreSQL, Redis, RocketMQ, and Milvus locally.
+- `apps/web/prisma/schema.prisma` defines the normalized production data model.
+- `production-env` centralizes typed service configuration from the root env.
+- `redis-cache` provides JSON cache operations with namespaced keys and TTL.
+- `vector-store` provides Milvus upsert/search while preserving PostgreSQL refs.
+- `planning-queue` publishes typed RocketMQ planning job events.
+- `postgres-route-card-store` maps the existing route-card store interface to
+  Prisma/PostgreSQL.
 
 The next mainline architecture is:
 
