@@ -35,6 +35,17 @@ class FakePlanningJobDelegate {
   async findUnique(payload: { where: { id: string } }): Promise<PlanningJobRow | null> {
     return this.rows.get(payload.where.id) || null;
   }
+
+  async update(payload: {
+    where: { id: string };
+    data: Partial<PlanningJobRow>;
+  }): Promise<PlanningJobRow> {
+    const current = this.rows.get(payload.where.id);
+    if (!current) throw new Error("not found");
+    const row = { ...current, ...payload.data, updatedAt: new Date("2026-05-08T10:05:00.000Z") };
+    this.rows.set(row.id, row);
+    return row;
+  }
 }
 
 test("createPrismaPlanningJobStore creates queued planning jobs", async () => {
@@ -84,4 +95,38 @@ test("createPrismaPlanningJobStore loads missing and existing jobs", async () =>
 
   assert.equal(await store.get("missing"), null);
   assert.equal((await store.get(created.id))?.id, created.id);
+});
+
+test("createPrismaPlanningJobStore marks jobs running completed and failed", async () => {
+  const delegate = new FakePlanningJobDelegate();
+  const store = createPrismaPlanningJobStore({ planningJob: delegate });
+  const created = await store.create({
+    requestPayload: {
+      city: "杭州"
+    }
+  });
+
+  const running = await store.markRunning(created.id, new Date("2026-05-08T10:01:00.000Z"));
+  assert.equal(running.status, "running");
+  assert.equal(running.startedAt, "2026-05-08T10:01:00.000Z");
+
+  const completed = await store.markCompleted(
+    created.id,
+    {
+      routeCard: { id: "card-1" },
+      planningTrace: []
+    },
+    new Date("2026-05-08T10:02:00.000Z"),
+  );
+  assert.equal(completed.status, "completed");
+  assert.deepEqual(completed.resultPayload, {
+    routeCard: { id: "card-1" },
+    planningTrace: []
+  });
+  assert.equal(completed.finishedAt, "2026-05-08T10:02:00.000Z");
+
+  const failed = await store.markFailed(created.id, "planner_error", new Date("2026-05-08T10:03:00.000Z"));
+  assert.equal(failed.status, "failed");
+  assert.equal(failed.errorCode, "planner_error");
+  assert.equal(failed.finishedAt, "2026-05-08T10:03:00.000Z");
 });

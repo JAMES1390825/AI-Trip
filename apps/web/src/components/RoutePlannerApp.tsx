@@ -60,7 +60,19 @@ const preferenceOptions: TripPreferenceId[] = [
   "预算友好"
 ];
 const planningTraceTemplate = createQueuedPlanningTrace();
-const planningStageCount = planningTraceTemplate.length;
+const asyncPlanningPreflightStages = [
+  {
+    id: "create_planning_job",
+    label: "创建规划任务",
+    detail: "把你的旅行需求写入 PostgreSQL PlanningJob"
+  },
+  {
+    id: "poll_planning_job",
+    label: "轮询任务结果",
+    detail: "等待规划大脑写回路线和进度"
+  }
+];
+const planningStageCount = asyncPlanningPreflightStages.length + planningTraceTemplate.length;
 
 function planningStageStatusLabel(state: PlanningStageState): string {
   if (state === "active") return "进行中";
@@ -73,6 +85,28 @@ function planningStageStatusLabel(state: PlanningStageState): string {
 function normalizePlanningTrace(trace?: PlanningTraceEvent[]): PlanningTraceEvent[] {
   return trace?.length ? mergeCompletedPlanningTrace(trace) : createQueuedPlanningTrace();
 }
+
+function routeCardFromPlanningJob(job: PlanningJobResponse): RouteCardData | null {
+  const resultPayload = job.resultPayload;
+  if (!resultPayload || typeof resultPayload !== "object") return null;
+  const routeCard = (resultPayload as { routeCard?: unknown }).routeCard;
+  if (!routeCard || typeof routeCard !== "object") return null;
+  return routeCard as RouteCardData;
+}
+
+function planningTraceFromPlanningJob(job: PlanningJobResponse): PlanningTraceEvent[] | undefined {
+  const resultPayload = job.resultPayload;
+  if (!resultPayload || typeof resultPayload !== "object") return undefined;
+  const planningTrace = (resultPayload as { planningTrace?: unknown }).planningTrace;
+  return Array.isArray(planningTrace) ? planningTrace as PlanningTraceEvent[] : undefined;
+}
+
+type PlanningJobResponse = {
+  id: string;
+  status: "queued" | "running" | "completed" | "failed";
+  resultPayload?: unknown;
+  errorCode?: string;
+};
 
 async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -164,7 +198,7 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
     if (!isPending && !planningStageError) return planningTrace;
     return planningTraceTemplate.map((event, index) => ({
       ...event,
-      status: planningStageState(index)
+      status: planningStageState(index + asyncPlanningPreflightStages.length)
     }));
   }
 
@@ -206,39 +240,46 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
         setPlanningStageError(false);
         setPlanningStageIndex(0);
         setPlanningTrace(createQueuedPlanningTrace());
-        setStatus("正在规划：理解需求、检索真实地点、查找公开证据、校验路线。");
+        setStatus("正在创建规划任务：写入 Job、执行规划大脑、轮询结果。");
         progressTimer = window.setInterval(() => {
           setPlanningStageIndex((current) => Math.min(current + 1, planningStageCount - 1));
         }, 520);
-        const payload = await readJson<{ routeCard: RouteCardData; planningTrace?: PlanningTraceEvent[] }>(
-          await fetch("/api/route-cards/generate", {
+        const payload = await readJson<{ job: PlanningJobResponse }>(
+          await fetch("/api/planning-jobs", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              city,
-              themeId: inferredThemeId,
-              startDate: currentTripDates.startDate,
-              endDate: currentTripDates.endDate,
-              durationDays: currentTripDates.durationDays,
-              note,
-              routeSeed,
-              tripPreferences,
-              importedText: activeCreateMode === "import" ? importedText : undefined,
-              budgetRange,
-              companion,
-              transportPreference,
-              startPoint,
-              endPoint,
-              mustVisitText,
-              avoidText
+              runImmediately: true,
+              request: {
+                city,
+                themeId: inferredThemeId,
+                startDate: currentTripDates.startDate,
+                endDate: currentTripDates.endDate,
+                durationDays: currentTripDates.durationDays,
+                note,
+                routeSeed,
+                tripPreferences,
+                importedText: activeCreateMode === "import" ? importedText : undefined,
+                budgetRange,
+                companion,
+                transportPreference,
+                startPoint,
+                endPoint,
+                mustVisitText,
+                avoidText
+              }
             })
           }),
         );
+        const nextRouteCard = routeCardFromPlanningJob(payload.job);
+        if (!nextRouteCard || payload.job.status === "failed") {
+          throw new Error(payload.job.errorCode || "规划任务未返回路线结果。");
+        }
         if (progressTimer) window.clearInterval(progressTimer);
-        const nextPlanningTrace = normalizePlanningTrace(payload.planningTrace || payload.routeCard.planningTrace);
+        const nextPlanningTrace = normalizePlanningTrace(planningTraceFromPlanningJob(payload.job) || nextRouteCard.planningTrace);
         setPlanningStageIndex(planningStageCount);
         setPlanningTrace(nextPlanningTrace);
-        setRouteCard({ ...payload.routeCard, planningTrace: nextPlanningTrace });
+        setRouteCard({ ...nextRouteCard, planningTrace: nextPlanningTrace });
         setRouteSeed(String(Date.now()));
         setStatus("真实行程已生成，可以继续编辑点位、重新校验或保存。");
       } catch (error) {
@@ -665,6 +706,18 @@ export function RoutePlannerApp(props: RoutePlannerAppProps = {}) {
             </div>
           </div>
           <ol>
+            {asyncPlanningPreflightStages.map((event, index) => {
+              const stageState = isPending || planningStageError ? planningStageState(index) : "queued";
+              return (
+                <li className={`progress-stage progress-stage--${stageState}`} key={event.id}>
+                  <div className="progress-stage-copy">
+                    <span>{event.label}</span>
+                    <small>{event.detail}</small>
+                  </div>
+                  <em>{planningStageStatusLabel(stageState)}</em>
+                </li>
+              );
+            })}
             {displayedPlanningTrace().map((event) => {
               const stageState = event.status;
               return (

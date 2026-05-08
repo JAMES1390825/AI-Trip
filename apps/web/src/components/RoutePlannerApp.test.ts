@@ -122,6 +122,8 @@ test("RoutePlannerApp exposes create mode and chip selection state to assistive 
 test("RoutePlannerApp renders honest generation progress labels", () => {
   const markup = renderToStaticMarkup(React.createElement(RoutePlannerApp));
 
+  assert.match(markup, /创建规划任务/);
+  assert.match(markup, /轮询任务结果/);
   assert.match(markup, /理解旅行需求/);
   assert.match(markup, /高德检索真实地点/);
   assert.match(markup, /Exa 查找公开攻略证据/);

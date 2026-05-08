@@ -22,6 +22,9 @@ export type CreatePlanningJobInput = {
 export type PlanningJobStore = {
   create(input: CreatePlanningJobInput): Promise<PlanningJobRecord>;
   get(id: string): Promise<PlanningJobRecord | null>;
+  markRunning(id: string, startedAt: Date): Promise<PlanningJobRecord>;
+  markCompleted(id: string, resultPayload: unknown, finishedAt: Date): Promise<PlanningJobRecord>;
+  markFailed(id: string, errorCode: string, finishedAt: Date): Promise<PlanningJobRecord>;
 };
 
 export type PlanningJobRow = {
@@ -47,6 +50,16 @@ type PlanningJobDelegate = {
     };
   }): Promise<PlanningJobRow>;
   findUnique(payload: { where: { id: string } }): Promise<PlanningJobRow | null>;
+  update(payload: {
+    where: { id: string };
+    data: {
+      status?: string;
+      resultPayload?: unknown;
+      errorCode?: string | null;
+      startedAt?: Date;
+      finishedAt?: Date;
+    };
+  }): Promise<PlanningJobRow>;
 };
 
 export type PrismaPlanningJobStoreClient = {
@@ -92,6 +105,40 @@ export function createPrismaPlanningJobStore(client: PrismaPlanningJobStoreClien
     async get(id) {
       const row = await client.planningJob.findUnique({ where: { id } });
       return row ? toPlanningJobRecord(row) : null;
+    },
+    async markRunning(id, startedAt) {
+      const row = await client.planningJob.update({
+        where: { id },
+        data: {
+          status: "running",
+          startedAt,
+          errorCode: null
+        }
+      });
+      return toPlanningJobRecord(row);
+    },
+    async markCompleted(id, resultPayload, finishedAt) {
+      const row = await client.planningJob.update({
+        where: { id },
+        data: {
+          status: "completed",
+          resultPayload,
+          finishedAt,
+          errorCode: null
+        }
+      });
+      return toPlanningJobRecord(row);
+    },
+    async markFailed(id, errorCode, finishedAt) {
+      const row = await client.planningJob.update({
+        where: { id },
+        data: {
+          status: "failed",
+          errorCode,
+          finishedAt
+        }
+      });
+      return toPlanningJobRecord(row);
     }
   };
 }

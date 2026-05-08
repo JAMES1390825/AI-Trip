@@ -16,8 +16,8 @@ no longer designed as an MVP-only local app. See
 3. Domain: route themes, fallback data, planner in `apps/web/src/domain`.
 4. Persistence: PostgreSQL through Prisma with normalized itinerary, POI,
    evidence, planning job, and trace tables.
-5. Async planning: target RocketMQ-based planning jobs consumed by worker
-   processes.
+5. Async planning: PostgreSQL-backed planning jobs, RocketMQ dispatch, and a
+   LangGraph executor that can run in-process or behind a worker process.
 6. Retrieval memory: target Milvus vector collections for evidence,
    POI semantics, user memory, and itinerary recall.
 7. Cache and progress plane: target Redis for provider caches, short-lived
@@ -114,6 +114,8 @@ Production platform V1 now adds concrete engineering boundaries:
 - `redis-cache` provides JSON cache operations with namespaced keys and TTL.
 - `vector-store` provides Milvus upsert/search while preserving PostgreSQL refs.
 - `planning-queue` publishes typed RocketMQ planning job events.
+- `planning-job-executor` runs one persisted job through LangGraph and writes
+  completed or failed results back to PostgreSQL.
 - `route-card-store` and `postgres-route-card-store` persist saved route cards
   through Prisma/PostgreSQL on the runtime path.
 

@@ -1,5 +1,26 @@
 # Citywalk Route Cards API
 
+## `POST /api/planning-jobs`
+
+Creates a durable planning job in PostgreSQL. The request body wraps the route
+planning request under `request`; the web app can pass `runImmediately: true`
+to execute the LangGraph planner in-process while the RocketMQ consumer is not
+yet running as a separate daemon.
+
+Response status is `202`. The returned `job` is `queued`, `running`,
+`completed`, or `failed`. Completed jobs include `resultPayload.routeCard` and
+`resultPayload.planningTrace`.
+
+## `GET /api/planning-jobs/:id`
+
+Returns the durable planning job for polling. The frontend reads
+`resultPayload.routeCard` when status is `completed`.
+
+## `POST /api/planning-jobs/:id/run`
+
+Executes one planning job through the server-side LangGraph executor. This is
+the local worker boundary and can also be called by a future RocketMQ consumer.
+
 ## `POST /api/route-cards/generate`
 
 Generation mode is environment-driven:

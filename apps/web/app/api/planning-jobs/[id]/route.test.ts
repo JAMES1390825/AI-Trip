@@ -18,6 +18,9 @@ const service: PlanningJobService = {
       createdAt: "2026-05-08T10:00:00.000Z",
       updatedAt: "2026-05-08T10:00:00.000Z"
     };
+  },
+  async runJob() {
+    throw new Error("not used");
   }
 };
 
