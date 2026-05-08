@@ -14,9 +14,8 @@ no longer designed as an MVP-only local app. See
 1. UI: `apps/web/app` and `apps/web/src/components`.
 2. API: Next.js Route Handlers in `apps/web/app/api`.
 3. Domain: route themes, fallback data, planner in `apps/web/src/domain`.
-4. Persistence: currently a local SQLite store in `apps/web/src/server`;
-   target persistence is PostgreSQL with normalized itinerary, POI, evidence,
-   planning job, and trace tables.
+4. Persistence: PostgreSQL through Prisma with normalized itinerary, POI,
+   evidence, planning job, and trace tables.
 5. Async planning: target RocketMQ-based planning jobs consumed by worker
    processes.
 6. Retrieval memory: target Milvus vector collections for evidence,
@@ -107,9 +106,6 @@ browser map credentials.
 
 ## Production Platform Direction
 
-SQLite is a legacy local persistence layer from the route-card prototype and
-is not the production target.
-
 Production platform V1 now adds concrete engineering boundaries:
 
 - `docker-compose.yml` runs PostgreSQL, Redis, RocketMQ, and Milvus locally.
@@ -118,8 +114,8 @@ Production platform V1 now adds concrete engineering boundaries:
 - `redis-cache` provides JSON cache operations with namespaced keys and TTL.
 - `vector-store` provides Milvus upsert/search while preserving PostgreSQL refs.
 - `planning-queue` publishes typed RocketMQ planning job events.
-- `postgres-route-card-store` maps the existing route-card store interface to
-  Prisma/PostgreSQL.
+- `route-card-store` and `postgres-route-card-store` persist saved route cards
+  through Prisma/PostgreSQL on the runtime path.
 
 The next mainline architecture is:
 
