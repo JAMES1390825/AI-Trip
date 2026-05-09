@@ -37,6 +37,11 @@ export type PlanningJobServiceOptions = {
 export function createPlanningJobService(options: PlanningJobServiceOptions): PlanningJobService {
   const now = options.now || (() => new Date());
   const runner = options.runner || createPlanningJobExecutor({ jobStore: options.jobStore });
+  async function withTraceEvents(job: PlanningJobRecord | null): Promise<PlanningJobRecord | null> {
+    if (!job) return null;
+    const traceEvents = await options.jobStore.listTraceEvents(job.id);
+    return traceEvents.length ? { ...job, traceEvents } : job;
+  }
 
   return {
     async createJob(request) {
@@ -59,10 +64,10 @@ export function createPlanningJobService(options: PlanningJobServiceOptions): Pl
       }
     },
     async getJob(id) {
-      return options.jobStore.get(id);
+      return withTraceEvents(await options.jobStore.get(id));
     },
     async runJob(id) {
-      return runner.executeJob(id);
+      return withTraceEvents(await runner.executeJob(id));
     }
   };
 }

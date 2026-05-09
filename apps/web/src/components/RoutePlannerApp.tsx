@@ -94,7 +94,8 @@ function routeCardFromPlanningJob(job: PlanningJobResponse): RouteCardData | nul
   return routeCard as RouteCardData;
 }
 
-function planningTraceFromPlanningJob(job: PlanningJobResponse): PlanningTraceEvent[] | undefined {
+export function planningTraceFromPlanningJob(job: PlanningJobResponse): PlanningTraceEvent[] | undefined {
+  if (Array.isArray(job.traceEvents) && job.traceEvents.length) return job.traceEvents;
   const resultPayload = job.resultPayload;
   if (!resultPayload || typeof resultPayload !== "object") return undefined;
   const planningTrace = (resultPayload as { planningTrace?: unknown }).planningTrace;
@@ -106,6 +107,7 @@ type PlanningJobResponse = {
   status: "queued" | "running" | "completed" | "failed";
   resultPayload?: unknown;
   errorCode?: string;
+  traceEvents?: PlanningTraceEvent[];
 };
 
 async function readJson<T>(response: Response): Promise<T> {

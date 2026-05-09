@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createPrismaPlanningJobStore, type PlanningJobRow } from "./planning-job-store";
+import { createPrismaPlanningJobStore, type PlanningJobRow, type PlanningTraceEventRow } from "./planning-job-store";
 
 class FakePlanningJobDelegate {
   public rows = new Map<string, PlanningJobRow>();
@@ -45,6 +45,52 @@ class FakePlanningJobDelegate {
     const row = { ...current, ...payload.data, updatedAt: new Date("2026-05-08T10:05:00.000Z") };
     this.rows.set(row.id, row);
     return row;
+  }
+}
+
+class FakePlanningTraceEventDelegate {
+  public rows: PlanningTraceEventRow[] = [];
+  public creates: unknown[] = [];
+
+  async createMany(payload: {
+    data: Array<{
+      planningJobId: string;
+      nodeId: string;
+      label: string;
+      status: string;
+      detail?: string;
+      sequence: number;
+      startedAt?: Date;
+      finishedAt?: Date;
+    }>;
+    skipDuplicates?: boolean;
+  }): Promise<{ count: number }> {
+    this.creates.push(payload);
+    const now = new Date("2026-05-08T10:06:00.000Z");
+    for (const item of payload.data) {
+      this.rows.push({
+        id: `trace-${this.rows.length + 1}`,
+        planningJobId: item.planningJobId,
+        nodeId: item.nodeId,
+        label: item.label,
+        status: item.status,
+        detail: item.detail || null,
+        sequence: item.sequence,
+        startedAt: item.startedAt || null,
+        finishedAt: item.finishedAt || null,
+        createdAt: now
+      });
+    }
+    return { count: payload.data.length };
+  }
+
+  async findMany(payload: {
+    where: { planningJobId: string };
+    orderBy: { sequence: "asc" };
+  }): Promise<PlanningTraceEventRow[]> {
+    return this.rows
+      .filter((row) => row.planningJobId === payload.where.planningJobId)
+      .sort((left, right) => left.sequence - right.sequence);
   }
 }
 
@@ -129,4 +175,71 @@ test("createPrismaPlanningJobStore marks jobs running completed and failed", asy
   assert.equal(failed.status, "failed");
   assert.equal(failed.errorCode, "planner_error");
   assert.equal(failed.finishedAt, "2026-05-08T10:03:00.000Z");
+});
+
+test("createPrismaPlanningJobStore appends and lists ordered planning trace events", async () => {
+  const planningJob = new FakePlanningJobDelegate();
+  const planningTraceEvent = new FakePlanningTraceEventDelegate();
+  const store = createPrismaPlanningJobStore({ planningJob, planningTraceEvent });
+
+  await store.appendTraceEvents("job-1", [
+    {
+      nodeId: "intent_agent",
+      label: "理解旅行需求",
+      status: "done",
+      detail: "想拍照，少走路",
+      startedAt: "2026-05-08T10:01:00.000Z",
+      finishedAt: "2026-05-08T10:01:01.000Z"
+    },
+    {
+      nodeId: "poi_search_agent",
+      label: "高德检索真实地点",
+      status: "warning",
+      detail: "真实地点候选不足"
+    }
+  ]);
+
+  assert.deepEqual(planningTraceEvent.creates[0], {
+    data: [
+      {
+        planningJobId: "job-1",
+        nodeId: "intent_agent",
+        label: "理解旅行需求",
+        status: "done",
+        detail: "想拍照，少走路",
+        sequence: 0,
+        startedAt: new Date("2026-05-08T10:01:00.000Z"),
+        finishedAt: new Date("2026-05-08T10:01:01.000Z")
+      },
+      {
+        planningJobId: "job-1",
+        nodeId: "poi_search_agent",
+        label: "高德检索真实地点",
+        status: "warning",
+        detail: "真实地点候选不足",
+        sequence: 1,
+        startedAt: undefined,
+        finishedAt: undefined
+      }
+    ],
+    skipDuplicates: true
+  });
+
+  const traceEvents = await store.listTraceEvents("job-1");
+  assert.deepEqual(traceEvents, [
+    {
+      nodeId: "intent_agent",
+      label: "理解旅行需求",
+      status: "done",
+      detail: "想拍照，少走路",
+      startedAt: "2026-05-08T10:01:00.000Z",
+      finishedAt: "2026-05-08T10:01:01.000Z"
+    },
+    {
+      nodeId: "poi_search_agent",
+      label: "高德检索真实地点",
+      status: "warning",
+      detail: "真实地点候选不足"
+    }
+  ]);
 });

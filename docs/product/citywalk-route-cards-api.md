@@ -9,17 +9,27 @@ yet running as a separate daemon.
 
 Response status is `202`. The returned `job` is `queued`, `running`,
 `completed`, or `failed`. Completed jobs include `resultPayload.routeCard` and
-`resultPayload.planningTrace`.
+`resultPayload.planningTrace`. The executor also persists trace events into
+`planning_trace_events` for job-level observability.
 
 ## `GET /api/planning-jobs/:id`
 
 Returns the durable planning job for polling. The frontend reads
-`resultPayload.routeCard` when status is `completed`.
+`resultPayload.routeCard` when status is `completed`. The response can include
+`job.traceEvents`, ordered by sequence, so the UI can prefer the durable
+planning ledger over the final result payload.
 
 ## `POST /api/planning-jobs/:id/run`
 
 Executes one planning job through the server-side LangGraph executor. This is
 the local worker boundary and can also be called by a future RocketMQ consumer.
+
+The CLI worker keeps the same boundary:
+
+```bash
+npm run worker:planning -- <planning-job-id>
+npm run worker:planning -- --event '{"type":"planning.job.created","jobId":"<planning-job-id>","requestedAt":"2026-05-10T00:00:00.000Z"}'
+```
 
 ## `POST /api/route-cards/generate`
 

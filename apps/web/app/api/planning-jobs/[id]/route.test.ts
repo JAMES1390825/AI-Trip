@@ -15,6 +15,14 @@ const service: PlanningJobService = {
       requestPayload: {
         city: "杭州"
       },
+      traceEvents: [
+        {
+          nodeId: "intent_agent",
+          label: "理解旅行需求",
+          status: "done",
+          detail: "来自数据库任务账本"
+        }
+      ],
       createdAt: "2026-05-08T10:00:00.000Z",
       updatedAt: "2026-05-08T10:00:00.000Z"
     };
@@ -34,6 +42,14 @@ test("GET /api/planning-jobs/:id returns an existing planning job", async () => 
   const payload = await response.json();
   assert.equal(payload.job.id, "job-1");
   assert.equal(payload.job.status, "queued");
+  assert.deepEqual(payload.job.traceEvents, [
+    {
+      nodeId: "intent_agent",
+      label: "理解旅行需求",
+      status: "done",
+      detail: "来自数据库任务账本"
+    }
+  ]);
 });
 
 test("GET /api/planning-jobs/:id returns 404 for missing jobs", async () => {

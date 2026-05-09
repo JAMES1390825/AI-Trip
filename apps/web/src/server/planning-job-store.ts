@@ -1,3 +1,5 @@
+import type { PlanningTraceEvent, PlanningTraceNodeId, PlanningTraceStatus } from "@/domain/types";
+
 export type PlanningJobStatus = "queued" | "running" | "completed" | "failed";
 
 export type PlanningJobRecord = {
@@ -12,6 +14,7 @@ export type PlanningJobRecord = {
   updatedAt: string;
   startedAt?: string;
   finishedAt?: string;
+  traceEvents?: PlanningTraceEvent[];
 };
 
 export type CreatePlanningJobInput = {
@@ -25,6 +28,8 @@ export type PlanningJobStore = {
   markRunning(id: string, startedAt: Date): Promise<PlanningJobRecord>;
   markCompleted(id: string, resultPayload: unknown, finishedAt: Date): Promise<PlanningJobRecord>;
   markFailed(id: string, errorCode: string, finishedAt: Date): Promise<PlanningJobRecord>;
+  appendTraceEvents(id: string, traceEvents: PlanningTraceEvent[]): Promise<void>;
+  listTraceEvents(id: string): Promise<PlanningTraceEvent[]>;
 };
 
 export type PlanningJobRow = {
@@ -62,12 +67,52 @@ type PlanningJobDelegate = {
   }): Promise<PlanningJobRow>;
 };
 
+export type PlanningTraceEventRow = {
+  id: string;
+  planningJobId: string;
+  nodeId: string;
+  label: string;
+  status: string;
+  detail: string | null;
+  sequence: number;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+  createdAt: Date;
+};
+
+type PlanningTraceEventDelegate = {
+  createMany(payload: {
+    data: Array<{
+      planningJobId: string;
+      nodeId: string;
+      label: string;
+      status: string;
+      detail?: string;
+      sequence: number;
+      startedAt?: Date;
+      finishedAt?: Date;
+    }>;
+    skipDuplicates?: boolean;
+  }): Promise<{ count: number }>;
+  findMany(payload: {
+    where: { planningJobId: string };
+    orderBy: { sequence: "asc" };
+  }): Promise<PlanningTraceEventRow[]>;
+};
+
 export type PrismaPlanningJobStoreClient = {
   planningJob: PlanningJobDelegate;
+  planningTraceEvent?: PlanningTraceEventDelegate;
 };
 
 function optionalDate(value: Date | null): string | undefined {
   return value ? value.toISOString() : undefined;
+}
+
+function parseOptionalDate(value: string | undefined): Date | undefined {
+  if (!value) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
 function toPlanningJobRecord(row: PlanningJobRow): PlanningJobRecord {
@@ -88,6 +133,20 @@ function toPlanningJobRecord(row: PlanningJobRow): PlanningJobRecord {
   if (startedAt) record.startedAt = startedAt;
   if (finishedAt) record.finishedAt = finishedAt;
   return record;
+}
+
+function toPlanningTraceEvent(row: PlanningTraceEventRow): PlanningTraceEvent {
+  const event: PlanningTraceEvent = {
+    nodeId: row.nodeId as PlanningTraceNodeId,
+    label: row.label,
+    status: row.status as PlanningTraceStatus
+  };
+  if (row.detail) event.detail = row.detail;
+  const startedAt = optionalDate(row.startedAt);
+  const finishedAt = optionalDate(row.finishedAt);
+  if (startedAt) event.startedAt = startedAt;
+  if (finishedAt) event.finishedAt = finishedAt;
+  return event;
 }
 
 export function createPrismaPlanningJobStore(client: PrismaPlanningJobStoreClient): PlanningJobStore {
@@ -139,6 +198,30 @@ export function createPrismaPlanningJobStore(client: PrismaPlanningJobStoreClien
         }
       });
       return toPlanningJobRecord(row);
+    },
+    async appendTraceEvents(id, traceEvents) {
+      if (!client.planningTraceEvent || traceEvents.length === 0) return;
+      await client.planningTraceEvent.createMany({
+        data: traceEvents.map((event, index) => ({
+          planningJobId: id,
+          nodeId: event.nodeId,
+          label: event.label,
+          status: event.status,
+          detail: event.detail,
+          sequence: index,
+          startedAt: parseOptionalDate(event.startedAt),
+          finishedAt: parseOptionalDate(event.finishedAt)
+        })),
+        skipDuplicates: true
+      });
+    },
+    async listTraceEvents(id) {
+      if (!client.planningTraceEvent) return [];
+      const rows = await client.planningTraceEvent.findMany({
+        where: { planningJobId: id },
+        orderBy: { sequence: "asc" }
+      });
+      return rows.map(toPlanningTraceEvent);
     }
   };
 }

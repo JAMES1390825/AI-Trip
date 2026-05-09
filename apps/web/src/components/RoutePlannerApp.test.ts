@@ -4,6 +4,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { RouteStop } from "@/domain/types";
 import {
+  planningTraceFromPlanningJob,
   reorderedStopsToReviseNote,
   RoutePlannerApp,
   type RoutePlannerAppProps,
@@ -147,6 +148,40 @@ test("RoutePlannerApp renders launch generation stages and retry guidance", () =
   assert.match(markup, /Critic Agent 校验路线/);
   assert.match(markup, /输出地图 \+ 每日行程/);
   assert.match(markup, /如果生成失败，保留输入后直接重试/);
+});
+
+test("planningTraceFromPlanningJob prefers persisted job trace events over result payload trace", () => {
+  const trace = planningTraceFromPlanningJob({
+    id: "job-1",
+    status: "completed",
+    traceEvents: [
+      {
+        nodeId: "intent_agent",
+        label: "理解旅行需求",
+        status: "done",
+        detail: "来自数据库任务账本"
+      }
+    ],
+    resultPayload: {
+      planningTrace: [
+        {
+          nodeId: "intent_agent",
+          label: "理解旅行需求",
+          status: "warning",
+          detail: "来自结果 payload"
+        }
+      ]
+    }
+  });
+
+  assert.deepEqual(trace, [
+    {
+      nodeId: "intent_agent",
+      label: "理解旅行需求",
+      status: "done",
+      detail: "来自数据库任务账本"
+    }
+  ]);
 });
 
 test("RoutePlannerApp empty preview explains what the user will get", () => {

@@ -1,15 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { PlanningQueue } from "./planning-queue";
+import type { PlanningTraceEvent } from "@/domain/types";
 import type { PlanningJobRecord, PlanningJobStore } from "./planning-job-store";
 import { createPlanningJobService, type PlanningJobRunner } from "./planning-job-service";
 
 class FakePlanningJobStore implements PlanningJobStore {
   public createdInputs: unknown[] = [];
+  public traceEvents: PlanningTraceEvent[] = [];
+  private storedJob: PlanningJobRecord | null = null;
 
   async create(input: { tripId?: string; requestPayload: unknown }): Promise<PlanningJobRecord> {
     this.createdInputs.push(input);
-    return {
+    this.storedJob = {
       id: "job-1",
       tripId: input.tripId,
       status: "queued",
@@ -17,10 +20,12 @@ class FakePlanningJobStore implements PlanningJobStore {
       createdAt: "2026-05-08T10:00:00.000Z",
       updatedAt: "2026-05-08T10:00:00.000Z"
     };
+    return this.storedJob;
   }
 
-  async get(): Promise<PlanningJobRecord | null> {
-    return null;
+  async get(id?: string): Promise<PlanningJobRecord | null> {
+    if (id && id !== "job-1") return null;
+    return this.storedJob;
   }
 
   async markRunning(): Promise<PlanningJobRecord> {
@@ -33,6 +38,14 @@ class FakePlanningJobStore implements PlanningJobStore {
 
   async markFailed(): Promise<PlanningJobRecord> {
     throw new Error("not used");
+  }
+
+  async appendTraceEvents(): Promise<void> {
+    throw new Error("not used");
+  }
+
+  async listTraceEvents(): Promise<PlanningTraceEvent[]> {
+    return this.traceEvents;
   }
 }
 
@@ -131,4 +144,63 @@ test("createPlanningJobService can run a planning job through an executor", asyn
   assert.deepEqual(result?.resultPayload, {
     routeCard: { id: "card-1" }
   });
+});
+
+test("createPlanningJobService returns persisted trace events with job details", async () => {
+  const store = new FakePlanningJobStore();
+  const created = await store.create({
+    requestPayload: {
+      city: "杭州"
+    }
+  });
+  store.traceEvents = [
+    {
+      nodeId: "intent_agent",
+      label: "理解旅行需求",
+      status: "done",
+      detail: "想拍照，少走路"
+    }
+  ];
+  const service = createPlanningJobService({
+    jobStore: store,
+    planningQueue: new FakePlanningQueue()
+  });
+
+  const job = await service.getJob(created.id);
+
+  assert.deepEqual(job?.traceEvents, store.traceEvents);
+});
+
+test("createPlanningJobService decorates executed jobs with persisted trace events", async () => {
+  const store = new FakePlanningJobStore();
+  store.traceEvents = [
+    {
+      nodeId: "composer",
+      label: "输出地图 + 每日行程",
+      status: "done"
+    }
+  ];
+  const runner: PlanningJobRunner = {
+    async executeJob(id) {
+      return {
+        id,
+        status: "completed",
+        requestPayload: {},
+        resultPayload: {
+          routeCard: { id: "card-1" }
+        },
+        createdAt: "2026-05-08T10:00:00.000Z",
+        updatedAt: "2026-05-08T10:02:00.000Z"
+      };
+    }
+  };
+  const service = createPlanningJobService({
+    jobStore: store,
+    planningQueue: new FakePlanningQueue(),
+    runner
+  });
+
+  const job = await service.runJob("job-1");
+
+  assert.deepEqual(job?.traceEvents, store.traceEvents);
 });

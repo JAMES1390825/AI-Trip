@@ -115,10 +115,22 @@ database.
 The production planning entrypoint is `POST /api/planning-jobs`. It creates a
 queued planning job in PostgreSQL and publishes a `planning.job.created`
 RocketMQ event. `GET /api/planning-jobs/:id` returns the durable job status for
-polling and worker progress UI. The web app can pass `runImmediately: true`
-for local fallback execution; production workers can run a specific job with:
+polling and worker progress UI. The planner writes LangGraph trace events into
+`planning_trace_events`, so the UI can show the real task ledger instead of a
+fake progress animation.
+
+The web app can pass `runImmediately: true` for local fallback execution while
+the separate consumer is not running. Production workers can run a specific job
+with:
 
 ```bash
 cd apps/web
 npm run worker:planning -- <planning-job-id>
+```
+
+They can also consume the same event body that RocketMQ publishes:
+
+```bash
+cd apps/web
+npm run worker:planning -- --event '{"type":"planning.job.created","jobId":"<planning-job-id>","requestedAt":"2026-05-10T00:00:00.000Z"}'
 ```

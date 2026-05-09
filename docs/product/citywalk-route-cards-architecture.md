@@ -116,6 +116,10 @@ Production platform V1 now adds concrete engineering boundaries:
 - `planning-queue` publishes typed RocketMQ planning job events.
 - `planning-job-executor` runs one persisted job through LangGraph and writes
   completed or failed results back to PostgreSQL.
+- `planning-job-worker` parses `planning.job.created` event bodies and executes
+  jobs through the same service boundary used by the API and CLI worker.
+- `planning_trace_events` stores the ordered planning ledger for progress UI,
+  debugging, and later retry/repair analytics.
 - `route-card-store` and `postgres-route-card-store` persist saved route cards
   through Prisma/PostgreSQL on the runtime path.
 

@@ -1,5 +1,5 @@
 import { generateGraphRouteCard, type TripPlanningGraphResult } from "@/domain/trip-planning-graph";
-import type { RouteCardRequest, RouteThemeId } from "@/domain/types";
+import type { PlanningTraceEvent, RouteCardRequest, RouteThemeId } from "@/domain/types";
 import { isRouteThemeId } from "@/domain/theme-catalog";
 import type { PlanningJobRecord, PlanningJobStore } from "./planning-job-store";
 
@@ -19,6 +19,18 @@ function asString(value: unknown): string {
 
 function isDurationDays(value: unknown): value is 1 | 2 {
   return value === 1 || value === 2;
+}
+
+function failureTraceEvent(errorCode: string, at: Date): PlanningTraceEvent {
+  const timestamp = at.toISOString();
+  return {
+    nodeId: "composer",
+    label: "规划任务失败",
+    status: "error",
+    detail: errorCode,
+    startedAt: timestamp,
+    finishedAt: timestamp
+  };
 }
 
 export function asRouteCardRequest(value: unknown): RouteCardRequest | null {
@@ -52,12 +64,15 @@ export function createPlanningJobExecutor(options: PlanningJobExecutorOptions): 
 
       const request = asRouteCardRequest(job.requestPayload);
       if (!request) {
-        return options.jobStore.markFailed(id, "invalid_request_payload", now());
+        const failedAt = now();
+        await options.jobStore.appendTraceEvents(id, [failureTraceEvent("invalid_request_payload", failedAt)]);
+        return options.jobStore.markFailed(id, "invalid_request_payload", failedAt);
       }
 
       await options.jobStore.markRunning(id, now());
       try {
         const result = await generateRoute(request);
+        await options.jobStore.appendTraceEvents(id, result.planningTrace);
         return options.jobStore.markCompleted(
           id,
           {
@@ -67,7 +82,9 @@ export function createPlanningJobExecutor(options: PlanningJobExecutorOptions): 
           now(),
         );
       } catch {
-        return options.jobStore.markFailed(id, "planning_execution_failed", now());
+        const failedAt = now();
+        await options.jobStore.appendTraceEvents(id, [failureTraceEvent("planning_execution_failed", failedAt)]);
+        return options.jobStore.markFailed(id, "planning_execution_failed", failedAt);
       }
     }
   };

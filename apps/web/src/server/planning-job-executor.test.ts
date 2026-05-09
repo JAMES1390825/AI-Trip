@@ -8,6 +8,7 @@ import { createPlanningJobExecutor } from "./planning-job-executor";
 class FakePlanningJobStore implements PlanningJobStore {
   public jobs = new Map<string, PlanningJobRecord>();
   public transitions: string[] = [];
+  public traceEventsByJob = new Map<string, unknown[]>();
 
   async create(): Promise<PlanningJobRecord> {
     throw new Error("not used");
@@ -43,6 +44,15 @@ class FakePlanningJobStore implements PlanningJobStore {
     this.jobs.set(id, next);
     return next;
   }
+
+  async appendTraceEvents(id: string, traceEvents: unknown[]): Promise<void> {
+    this.traceEventsByJob.set(id, traceEvents);
+  }
+
+  async listTraceEvents(id: string): Promise<never[]> {
+    if (this.traceEventsByJob.has(id)) return this.traceEventsByJob.get(id) as never[];
+    return [];
+  }
 }
 
 const requestPayload: RouteCardRequest = {
@@ -68,13 +78,21 @@ test("createPlanningJobExecutor completes a queued planning job with graph resul
     now: (() => {
       const dates = [
         new Date("2026-05-08T10:01:00.000Z"),
-        new Date("2026-05-08T10:02:00.000Z")
+        new Date("2026-05-08T10:02:00.000Z"),
+        new Date("2026-05-08T10:03:00.000Z")
       ];
-      return () => dates.shift() || new Date("2026-05-08T10:03:00.000Z");
+      return () => dates.shift() || new Date("2026-05-08T10:04:00.000Z");
     })(),
     generateRoute: async (request) => ({
       routeCard: { ...generateRouteCard(request), id: "card-1" },
-      planningTrace: []
+      planningTrace: [
+        {
+          nodeId: "intent_agent",
+          label: "理解旅行需求",
+          status: "done",
+          detail: "想拍照，少走路"
+        }
+      ]
     })
   });
 
@@ -85,7 +103,22 @@ test("createPlanningJobExecutor completes a queued planning job with graph resul
   const resultPayload = result.resultPayload as { routeCard: { id: string; city: string }; planningTrace: unknown[] };
   assert.equal(resultPayload.routeCard.id, "card-1");
   assert.equal(resultPayload.routeCard.city, "杭州");
-  assert.deepEqual(resultPayload.planningTrace, []);
+  assert.deepEqual(resultPayload.planningTrace, [
+    {
+      nodeId: "intent_agent",
+      label: "理解旅行需求",
+      status: "done",
+      detail: "想拍照，少走路"
+    }
+  ]);
+  assert.deepEqual(store.traceEventsByJob.get("job-1"), [
+    {
+      nodeId: "intent_agent",
+      label: "理解旅行需求",
+      status: "done",
+      detail: "想拍照，少走路"
+    }
+  ]);
   assert.deepEqual(store.transitions, [
     "running:2026-05-08T10:01:00.000Z",
     "completed:2026-05-08T10:02:00.000Z"
@@ -137,4 +170,14 @@ test("createPlanningJobExecutor marks graph failures as failed", async () => {
 
   assert.equal(failed?.status, "failed");
   assert.equal(failed?.errorCode, "planning_execution_failed");
+  assert.deepEqual(store.traceEventsByJob.get("job-3"), [
+    {
+      nodeId: "composer",
+      label: "规划任务失败",
+      status: "error",
+      detail: "planning_execution_failed",
+      startedAt: "2026-05-08T10:05:00.000Z",
+      finishedAt: "2026-05-08T10:05:00.000Z"
+    }
+  ]);
 });
