@@ -120,17 +120,40 @@ polling and worker progress UI. The planner writes LangGraph trace events into
 fake progress animation.
 
 The web app can pass `runImmediately: true` for local fallback execution while
-the separate consumer is not running. Production workers can run a specific job
-with:
+the separate consumer is not running. A production worker should normally run
+as a RocketMQ daemon:
+
+```bash
+cd apps/web
+npm run worker:planning -- --daemon
+```
+
+For smoke tests or local debugging, the daemon can stop after a fixed number of
+receive batches:
+
+```bash
+cd apps/web
+npm run worker:planning -- --daemon --max-batches 1
+```
+
+The worker can still run a specific job directly:
 
 ```bash
 cd apps/web
 npm run worker:planning -- <planning-job-id>
 ```
 
-They can also consume the same event body that RocketMQ publishes:
+It can also consume the same event body that RocketMQ publishes, which is
+useful for debugging a single message without a broker:
 
 ```bash
 cd apps/web
 npm run worker:planning -- --event '{"type":"planning.job.created","jobId":"<planning-job-id>","requestedAt":"2026-05-10T00:00:00.000Z"}'
 ```
+
+RocketMQ daemon settings are read from the root `.env`:
+
+- `ROCKETMQ_ENDPOINT`: RocketMQ proxy endpoint, such as `localhost:8081`.
+- `ROCKETMQ_NAMESPACE`: optional namespace; empty for the local compose stack.
+- `ROCKETMQ_TOPIC_PLANNING`: planning job topic.
+- `ROCKETMQ_CONSUMER_GROUP_PLANNING`: daemon consumer group.

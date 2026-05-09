@@ -12,6 +12,16 @@ Response status is `202`. The returned `job` is `queued`, `running`,
 `resultPayload.planningTrace`. The executor also persists trace events into
 `planning_trace_events` for job-level observability.
 
+A separate worker process consumes those RocketMQ events with:
+
+```bash
+npm run worker:planning -- --daemon
+```
+
+Successful, ignored, and not-found messages are acknowledged. Failed or thrown
+planning executions are intentionally left unacked so RocketMQ can redeliver
+them according to broker policy.
+
 ## `GET /api/planning-jobs/:id`
 
 Returns the durable planning job for polling. The frontend reads
@@ -27,6 +37,8 @@ the local worker boundary and can also be called by a future RocketMQ consumer.
 The CLI worker keeps the same boundary:
 
 ```bash
+npm run worker:planning -- --daemon
+npm run worker:planning -- --daemon --max-batches 1
 npm run worker:planning -- <planning-job-id>
 npm run worker:planning -- --event '{"type":"planning.job.created","jobId":"<planning-job-id>","requestedAt":"2026-05-10T00:00:00.000Z"}'
 ```

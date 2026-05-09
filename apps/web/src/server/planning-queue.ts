@@ -52,7 +52,7 @@ export function createRocketMqProducerFromEnv(env = readProductionEnv()): Produc
 
   return new Producer({
     endpoints: env.rocketmq.endpoints,
-    namespace: "",
+    namespace: env.rocketmq.namespace,
     topics: [env.rocketmq.topicPlanning],
     sessionCredentials
   });

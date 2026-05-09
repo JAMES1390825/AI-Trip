@@ -114,6 +114,10 @@ Production platform V1 now adds concrete engineering boundaries:
 - `redis-cache` provides JSON cache operations with namespaced keys and TTL.
 - `vector-store` provides Milvus upsert/search while preserving PostgreSQL refs.
 - `planning-queue` publishes typed RocketMQ planning job events.
+- `planning-job-consumer` runs a real RocketMQ SimpleConsumer daemon for
+  `planning.job.created` messages. It acknowledges processed, ignored, and
+  not-found messages; failed or thrown planning executions remain unacked for
+  broker redelivery.
 - `planning-job-executor` runs one persisted job through LangGraph and writes
   completed or failed results back to PostgreSQL.
 - `planning-job-worker` parses `planning.job.created` event bodies and executes

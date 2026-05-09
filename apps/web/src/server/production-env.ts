@@ -5,7 +5,9 @@ export type ProductionEnv = {
     endpoints: string;
     accessKey?: string;
     secretKey?: string;
+    namespace: string;
     topicPlanning: string;
+    consumerGroupPlanning: string;
   };
   milvus: {
     address: string;
@@ -39,7 +41,9 @@ export function readProductionEnv(env: EnvSource = process.env): ProductionEnv {
       endpoints: value(env, "ROCKETMQ_ENDPOINT", "localhost:8081"),
       accessKey: optionalValue(env, "ROCKETMQ_ACCESS_KEY"),
       secretKey: optionalValue(env, "ROCKETMQ_SECRET_KEY"),
-      topicPlanning: value(env, "ROCKETMQ_TOPIC_PLANNING", "ai-trip-planning")
+      namespace: value(env, "ROCKETMQ_NAMESPACE", ""),
+      topicPlanning: value(env, "ROCKETMQ_TOPIC_PLANNING", "ai-trip-planning"),
+      consumerGroupPlanning: value(env, "ROCKETMQ_CONSUMER_GROUP_PLANNING", "ai-trip-planning-worker")
     },
     milvus: {
       address: value(env, "MILVUS_ADDRESS", "localhost:19530"),
