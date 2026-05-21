@@ -3,6 +3,7 @@ import { createRocketMqPlanningQueue, createRocketMqProducerFromEnv } from "./pl
 import { createPlanningJobExecutor } from "./planning-job-executor";
 import type { PlanningJobRecord, PlanningJobStore, PrismaPlanningJobStoreClient } from "./planning-job-store";
 import { createPrismaPlanningJobStore } from "./planning-job-store";
+import { getPrismaClient } from "./prisma-client";
 import { readProductionEnv } from "./production-env";
 
 export type CreatePlanningJobRequest = {
@@ -73,7 +74,6 @@ export function createPlanningJobService(options: PlanningJobServiceOptions): Pl
 }
 
 export function createDefaultPlanningJobService(): PlanningJobService {
-  const { getPrismaClient } = require("./prisma-client") as typeof import("./prisma-client");
   const env = readProductionEnv();
   return createPlanningJobService({
     jobStore: createPrismaPlanningJobStore(getPrismaClient() as unknown as PrismaPlanningJobStoreClient),

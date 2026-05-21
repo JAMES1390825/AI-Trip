@@ -1,6 +1,7 @@
 import type { RouteCard, SavedRouteCardSummary } from "../domain/types";
 import type { PrismaRouteCardStoreClient } from "./postgres-route-card-store";
 import { createPostgresRouteCardStore } from "./postgres-route-card-store";
+import { getPrismaClient } from "./prisma-client";
 
 export type RouteCardStore = {
   save(card: RouteCard): Promise<RouteCard>;
@@ -10,6 +11,5 @@ export type RouteCardStore = {
 };
 
 export function createRouteCardStore(): RouteCardStore {
-  const { getPrismaClient } = require("./prisma-client") as typeof import("./prisma-client");
   return createPostgresRouteCardStore(getPrismaClient() as unknown as PrismaRouteCardStoreClient);
 }
